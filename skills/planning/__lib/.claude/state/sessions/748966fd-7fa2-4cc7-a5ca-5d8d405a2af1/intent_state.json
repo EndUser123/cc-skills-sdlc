@@ -1,0 +1,10 @@
+{
+  "current_intent": {
+    "work_type": "bugfix",
+    "target": "/planning",
+    "problem": "The root-cause fix is now in place. Do not rerun `/planning` just because the plan is `in-review`.\n\nNew authority:\n- `/planning auto_verify.py` now emits machine-readable `readiness.phase_ready_thr...",
+    "user_prompt": "The root-cause fix is now in place. Do not rerun `/planning` just because the plan is `in-review`.\n\nNew authority:\n- `/planning auto_verify.py` now emits machine-readable `readiness.phase_ready_through`\n- `/code` and `/tdd` now consume phased-ready plans when the required phase is covered\n- `implementation-ready` is still for fully ready plans, but it is no longer the only executable state\n\nWhat that means for this plan:\n- The current plan verifies `READY`\n- Its validated readiness is `phase_ready_through: 1`\n- `/code` is allowed for Phase 1\n- `/code` is not allowed for Phase 2 or later until the plan\u2019s validated readiness advances\n\nSo the correct next step is:\n- proceed to implementation for Phase 1 via `/code`\n- do not treat the plan as fully implementation-ready\n- before Phase 2, update/reverify the plan so `phase_ready_through >= 2`\n\nIf you need an explicit execution rule, use this:\n- Phase 1: allowed now\n- Phase 2+: blocked until validated readiness covers that phase\n\nDo not send me back to `/planning` unless:\n- the Phase 1 task itself is unclear\n- the plan changes materially\n- or you are trying to start a phase above the validated readiness threshold",
+    "timestamp": "2026-04-03T23:57:36.069350+00:00"
+  },
+  "last_updated": "2026-04-03T23:57:36.077303+00:00"
+}

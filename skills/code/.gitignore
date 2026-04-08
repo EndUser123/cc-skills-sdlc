@@ -1,0 +1,15 @@
+# Skill state files (runtime flags and temporary data)
+.state/
+*.flag
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

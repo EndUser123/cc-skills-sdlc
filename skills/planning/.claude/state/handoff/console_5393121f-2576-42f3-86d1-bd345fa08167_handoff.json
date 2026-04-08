@@ -1,0 +1,129 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "3ae7acad-b85e-4573-a8e9-707345c13755",
+    "terminal_id": "console_5393121f-2576-42f3-86d1-bd345fa08167",
+    "source_session_id": "38ed3567-874e-4696-9ea1-7e538062bcc8",
+    "created_at": "2026-04-05T00:27:54.714025+00:00",
+    "expires_at": "2026-04-05T00:47:54.714025+00:00",
+    "status": "pending",
+    "goal": "What's your recommendation?  Do that.\n\nWhat do we need to update so that I am presented a RNS formated options list I can select from with recommendations?",
+    "current_task": "What's your recommendation? Do that. What do we need to update so that I am presented a RNS formated options list I can select from with recommendations?",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:/packages/skill-guard/src/skill_guard/breadcrumb/database.py",
+      "P:/.claude/skills/session/SKILL.md",
+      "P:/packages/search-research/core/session_chain.py",
+      "P:/.claude/skills/chs/references/command-reference.md",
+      "P:/packages/search-research/skills/chs/scripts/chs_cli.py",
+      "C:/Users/brsth/.claude/plans/plan-adr-002-chs-architecture-consolidation.md",
+      "P:/.claude/.evidence/arch_decisions/ADR-20260401-chs-multi-provider-history-archive.md",
+      "P:/.claude/skills/planning/__lib/auto_verify.py",
+      "P:/.claude/skills/planning/references/verification-workflow.md",
+      "C:/Users/brsth/.claude/plans/plan-adr-20260401-chs-multi-provider-history-archive.md"
+    ],
+    "pending_operations": [
+      {
+        "type": "command",
+        "target": "cat P:/.claude/settings.json | python -c \"import sys,json; s=json.load(sys.stdin",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "cat P:/.claude/settings.json | python -c \"import sys,json; s=json.load(sys.stdin",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "cat P:/.claude/settings.json | python -c \"\nimport sys, json\ns = json.load(sys.st",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python -c \"\nimport json, pathlib\nlog = pathlib.Path('P:/.claude/hooks/logs/diagn",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python -c \"\nimport json, pathlib\nlog = pathlib.Path('P:/.claude/hooks/logs/diagn",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume command on cat P:/.claude/settings.json | python -c \"import sys,json; s=json.load(sys.stdin.",
+    "decision_refs": [
+      "dec_7be653469e28438abf5b8b92f3edeaf6"
+    ],
+    "evidence_refs": [
+      "ev_022e4be8bd9e4fc3b8bf0f694045ccc5",
+      "ev_a130d4d56ad741d7ad6e3f55eebf7f5c",
+      "ev_3cf3e6e1329042f1912227d703a34e25",
+      "ev_1878d9198e144335bfaa851f04466abc",
+      "ev_5b76e1185e9041a8b050d2bb16ea0864",
+      "ev_90642a8fc29941759941a4b4e441f7fb"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\38ed3567-874e-4696-9ea1-7e538062bcc8.jsonl",
+    "message_intent": "question",
+    "quality_score": 0.4,
+    "tasks_snapshot": []
+  },
+  "decision_register": [
+    {
+      "id": "dec_7be653469e28438abf5b8b92f3edeaf6",
+      "kind": "constraint",
+      "summary": "The installed skill at `P:\\packages\\sdlc\\skills\\planning\\` never finds `P:\\.claude\\` — it hits `P:\\packages\\sdlc` instead. Adding `P:\\.claude\\agents` explicitly:",
+      "details": "The installed skill at `P:\\packages\\sdlc\\skills\\planning\\` never finds `P:\\.claude\\` — it hits `P:\\packages\\sdlc` instead. Adding `P:\\.claude\\agents` explicitly:",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_022e4be8bd9e4fc3b8bf0f694045ccc5"
+      ]
+    }
+  ],
+  "evidence_index": [
+    {
+      "id": "ev_022e4be8bd9e4fc3b8bf0f694045ccc5",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\38ed3567-874e-4696-9ea1-7e538062bcc8.jsonl",
+      "content_hash": "sha256:d97dfc2bf894074f93c6d22ffd6033eab7bfe4eec33e8c9ab3d0c58ee12d8a85"
+    },
+    {
+      "id": "ev_a130d4d56ad741d7ad6e3f55eebf7f5c",
+      "type": "file",
+      "label": "database.py",
+      "path": "P:\\packages\\skill-guard\\src\\skill_guard\\breadcrumb\\database.py",
+      "content_hash": "sha256:2a845aedd66c0e70422efef0ee9223de9383bce528da1981815ff006d3f9aa00"
+    },
+    {
+      "id": "ev_3cf3e6e1329042f1912227d703a34e25",
+      "type": "file",
+      "label": "SKILL.md",
+      "path": "P:\\.claude\\skills\\session\\SKILL.md",
+      "content_hash": "sha256:8198d92b80efdafcb79fb291fc7ebbb9d795de6991dd746334e983eb70378a82"
+    },
+    {
+      "id": "ev_1878d9198e144335bfaa851f04466abc",
+      "type": "file",
+      "label": "session_chain.py",
+      "path": "P:\\packages\\search-research\\core\\session_chain.py",
+      "content_hash": "sha256:b8e8cbedf406152bbe31a68078988f9906e1f19714cb43393407fde12ccdf6d4"
+    },
+    {
+      "id": "ev_5b76e1185e9041a8b050d2bb16ea0864",
+      "type": "file",
+      "label": "command-reference.md",
+      "path": "P:\\.claude\\skills\\chs\\references\\command-reference.md",
+      "content_hash": "sha256:6dde3fbea820b8e17a6934620f3b98e0289b14c5597eb7d6d29cc9bf935fe30d"
+    },
+    {
+      "id": "ev_90642a8fc29941759941a4b4e441f7fb",
+      "type": "file",
+      "label": "chs_cli.py",
+      "path": "P:\\packages\\search-research\\skills\\chs\\scripts\\chs_cli.py",
+      "content_hash": "sha256:1b5d27857058f295a7ccbcff697c8ebc45f49729a4ed82e45477d445440199f8"
+    }
+  ],
+  "checksum": "sha256:fb92ec403bd0dabac5812fffa450aa3f25b6b1712c74f0e4335d6c172e8d60d0"
+}

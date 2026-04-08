@@ -1,0 +1,120 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "012a1bda-07d3-4ebd-b67d-071f35a82028",
+    "terminal_id": "console_8050a88b-8bae-49d8-bb0b-567a115f3831",
+    "source_session_id": "748966fd-7fa2-4cc7-a5ca-5d8d405a2af1",
+    "created_at": "2026-04-03T22:34:35.013870+00:00",
+    "expires_at": "2026-04-03T22:54:35.013870+00:00",
+    "status": "pending",
+    "goal": "do what's needed so we can get a good plan.",
+    "current_task": "do what's needed so we can get a good plan.",
+    "progress_percent": 100,
+    "progress_state": "blocked",
+    "blockers": [
+      {
+        "type": "awaiting_approval",
+        "summary": "Plan exists but requires user approval before implementation."
+      }
+    ],
+    "active_files": [
+      "P:\\.claude\\arch_decisions\\ADR-20260402-producer-consumer-contract-enforcement.md",
+      "P:\\.claude\\skills\\planning\\references\\verification-workflow.md",
+      "P:\\.claude\\skills\\planning\\references\\artifact-contract.md",
+      "C:\\Users\\brsth\\.claude\\plans\\plan-adr-20260402-producer-consumer-contract-enforcement.md",
+      "P:\\.claude\\skills\\arch\\resources\\deep.md",
+      "P:\\.claude\\skills\\arch\\resources\\precedent.md",
+      "P:\\.claude\\skills\\arch\\resources\\shared_frameworks.md",
+      "P:\\.claude\\skills\\arch\\resources\\base.md",
+      "P:\\.claude\\skills\\arch\\references\\scope-and-contract.md",
+      "P:\\.claude\\skills\\code\\SKILL.md"
+    ],
+    "pending_operations": [
+      {
+        "type": "skill",
+        "target": "skill: planning",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:\\.claude\\arch_decisions\\ADR-20260402-producer-consumer-contract-enforcement.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:\\.claude\\skills\\planning\\references\\verification-workflow.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:\\.claude\\skills\\planning\\references\\artifact-contract.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python \"P:/.claude/skills/planning/__lib/auto_verify.py\" \"C:\\Users\\brsth\\.claude",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume skill on skill: planning.",
+    "decision_refs": [],
+    "evidence_refs": [
+      "ev_735f1ce20fb1417b8899a7fb32aeb09a",
+      "ev_b168ade724344889bc969e684170704e",
+      "ev_0174d8fa08e749108193c06bc8f1207c",
+      "ev_26503874902b4b38b40e0b1b9e23f9c5",
+      "ev_d2f693dc4c424f3a9974c514d46d9726",
+      "ev_30e610aa8d29479db2a94e15566ba134"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\748966fd-7fa2-4cc7-a5ca-5d8d405a2af1.jsonl",
+    "message_intent": "question",
+    "quality_score": 0.9,
+    "tasks_snapshot": []
+  },
+  "decision_register": [],
+  "evidence_index": [
+    {
+      "id": "ev_735f1ce20fb1417b8899a7fb32aeb09a",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\748966fd-7fa2-4cc7-a5ca-5d8d405a2af1.jsonl",
+      "content_hash": "sha256:2ed3acc764d2ee53e6d8ad948449ee6305014cca80c88ba133808d521b4589e1"
+    },
+    {
+      "id": "ev_b168ade724344889bc969e684170704e",
+      "type": "file",
+      "label": "ADR-20260402-producer-consumer-contract-enforcement.md",
+      "path": "P:\\.claude\\arch_decisions\\ADR-20260402-producer-consumer-contract-enforcement.md",
+      "content_hash": "sha256:2b5895a9de6898169d82fabfd96376fbb65baa252057ddffb60b5d9fae8309c6"
+    },
+    {
+      "id": "ev_0174d8fa08e749108193c06bc8f1207c",
+      "type": "file",
+      "label": "verification-workflow.md",
+      "path": "P:\\.claude\\skills\\planning\\references\\verification-workflow.md",
+      "content_hash": "sha256:838a58ca5d336e1d424263aa7cc4f5e811d75d52eff6e50e6420356bf22749ad"
+    },
+    {
+      "id": "ev_26503874902b4b38b40e0b1b9e23f9c5",
+      "type": "file",
+      "label": "artifact-contract.md",
+      "path": "P:\\.claude\\skills\\planning\\references\\artifact-contract.md",
+      "content_hash": "sha256:2267be2ef26588bada029b917e8511b5c6fccfcf0d2e694700de23c963d7f3cb"
+    },
+    {
+      "id": "ev_d2f693dc4c424f3a9974c514d46d9726",
+      "type": "file",
+      "label": "plan-adr-20260402-producer-consumer-contract-enforcement.md",
+      "path": "C:\\Users\\brsth\\.claude\\plans\\plan-adr-20260402-producer-consumer-contract-enforcement.md",
+      "content_hash": "sha256:6a68730bcb292fe40840c674b1578c59c029266d63aa2f94f129e270dfcde543"
+    },
+    {
+      "id": "ev_30e610aa8d29479db2a94e15566ba134",
+      "type": "file",
+      "label": "deep.md",
+      "path": "P:\\.claude\\skills\\arch\\resources\\deep.md",
+      "content_hash": "sha256:e09a83d09c5333abdc5a95eab2cc5be6d6238d20e581260e0355645bd3f7a14b"
+    }
+  ],
+  "checksum": "sha256:2e2da3e16e964bfd84ad7927c2f5e51f057ab512ff91ea382177993c8faeb142"
+}

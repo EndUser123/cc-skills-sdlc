@@ -1,0 +1,129 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "ed1ebb0f-d91b-486b-9ea5-25d8f7f8d8d2",
+    "terminal_id": "console_b8c045f4-31ab-424d-ab69-1d1d9b7f862d",
+    "source_session_id": "989bed15-e54a-4b6a-a40f-61570b59a5f2",
+    "created_at": "2026-04-05T05:38:40.530987+00:00",
+    "expires_at": "2026-04-05T05:58:40.530987+00:00",
+    "status": "pending",
+    "goal": "Do the open primordial items.",
+    "current_task": "Do the open primordial items.",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "C:\\Users\\brsth\\Downloads\\lazy again.txt",
+      "C:\\Users\\brsth\\.claude\\projects\\P--\\memory\\lazy_patterns.md",
+      "P:/.claude/hooks/anti_sycophancy/lazy_closure_detector.py",
+      "P:/.claude/hooks/anti_sycophancy/hypothesis_as_fact_detector.py",
+      "P:/.claude/hooks/Stop_router.py",
+      "P:/.claude/hooks/stop/Stop_verification_gate.py",
+      "P:/.claude/hooks/empirical_claims_gate.py",
+      "P:/.claude/hooks/tests/test_verification_gate.py",
+      "P:\\packages\\intelligence-stream\\.claude\\arch_decisions\\ADR-20260403-gemma-vision-provider.md",
+      "P:\\.claude\\skills\\recap\\SKILL.md"
+    ],
+    "pending_operations": [
+      {
+        "type": "read",
+        "target": "C:\\Users\\brsth\\Downloads\\lazy again.txt",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "C:\\Users\\brsth\\.claude\\projects\\P--\\memory\\lazy_patterns.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: P:/.claude/hooks/**/*.py",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/.claude/hooks/anti_sycophancy/lazy_closure_detector.py",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "search: lazy_closure|Stop_lazy|anti_lazy",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume read on C:\\Users\\brsth\\Downloads\\lazy again.txt.",
+    "decision_refs": [
+      "dec_a305988daa504ac78e177fbeefd8a493"
+    ],
+    "evidence_refs": [
+      "ev_0523bbad07844284b36c60091ade9c64",
+      "ev_7dcc01c78bc246f4a6f0bbfd4480a47f",
+      "ev_4de8557b9cf04c889004d0299f25f2ea",
+      "ev_9a87fe34fd0947d3b00ac872579a832f",
+      "ev_28ab1bc21f7c4741bcf6f09eede7b4c6",
+      "ev_0e9c50ba8f1b40e1b841a96b48ac0c64"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\989bed15-e54a-4b6a-a40f-61570b59a5f2.jsonl",
+    "message_intent": "question",
+    "quality_score": 0.4,
+    "tasks_snapshot": []
+  },
+  "decision_register": [
+    {
+      "id": "dec_a305988daa504ac78e177fbeefd8a493",
+      "kind": "constraint",
+      "summary": "Plan is `READY` — 0 blockers. VERIFY-001 complete. **Verification findings:** - Transcript entries use XML-structured `<command-name>/skillname</command-name>` pattern, NOT `user:` prefix - The plan's original regex `r'^user:\\s+/([a-z-]+)'` would never match - Fixed: Updated `_detect_skill_from_transcript()` to use `r\"<command-name>(/[^<]+)</command-name>\"` pattern - Updated verification table with confirmed schema Now executing **CODE-001**: Replace YAML regex with PyYAML.",
+      "details": "Plan is `READY` — 0 blockers. VERIFY-001 complete. **Verification findings:** - Transcript entries use XML-structured `<command-name>/skillname</command-name>` pattern, NOT `user:` prefix - The plan's original regex `r'^user:\\s+/([a-z-]+)'` would never match - Fixed: Updated `_detect_skill_from_transcript()` to use `r\"<command-name>(/[^<]+)</command-name>\"` pattern - Updated verification table with confirmed schema Now executing **CODE-001**: Replace YAML regex with PyYAML.",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_0523bbad07844284b36c60091ade9c64"
+      ]
+    }
+  ],
+  "evidence_index": [
+    {
+      "id": "ev_0523bbad07844284b36c60091ade9c64",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\989bed15-e54a-4b6a-a40f-61570b59a5f2.jsonl",
+      "content_hash": "sha256:0f1a20e40c0dac2a4b1169d6bee4d4cd236908a638b1ebce8f97ce78b4589e5f"
+    },
+    {
+      "id": "ev_7dcc01c78bc246f4a6f0bbfd4480a47f",
+      "type": "file",
+      "label": "lazy again.txt",
+      "path": "C:\\Users\\brsth\\Downloads\\lazy again.txt",
+      "content_hash": "sha256:ace4a138161504087be64d9b05159e14382a132d33c7cb1ffec38f09c17309fb"
+    },
+    {
+      "id": "ev_4de8557b9cf04c889004d0299f25f2ea",
+      "type": "file",
+      "label": "lazy_patterns.md",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\memory\\lazy_patterns.md",
+      "content_hash": "sha256:7cefb3dd8e0631981bd63c329ae8b8a153ff6ce3fc611a37f1de9d099050f89b"
+    },
+    {
+      "id": "ev_9a87fe34fd0947d3b00ac872579a832f",
+      "type": "file",
+      "label": "lazy_closure_detector.py",
+      "path": "P:\\.claude\\hooks\\anti_sycophancy\\lazy_closure_detector.py",
+      "content_hash": "sha256:1c7529780eececbd2b434659f41cff6941643b00c689e6ccbf9eedba0f2ffa8f"
+    },
+    {
+      "id": "ev_28ab1bc21f7c4741bcf6f09eede7b4c6",
+      "type": "file",
+      "label": "hypothesis_as_fact_detector.py",
+      "path": "P:\\.claude\\hooks\\anti_sycophancy\\hypothesis_as_fact_detector.py",
+      "content_hash": "sha256:e0ab1e6f45633142c259524f60d7a410b4c4c3c47b0e58b9213bb23f4238e76f"
+    },
+    {
+      "id": "ev_0e9c50ba8f1b40e1b841a96b48ac0c64",
+      "type": "file",
+      "label": "Stop_router.py",
+      "path": "P:\\.claude\\hooks\\Stop_router.py",
+      "content_hash": "sha256:932889b2fd8997ac37c290c27c927a435554d86cb4ec5bc9511a459713e152e2"
+    }
+  ],
+  "checksum": "sha256:19f5167102b2c8c8b5202d76208759688a05721680dd842c80929d1922bce8b3"
+}
