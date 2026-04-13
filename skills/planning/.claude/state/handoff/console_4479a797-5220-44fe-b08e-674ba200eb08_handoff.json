@@ -1,0 +1,128 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "6378b390-dfc9-4955-ac65-324acee279e7",
+    "terminal_id": "console_4479a797-5220-44fe-b08e-674ba200eb08",
+    "source_session_id": "95ef4de5-146c-44e5-9a09-16de5699a35a",
+    "created_at": "2026-04-09T03:17:45.764534+00:00",
+    "expires_at": "2026-04-09T03:37:45.764534+00:00",
+    "status": "pending",
+    "goal": "update the adr for phase 2 solution using agents.\n\"Failure loop\", add to phase 2\n\"Context overflow handling\", add to phase 2",
+    "current_task": "update the adr for phase 2 solution using agents. \"Failure loop\", add to phase 2 \"Context overflow handling\", add to phase 2",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "C:\\Users\\brsth\\.claude\\plans\\active\\youtube-transcript-provider.md",
+      "P:/packages/intelligence-stream/README.md",
+      "P:/packages/intelligence-stream/csf/transcript.py",
+      "C:\\Users\\brsth\\.claude\\plans\\linked-exploring-rainbow.md",
+      "P:/packages/search-research/src/search_research/cli.py",
+      "P:/packages/search-research/core/cli.py",
+      "P:/packages/search-research/core/providers/__init__.py",
+      "P:/packages/search-research/core/providers/base_web.py",
+      "P:/packages/search-research/core/providers/tavily.py",
+      "P:/packages/search-research/core/router_async.py"
+    ],
+    "pending_operations": [
+      {
+        "type": "read",
+        "target": "C:\\Users\\brsth\\.claude\\plans\\active\\youtube-transcript-provider.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: P:/packages/intelligence-stream/**/*",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "search: youtube.*transcript|transcript.*youtube",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/packages/intelligence-stream/README.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/packages/intelligence-stream/csf/transcript.py",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume read on C:\\Users\\brsth\\.claude\\plans\\active\\youtube-transcript-provider.md.",
+    "decision_refs": [
+      "dec_454e23366e1b448da0a659df91800dd5"
+    ],
+    "evidence_refs": [
+      "ev_8ad9e212d1134d67a8433d7c11c44c30",
+      "ev_cdb591e3e1834719ac499254ce38927a",
+      "ev_e0b7d1dee6af404e91803d65c7fda8dd",
+      "ev_1a04940b032f4166a33fced61410d544",
+      "ev_0da83b579cdd4cf79963055320d33d7e",
+      "ev_3ca6d30cdfe44b2b8ffc9cb8e62524d3"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\95ef4de5-146c-44e5-9a09-16de5699a35a.jsonl",
+    "message_intent": "directive",
+    "quality_score": 0.9,
+    "tasks_snapshot": []
+  },
+  "decision_register": [
+    {
+      "id": "dec_454e23366e1b448da0a659df91800dd5",
+      "kind": "constraint",
+      "summary": "you must not use chinese.",
+      "details": "you must not use chinese.",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_8ad9e212d1134d67a8433d7c11c44c30"
+      ]
+    }
+  ],
+  "evidence_index": [
+    {
+      "id": "ev_8ad9e212d1134d67a8433d7c11c44c30",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\95ef4de5-146c-44e5-9a09-16de5699a35a.jsonl",
+      "content_hash": "sha256:6c3568828adce480f80aacec37f8f381fda1ec1a3b649801c1a66c82be62e95d"
+    },
+    {
+      "id": "ev_cdb591e3e1834719ac499254ce38927a",
+      "type": "file",
+      "label": "youtube-transcript-provider.md",
+      "path": "C:\\Users\\brsth\\.claude\\plans\\active\\youtube-transcript-provider.md",
+      "content_hash": "sha256:9b173d2858f70cf7ec386b34d57bd4bab6a88037defdcb8d1cd4d8d3d454d9d8"
+    },
+    {
+      "id": "ev_e0b7d1dee6af404e91803d65c7fda8dd",
+      "type": "file",
+      "label": "README.md",
+      "path": "P:\\packages\\intelligence-stream\\README.md",
+      "content_hash": "sha256:a7ebef98c8ee85bb610ba3b91708a14d4f2ed15e6b05ac2f12bc948f402d17ba"
+    },
+    {
+      "id": "ev_1a04940b032f4166a33fced61410d544",
+      "type": "file",
+      "label": "transcript.py",
+      "path": "P:\\packages\\intelligence-stream\\csf\\transcript.py",
+      "content_hash": "sha256:4f9ff14f0ce9c76817bca6be71432320196ff95893f468fd59f3e8e12cde19b7"
+    },
+    {
+      "id": "ev_0da83b579cdd4cf79963055320d33d7e",
+      "type": "file",
+      "label": "linked-exploring-rainbow.md",
+      "path": "C:\\Users\\brsth\\.claude\\plans\\linked-exploring-rainbow.md",
+      "content_hash": "sha256:06fa3cc909f060149877348fab34341767ee9ad00642246f14af9bcb4980cf7c"
+    },
+    {
+      "id": "ev_3ca6d30cdfe44b2b8ffc9cb8e62524d3",
+      "type": "file",
+      "label": "cli.py",
+      "path": "P:\\packages\\search-research\\src\\search_research\\cli.py"
+    }
+  ],
+  "checksum": "sha256:bb08be5b08d7ecba9eeda05c87b7caa1d7a5653df53ae6a3f1389922690e6dba"
+}

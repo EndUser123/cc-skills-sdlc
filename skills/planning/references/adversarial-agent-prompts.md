@@ -1,3 +1,9 @@
+---
+name: adversarial-agent-prompts
+description: Dispatch prompts for 5 phase-1 adversarial agents + critic, with idempotency checks and mandatory Write-tool enforcement
+contract: response text must contain ONLY the file path
+---
+
 # Adversarial Agent Dispatch Prompts
 
 Reference for Step 4b: Dispatch the 5 phase-1 agents in one parallel batch, then dispatch the critic in a second phase.
@@ -57,8 +63,27 @@ Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 
 1. Review the plan at <plan_path> for specification violations and solo-dev constraints.
    - For stateful/history/provider/multi-terminal plans, explicitly check identity model completeness, source-of-truth declarations, and unresolved implementation-shaping open questions.
-2. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+2. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA (top-level keys must be exactly these):
+   {
+     "plan_path": "<plan_path>",
+     "findings": [
+       {
+         "id": "COMP-XXX",
+         "severity": "BLOCKER | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what is wrong and why it matters",
+         "location": "file:line or plan section",
+         "remediation": "specific fix required"
+       }
+     ],
+     "overall_assessment": "one-sentence summary",
+     "open_questions": [],
+     "handoff": {}
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 3. Return ONLY: "<findings_path>" """)
 
 Task(subagent_type="adversarial-logic",
@@ -93,8 +118,27 @@ Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 1. Review the plan at <plan_path> for pure logic errors, race conditions, and off-by-one bugs.
    - For stateful/history/provider/multi-terminal plans, explicitly compare prose behavior against keys, schema snippets, and contract sections.
    - Flag contradictory ordering rules, dedupe rules, or identity semantics as logic findings.
-2. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+2. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA (top-level keys must be exactly these):
+   {
+     "plan_path": "<plan_path>",
+     "findings": [
+       {
+         "id": "L-XXX",
+         "severity": "BLOCKER | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what is wrong and why it matters",
+         "location": "file:line or plan section",
+         "remediation": "specific fix required"
+       }
+     ],
+     "overall_assessment": "one-sentence summary",
+     "open_questions": [],
+     "handoff": {}
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 3. Return ONLY: "<findings_path>" """)
 
 Task(subagent_type="adversarial-testing",
@@ -127,8 +171,27 @@ If the above script prints a path, return ONLY that path.
 Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 
 1. Review the plan at <plan_path> for coverage gaps and brittle tests.
-2. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+2. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA -- top-level keys MUST be exactly these:
+   {
+     "plan_path": "<plan_path>",
+     "findings": [
+       {
+         "id": "TEST-XXX",
+         "severity": "BLOCKER | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what is wrong and why it matters",
+         "location": "file:line or plan section",
+         "remediation": "specific fix required"
+       }
+     ],
+     "overall_assessment": "one-sentence summary",
+     "open_questions": [],
+     "handoff": {}
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 3. Return ONLY: "<findings_path>" """)
 
 Task(subagent_type="adversarial-security",
@@ -161,8 +224,27 @@ If the above script prints a path, return ONLY that path.
 Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 
 1. Review the plan at <plan_path> for data exposure and access control issues.
-2. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+2. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA -- top-level keys MUST be exactly these:
+   {
+     "plan_path": "<plan_path>",
+     "findings": [
+       {
+         "id": "SEC-XXX",
+         "severity": "BLOCKER | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what is wrong and why it matters",
+         "location": "file:line or plan section",
+         "remediation": "specific fix required"
+       }
+     ],
+     "overall_assessment": "one-sentence summary",
+     "open_questions": [],
+     "handoff": {}
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 3. Return ONLY: "<findings_path>" """)
 
 Task(subagent_type="adversarial-failure-modes",
@@ -197,8 +279,27 @@ Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 1. Review the plan at <plan_path> for domain-aware failure mode discovery.
    - For stateful/history/provider/multi-terminal plans, explicitly check stale-data invalidation, replay triggers, watermark advancement, and cache/archive authority boundaries.
    - Deferred freshness semantics count as blocker/high findings when the plan claims stale-data immunity or durable retention.
-2. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+2. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA -- top-level keys MUST be exactly these:
+   {
+     "plan_path": "<plan_path>",
+     "findings": [
+       {
+         "id": "F-XXX",
+         "severity": "BLOCKER | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what is wrong and why it matters",
+         "location": "file:line or plan section",
+         "remediation": "specific fix required"
+       }
+     ],
+     "overall_assessment": "one-sentence summary",
+     "open_questions": [],
+     "handoff": {}
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 3. Return ONLY: "<findings_path>" """)
 
 Task(subagent_type="adversarial-critic",
@@ -232,8 +333,38 @@ If the above script prints a path, return ONLY that path.
    - SKIP any file whose plan_path field does not match <plan_path>
 2. Perform meta-analysis of consensus, blind spots, calibration for the plan at <plan_path>
    - Specifically look for consensus gaps around identity model, ordering, dedupe, invalidation, event source-of-truth, and isolation boundaries.
-3. Write JSON findings to: <findings_path>
-   - Include field: "plan_path": "<plan_path>"
+3. Use the Write tool to save findings to: <findings_path>
+
+   MANDATORY JSON SCHEMA -- top-level keys MUST be exactly these:
+   {
+     "plan_path": "<plan_path>",
+     "review_metadata": {
+       "skill": "adversarial-critic",
+       "review_type": "meta-analysis",
+       "agents_analyzed": ["compliance", "logic", "testing", "security", "failure-modes"],
+       "total_findings": 0,
+       "consensus_count": 0,
+       "blind_spot_count": 0
+     },
+     "meta_findings": [
+       {
+         "meta_type": "consensus | blind_spot | bias | contradiction | quality_calibration",
+         "severity": "CRITICAL | HIGH | MEDIUM | LOW",
+         "title": "short title",
+         "description": "what was found across agents",
+         "location": "file:line or plan section",
+         "why_missed": "why this wasn't caught by individual agents",
+         "recommendation": "specific fix required"
+       }
+     ],
+     "summary": {
+       "blockers": [],
+       "critical_issues": [],
+       "high_priority_issues": []
+     }
+   }
+
+   IMPORTANT: plan_path MUST be a top-level field, not nested. Do NOT use any other top-level key names.
 4. Return ONLY: "<findings_path>" """)
 ```
 

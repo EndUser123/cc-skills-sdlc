@@ -1,0 +1,141 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "83f3d1cc-21b3-49cb-8b1d-e8e3028c44a8",
+    "terminal_id": "console_2710402c-d67b-460a-9642-0b43b80dbac2",
+    "source_session_id": "459eb057-91c9-4307-9d4d-31bd3e4e9b61",
+    "created_at": "2026-04-09T06:24:17.500956+00:00",
+    "expires_at": "2026-04-09T06:44:17.500956+00:00",
+    "status": "pending",
+    "goal": "enable it via env var",
+    "current_task": "enable it via env var",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:\\__csf\\arch_decisions\\ADR-20260407-qmd-wiki-skill.md",
+      "P:\\__csf\\arch_decisions\\ADR-20260407-qmd-wiki-skill.review.result.json",
+      "P:\\.claude\\skills\\gitingest\\claude-code-qmd-repos.yaml",
+      "P:\\packages\\search-research\\core\\backends\\local\\base_local_backend.py",
+      "P:\\packages\\search-research\\ARCHITECTURE.md",
+      "P:\\packages\\search-research\\core\\backends\\local\\__init__.py",
+      "P:\\packages\\search-research\\core\\unified_router.py",
+      "P:\\packages\\sdlc\\skills\\planning\\__lib\\auto_verify.py",
+      "C:\\Users\\brsth\\.claude\\plans\\plan-adr-20260407-qmd-wiki-skill.md",
+      "P:\\.claude\\plans\\adversarial\\plan-adr-20260407-qmd-wiki-skill\\console_2710402c-d67b-460a-9642-0b43b80dbac2\\logic-findings.json"
+    ],
+    "pending_operations": [
+      {
+        "type": "investigation",
+        "target": "search: obsidian",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/*adr*",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/*ADR*",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/arch_decisions/**",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "search: obsidian",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume investigation on search: obsidian.",
+    "decision_refs": [
+      "dec_40cf9e6c21e04638b28b0be3142b30aa",
+      "dec_d9adf80dda32461e9c8b0aa76df62dd1"
+    ],
+    "evidence_refs": [
+      "ev_7ec5e5aed9b14926953b879659002120",
+      "ev_c368965363c64b74b83eee6b86b13f0a",
+      "ev_b14ec48c94c54eb0808cb5a63f1becd3",
+      "ev_42d3fd6305ef481b80dcc51d378813fa",
+      "ev_e80fddb1966540f0b3c700ed94822909",
+      "ev_2d89f70e6a784180b5a24dcac20301d6"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\459eb057-91c9-4307-9d4d-31bd3e4e9b61.jsonl",
+    "message_intent": "instruction",
+    "quality_score": 0.4,
+    "tasks_snapshot": []
+  },
+  "decision_register": [
+    {
+      "id": "dec_40cf9e6c21e04638b28b0be3142b30aa",
+      "kind": "constraint",
+      "summary": "The validator checks for the exact string `\"response text must contain ONLY the file path\"` (line 36), not `\"return ONLY file path\"`. I need to fix the contract field value:",
+      "details": "The validator checks for the exact string `\"response text must contain ONLY the file path\"` (line 36), not `\"return ONLY file path\"`. I need to fix the contract field value:",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_7ec5e5aed9b14926953b879659002120"
+      ]
+    },
+    {
+      "id": "dec_d9adf80dda32461e9c8b0aa76df62dd1",
+      "kind": "constraint",
+      "summary": "**Fix complete.** The `adversarial-agent-prompts.md` file now has: 1. **Frontmatter** with correct contract value matching the validator: ```yaml contract: response text must contain ONLY the file path ``` 2. **All 6 agents** (5 phase-1 + critic) have explicit \"Use the Write tool to save findings\" instruction 3. **Correct ID prefixes**: COMP-XXX, L-XXX, TEST-XXX, SEC-XXX, F-XXX 4. **MANDATORY JSON SCHEMA** for each agent with `plan_path` as required top-level field 5. **Critic schema** uses `review_metadata` wrapper with consistent `plan_path` The root cause was the validator expected the exact string `\"response text must contain ONLY the file path\"` but the contract field had `\"return ONLY file path\"`.",
+      "details": "**Fix complete.** The `adversarial-agent-prompts.md` file now has: 1. **Frontmatter** with correct contract value matching the validator: ```yaml contract: response text must contain ONLY the file path ``` 2. **All 6 agents** (5 phase-1 + critic) have explicit \"Use the Write tool to save findings\" instruction 3. **Correct ID prefixes**: COMP-XXX, L-XXX, TEST-XXX, SEC-XXX, F-XXX 4. **MANDATORY JSON SCHEMA** for each agent with `plan_path` as required top-level field 5. **Critic schema** uses `review_metadata` wrapper with consistent `plan_path` The root cause was the validator expected the exact string `\"response text must contain ONLY the file path\"` but the contract field had `\"return ONLY file path\"`.",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_7ec5e5aed9b14926953b879659002120"
+      ]
+    }
+  ],
+  "evidence_index": [
+    {
+      "id": "ev_7ec5e5aed9b14926953b879659002120",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\459eb057-91c9-4307-9d4d-31bd3e4e9b61.jsonl",
+      "content_hash": "sha256:89624a0f1a996ee02d626ace6fa411cb72b6af0c447cd3702e8933596ed94ed0"
+    },
+    {
+      "id": "ev_c368965363c64b74b83eee6b86b13f0a",
+      "type": "file",
+      "label": "ADR-20260407-qmd-wiki-skill.md",
+      "path": "P:\\__csf\\arch_decisions\\ADR-20260407-qmd-wiki-skill.md",
+      "content_hash": "sha256:089e351a1e688bba3e2f98079a821218180fc5882a3068c52731e351b54b595a"
+    },
+    {
+      "id": "ev_b14ec48c94c54eb0808cb5a63f1becd3",
+      "type": "file",
+      "label": "ADR-20260407-qmd-wiki-skill.review.result.json",
+      "path": "P:\\__csf\\arch_decisions\\ADR-20260407-qmd-wiki-skill.review.result.json",
+      "content_hash": "sha256:685ee91028c1961a534c07f6bbda4aaeb8ac8444c4d6b677d34345ce52117c18"
+    },
+    {
+      "id": "ev_42d3fd6305ef481b80dcc51d378813fa",
+      "type": "file",
+      "label": "claude-code-qmd-repos.yaml",
+      "path": "P:\\.claude\\skills\\gitingest\\claude-code-qmd-repos.yaml",
+      "content_hash": "sha256:371029999b73bc3eb280ec8c29e5fcebbca17421ec63d226daab2b4799421790"
+    },
+    {
+      "id": "ev_e80fddb1966540f0b3c700ed94822909",
+      "type": "file",
+      "label": "base_local_backend.py",
+      "path": "P:\\packages\\search-research\\core\\backends\\local\\base_local_backend.py",
+      "content_hash": "sha256:a06466a7707657ab347f9f9235d2b8f0959199b1ec57ea94a66a46e40daec427"
+    },
+    {
+      "id": "ev_2d89f70e6a784180b5a24dcac20301d6",
+      "type": "file",
+      "label": "ARCHITECTURE.md",
+      "path": "P:\\packages\\search-research\\ARCHITECTURE.md",
+      "content_hash": "sha256:9f2a71e115305ddef29be00d5a77710555f11bb6be69dc57a471aada9c4b6871"
+    }
+  ],
+  "checksum": "sha256:8530bb2441f40d6bf61104a279e2e677e58b9f33d4fd39e6e41f1eee79a49f82"
+}

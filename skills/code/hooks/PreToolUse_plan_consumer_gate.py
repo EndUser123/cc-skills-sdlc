@@ -35,12 +35,12 @@ def main() -> None:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError:
-        print(json.dumps({"decision": "allow", "reason": "Invalid hook payload"}))
+        print(json.dumps({"decision": "approve", "reason": "Invalid hook payload"}))
         sys.exit(0)
 
     tool_name = payload.get("tool_name") or payload.get("name") or ""
     if tool_name not in {"Edit", "Write", "MultiEdit"}:
-        print(json.dumps({"decision": "allow", "reason": "Tool does not mutate files"}))
+        print(json.dumps({"decision": "approve", "reason": "Tool does not mutate files"}))
         sys.exit(0)
 
     tool_input = payload.get("tool_input") or {}
@@ -51,7 +51,7 @@ def main() -> None:
         or ""
     )
     if file_path and _should_skip_for_path(file_path):
-        print(json.dumps({"decision": "allow", "reason": "Editing the source plan/ADR artifact"}))
+        print(json.dumps({"decision": "approve", "reason": "Editing the source plan/ADR artifact"}))
         sys.exit(0)
 
     _add_import_paths()
@@ -60,7 +60,7 @@ def main() -> None:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     plan_path = discover_local_plan_path(project_dir=project_dir, cwd=os.getcwd())
     if not plan_path:
-        print(json.dumps({"decision": "allow", "reason": "No local plan artifact discovered"}))
+        print(json.dumps({"decision": "approve", "reason": "No local plan artifact discovered"}))
         sys.exit(0)
 
     result = validate_plan_for_execution(
@@ -72,7 +72,7 @@ def main() -> None:
         print(
             json.dumps(
                 {
-                    "decision": "allow",
+                    "decision": "approve",
                     "reason": result.reason,
                     "context": {
                         "plan_path": result.plan_path,

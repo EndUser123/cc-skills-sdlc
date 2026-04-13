@@ -29,13 +29,23 @@ for _candidate in _CONTRACT_PRIMITIVES_CANDIDATES:
     if _candidate.exists() and str(_candidate) not in sys.path:
         sys.path.insert(0, str(_candidate))
 
-from contract_primitives import (  # noqa: E402
-    ACTIVE_PLAN_ARTIFACT_FAILURE_BEHAVIOR,
-    REQUIRED_BOUNDARY_FIELDS,
-    parse_contract_authority_packet,
-    parse_planning_handoff_packet,
-)
-from planning_handoff_validation import validate_planning_handoff_contract
+try:
+    from contract_primitives import (  # noqa: E402
+        ACTIVE_PLAN_ARTIFACT_FAILURE_BEHAVIOR,
+        REQUIRED_BOUNDARY_FIELDS,
+        parse_contract_authority_packet,
+        parse_planning_handoff_packet,
+    )
+    from planning_handoff_validation import validate_planning_handoff_contract
+
+    CONTRACT_PRIMITIVES_AVAILABLE = True
+except ImportError:
+    CONTRACT_PRIMITIVES_AVAILABLE = False
+    ACTIVE_PLAN_ARTIFACT_FAILURE_BEHAVIOR = None
+    REQUIRED_BOUNDARY_FIELDS = []
+    parse_contract_authority_packet = None
+    parse_planning_handoff_packet = None
+    validate_planning_handoff_contract = None
 
 
 # =============================================================================
@@ -376,9 +386,29 @@ def validate_adr(
         }
 
     text = adr_path.read_text(encoding="utf-8")
+    findings: list[dict[str, object]] = []
+
+    if not CONTRACT_PRIMITIVES_AVAILABLE:
+        findings.append(
+            {
+                "id": "ADR-000",
+                "priority": "MEDIUM",
+                "title": "contract_primitives package unavailable — packet validation skipped",
+                "description": "Install contract-primitives package to enable full ADR validation.",
+            }
+        )
+        return {
+            "status": "READY",
+            "packet_version": None,
+            "boundary_count": 0,
+            "planning_handoff_packet_version": None,
+            "contract_sensitive": False,
+            "stage_validation": _run_stage_validation(text, False) if check_stages else None,
+            "findings": findings,
+        }
+
     packet = parse_contract_authority_packet(text)
     handoff = parse_planning_handoff_packet(text)
-    findings: list[dict[str, object]] = []
     contract_sensitive = bool(packet.boundaries)
 
     if not packet.boundaries:

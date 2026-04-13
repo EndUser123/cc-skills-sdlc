@@ -226,7 +226,15 @@ if "{AI_ACTION}" != "none":
 
 **AID AVAILABILITY CHECK:**
 
-If AID CLI is not available, the integrator will raise RuntimeError with installation instructions:
+If AID CLI is not available at `~/.aid/bin/aid.exe`, the architecture analysis proceeds without AID-dependent features. The template will use direct file analysis instead. Graceful degradation path:
+
+```
+AID NOT AVAILABLE — proceeding with direct file analysis
+- AID provides: layer detection, dependency direction analysis, AI action prompts
+- Fallback: manual file globbing + grep for architectural pattern detection
+```
+
+To enable AID features:
 - Download: https://github.com/janreges/ai-distiller/releases
 - Install: Extract aid.exe to ~/.aid/bin/ (Windows) or ~/bin/ (Unix)
 - Verify: aid --version
