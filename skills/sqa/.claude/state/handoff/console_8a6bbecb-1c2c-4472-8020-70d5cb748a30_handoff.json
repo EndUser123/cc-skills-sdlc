@@ -1,0 +1,112 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "1634547d-236f-4e44-b3d0-e3ed3726113c",
+    "terminal_id": "console_8a6bbecb-1c2c-4472-8020-70d5cb748a30",
+    "source_session_id": "7834e2d6-286d-40ec-886f-0eec7781c2b7",
+    "created_at": "2026-04-01T19:49:48.723015+00:00",
+    "expires_at": "2026-04-01T20:09:48.723015+00:00",
+    "status": "pending",
+    "goal": "what do you think I meant?",
+    "current_task": "what do you think I meant?",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:\\.claude\\skills\\sqa\\SKILL.md",
+      "P:\\.claude\\skills\\arch\\resources\\fast.md",
+      "P:\\.claude\\skills\\arch\\resources\\base.md",
+      "P:\\.claude\\skills\\sqa\\orchestrator.py",
+      "P:\\.claude\\skills\\sqa\\layers\\layer_meta.py",
+      "C:\\Users\\brsth\\.claude\\plans\\iterative-wondering-planet.md",
+      "P:\\.claude\\skills\\sqa\\findings\\models.py"
+    ],
+    "pending_operations": [
+      {
+        "type": "skill",
+        "target": "skill: nlm",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "nlm notebook list --json 2>/dev/null | python -c \"import json,sys; data=json.loa",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: .claude/skills/sqa/**/*",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "nlm notebook list 2>&1 | head -30",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: .claude/skills/sqa/**/*",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume skill on skill: nlm.",
+    "decision_refs": [],
+    "evidence_refs": [
+      "ev_a0b0f23ecf594f8384a154233f29914a",
+      "ev_7cd99f90ee1a49c7a4c2e0c4ba144347",
+      "ev_1c9d664b29434d74a86c8fe1fe317cb2",
+      "ev_96c5b1e515d54c74b788658ab080e887",
+      "ev_b367b170657e4643a6429385e5af4d10",
+      "ev_899a2cddd3354801a81c543b51166ccd"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\7834e2d6-286d-40ec-886f-0eec7781c2b7.jsonl",
+    "message_intent": "question",
+    "quality_score": 0.4,
+    "tasks_snapshot": []
+  },
+  "decision_register": [],
+  "evidence_index": [
+    {
+      "id": "ev_a0b0f23ecf594f8384a154233f29914a",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\7834e2d6-286d-40ec-886f-0eec7781c2b7.jsonl",
+      "content_hash": "sha256:a768e60c27a4ad9d59ef84ed3310e38c9ba9d0932b8d45ef82852856803e2f85"
+    },
+    {
+      "id": "ev_7cd99f90ee1a49c7a4c2e0c4ba144347",
+      "type": "file",
+      "label": "SKILL.md",
+      "path": "P:\\.claude\\skills\\sqa\\SKILL.md",
+      "content_hash": "sha256:f0218d49bb5cb9f245fe832a5d7f21835af6a9836ae8e9a54b82205928c0b63b"
+    },
+    {
+      "id": "ev_1c9d664b29434d74a86c8fe1fe317cb2",
+      "type": "file",
+      "label": "fast.md",
+      "path": "P:\\packages\\arch\\skill\\resources\\fast.md",
+      "content_hash": "sha256:728cff94ce5396b31b551d22cbd522db15ebf85fd6da44775f3fd9745be10549"
+    },
+    {
+      "id": "ev_96c5b1e515d54c74b788658ab080e887",
+      "type": "file",
+      "label": "base.md",
+      "path": "P:\\packages\\arch\\skill\\resources\\base.md",
+      "content_hash": "sha256:3d6692906c6089a4422918e9bd119ef5a6262e3903c00b10fff1ebfe3af34ef2"
+    },
+    {
+      "id": "ev_b367b170657e4643a6429385e5af4d10",
+      "type": "file",
+      "label": "orchestrator.py",
+      "path": "P:\\.claude\\skills\\sqa\\orchestrator.py",
+      "content_hash": "sha256:e02649c27646f1c96a3e39c78a725ada28442496a93f375fb29dd43dd722728c"
+    },
+    {
+      "id": "ev_899a2cddd3354801a81c543b51166ccd",
+      "type": "file",
+      "label": "layer_meta.py",
+      "path": "P:\\.claude\\skills\\sqa\\layers\\layer_meta.py",
+      "content_hash": "sha256:27902e09e53098ecb5e366f23028a1796a5bf6c2fe7ca5b3594fe6c71fccf174"
+    }
+  ],
+  "checksum": "sha256:45c88b91b0d7dfbead9e278ad636bd1e4ab25f9b5b51199e7549cae2002a617f"
+}

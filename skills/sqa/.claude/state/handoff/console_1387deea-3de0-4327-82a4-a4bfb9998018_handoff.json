@@ -1,0 +1,140 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "0ac25fa3-048d-4c5e-989d-2b6b59aa132c",
+    "terminal_id": "console_1387deea-3de0-4327-82a4-a4bfb9998018",
+    "source_session_id": "cc6aebbf-98f0-4927-8f1f-8e749f40025f",
+    "created_at": "2026-04-05T13:08:00.632910+00:00",
+    "expires_at": "2026-04-05T13:28:00.632910+00:00",
+    "status": "pending",
+    "goal": "I would like a halt at the end of a step or layer, when an error is discovered that will impact later layer findings.",
+    "current_task": "I would like a halt at the end of a step or layer, when an error is discovered that will impact later layer findings.",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:\\.claude\\plans\\plan-20260401-chs-history-provider-architecture.md",
+      "P:\\.claude\\hooks\\PreToolUse_directory_policy.py",
+      "P:\\.claude\\hooks\\config\\directory_policy.json",
+      "P:\\.claude\\arch_decisions\\ADR-20260401-chs-multi-provider-history-archive.md",
+      "P:\\packages\\search-research\\core\\chs\\__init__.py",
+      "P:\\packages\\search-research\\core\\chs\\db.py",
+      "P:\\packages\\search-research\\core\\chs\\schema.sql",
+      "P:\\.claude\\skills\\code\\flows\\feature.md",
+      "P:\\packages\\search-research\\core\\chs\\providers\\__init__.py",
+      "P:\\packages\\search-research\\core\\chs\\providers\\base.py"
+    ],
+    "pending_operations": [
+      {
+        "type": "read",
+        "target": "P:\\.claude\\plans\\plan-20260401-chs-history-provider-architecture.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "cd /p && ls packages/search-research/core/chs/ 2>/dev/null || echo \"Directory no",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:\\.claude\\hooks\\PreToolUse_directory_policy.py",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/directory_policy.json",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:\\.claude\\hooks\\config\\directory_policy.json",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume read on P:\\.claude\\plans\\plan-20260401-chs-history-provider-architecture.md.",
+    "decision_refs": [
+      "dec_f6d49a171018445babc5abe190f17995",
+      "dec_c1c97cb55db84dffaea1d9e82361c1a6"
+    ],
+    "evidence_refs": [
+      "ev_6cb2efb784cb4ffbbe1bcc2c867d8e95",
+      "ev_2f2d1c8cfb724d5bb30382fe0fc30e64",
+      "ev_6235d4ee9d6849f1842d560630d1cef3",
+      "ev_af641771e5fe48f6b12f4d20ff84e453",
+      "ev_890c6a8cd11e48f2b0db3fc25fb30180",
+      "ev_cd665507aa2c4c948dc057f4622de51f"
+    ],
+    "transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\cc6aebbf-98f0-4927-8f1f-8e749f40025f.jsonl",
+    "message_intent": "instruction",
+    "quality_score": 0.9,
+    "tasks_snapshot": []
+  },
+  "decision_register": [
+    {
+      "id": "dec_f6d49a171018445babc5abe190f17995",
+      "kind": "constraint",
+      "summary": "Verification confirms my claims are accurate. Grep of `P:/.claude/skills/sqa` found no `validate_p_phase_order` or `marker.*gate` files exist — the `/p` phase-gate mechanism was **not migrated** to `/sqa`. Grep of `SKILL.md:172` confirms the only \"cannot proceed\" behavior is: `ALL-tools-unavailable behavior: If ALL tools for a layer are unavailable, log ERROR: All tools unavailable for Layer N — cannot proceed and skip all remaining layers.` — which is tool-availability-based, not error-propagation-based. The L2→L4 dependency is documented at `SKILL.md:123` (`HARD DEPENDENCY: Layer 4 MUST NOT execute if Layer 2 reported failures`) — that's the only cross-layer gating. So the gap stands: `/sqa` does **not** halt on upstream findings the way `/p` did with its phase-order validator.",
+      "details": "Verification confirms my claims are accurate. Grep of `P:/.claude/skills/sqa` found no `validate_p_phase_order` or `marker.*gate` files exist — the `/p` phase-gate mechanism was **not migrated** to `/sqa`. Grep of `SKILL.md:172` confirms the only \"cannot proceed\" behavior is: `ALL-tools-unavailable behavior: If ALL tools for a layer are unavailable, log ERROR: All tools unavailable for Layer N — cannot proceed and skip all remaining layers.` — which is tool-availability-based, not error-propagation-based. The L2→L4 dependency is documented at `SKILL.md:123` (`HARD DEPENDENCY: Layer 4 MUST NOT execute if Layer 2 reported failures`) — that's the only cross-layer gating. So the gap stands: `/sqa` does **not** halt on upstream findings the way `/p` did with its phase-order validator.",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_6cb2efb784cb4ffbbe1bcc2c867d8e95"
+      ]
+    },
+    {
+      "id": "dec_c1c97cb55db84dffaea1d9e82361c1a6",
+      "kind": "constraint",
+      "summary": "This requires a halt-on-impact gate between layers. The most impactful single dependency is L2 (pytest failures) → L4 (requirements), since failed tests make gap analysis unreliable. But you want a general mechanism. Design: add `--halt-on <severity>` flag (default: `CRITICAL`). At the end of each layer, if that layer's worst finding meets or exceeds the threshold, halt and surface findings immediately rather than running subsequent layers with degraded data. ``` /sqa target --halt-on HIGH ``` - L1 finds 2 HIGH → halt before L2 runs - L2 finds CRITICAL → halt before L4 runs - L3 finds nothing blocking → continue to L5 L4→L7 is a weaker dependency (structural/security findings don't invalidate each other), so only CRITICAL would halt there. Want me to implement this? I'd add: 1. `SeverityHaltTracker` in orchestrator — accumulates findings per layer, checks threshold at each layer boundary 2. `SKILL.md` flag documentation 3. A `SQA_HALT_SEVERITY` env var defaulting to `CRITICAL` 4. L2→L4 hard halt (no flag needed — this is the only non-controversial mandatory skip) The broader `--halt-on HIGH` for L1→L2 and L3→L5/L6 is the configurable part.",
+      "details": "This requires a halt-on-impact gate between layers. The most impactful single dependency is L2 (pytest failures) → L4 (requirements), since failed tests make gap analysis unreliable. But you want a general mechanism. Design: add `--halt-on <severity>` flag (default: `CRITICAL`). At the end of each layer, if that layer's worst finding meets or exceeds the threshold, halt and surface findings immediately rather than running subsequent layers with degraded data. ``` /sqa target --halt-on HIGH ``` - L1 finds 2 HIGH → halt before L2 runs - L2 finds CRITICAL → halt before L4 runs - L3 finds nothing blocking → continue to L5 L4→L7 is a weaker dependency (structural/security findings don't invalidate each other), so only CRITICAL would halt there. Want me to implement this? I'd add: 1. `SeverityHaltTracker` in orchestrator — accumulates findings per layer, checks threshold at each layer boundary 2. `SKILL.md` flag documentation 3. A `SQA_HALT_SEVERITY` env var defaulting to `CRITICAL` 4. L2→L4 hard halt (no flag needed — this is the only non-controversial mandatory skip) The broader `--halt-on HIGH` for L1→L2 and L3→L5/L6 is the configurable part.",
+      "priority": "high",
+      "applies_when": "Continue the current task after compact.",
+      "source_refs": [
+        "ev_6cb2efb784cb4ffbbe1bcc2c867d8e95"
+      ]
+    }
+  ],
+  "evidence_index": [
+    {
+      "id": "ev_6cb2efb784cb4ffbbe1bcc2c867d8e95",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\cc6aebbf-98f0-4927-8f1f-8e749f40025f.jsonl",
+      "content_hash": "sha256:b25df28dc18a1ce4fdf13282a1a2e0004301967e2484b82a15ead63fe0f62a46"
+    },
+    {
+      "id": "ev_2f2d1c8cfb724d5bb30382fe0fc30e64",
+      "type": "file",
+      "label": "plan-20260401-chs-history-provider-architecture.md",
+      "path": "P:\\.claude\\plans\\plan-20260401-chs-history-provider-architecture.md",
+      "content_hash": "sha256:05f11ac4e150ce27a8ff65e9d88b6f3f50c7bad681a2c68ef1fab2a2de57a9a3"
+    },
+    {
+      "id": "ev_6235d4ee9d6849f1842d560630d1cef3",
+      "type": "file",
+      "label": "PreToolUse_directory_policy.py",
+      "path": "P:\\.claude\\hooks\\PreToolUse_directory_policy.py",
+      "content_hash": "sha256:82fcca84a6e53abd6a4c2da46bb5200d4a9408a477ad595f1c24fe836aa77f63"
+    },
+    {
+      "id": "ev_af641771e5fe48f6b12f4d20ff84e453",
+      "type": "file",
+      "label": "directory_policy.json",
+      "path": "P:\\.claude\\hooks\\config\\directory_policy.json",
+      "content_hash": "sha256:fcbb67b73a185a1e0277f00034bd8cc0010a6b0a48eb8b7c69c79fe63919a80b"
+    },
+    {
+      "id": "ev_890c6a8cd11e48f2b0db3fc25fb30180",
+      "type": "file",
+      "label": "ADR-20260401-chs-multi-provider-history-archive.md",
+      "path": "P:\\.claude\\arch_decisions\\ADR-20260401-chs-multi-provider-history-archive.md"
+    },
+    {
+      "id": "ev_cd665507aa2c4c948dc057f4622de51f",
+      "type": "file",
+      "label": "__init__.py",
+      "path": "P:\\packages\\search-research\\core\\chs\\__init__.py",
+      "content_hash": "sha256:592c74c0376d7a741aeac5a6fe46a488e6c55ca93eebc4acef717b39f24992c2"
+    }
+  ],
+  "checksum": "sha256:a763942586ddb787cdcd02f76e678ebdb89ade84f75d8268592f89c9d3db2ed3"
+}
