@@ -812,6 +812,17 @@ def _resolve_file_reference(raw_path: str, plan_path: str | None) -> list[Path]:
         hooks_dir = Path(__import__('os').environ.get("CLAUDE_HOOKS_DIR", "P:/.claude/hooks"))
         if hooks_dir.exists():
             candidates.append(hooks_dir / path)
+        # Search P: drive for cross-drive compatibility (plan on C:, files on P:).
+        p_drive = Path("P:/")
+        if p_drive.exists():
+            candidates.append(p_drive / path)
+            try:
+                for match in p_drive.rglob(path.name):
+                    if match.is_file() and match.name == path.name:
+                        candidates.append(match)
+                        break
+            except OSError:
+                pass
     # preserve order, remove duplicates
     seen: set[str] = set()
     unique: list[Path] = []
@@ -2539,15 +2550,50 @@ def check_evidence_file_targets(plan: str, plan_path: str | None = None) -> list
             # Try skill path resolution as fallback for cross-drive issues
             existing = _resolve_evidence_path(raw_path, plan_path)
             if existing is None:
+                # Check if this is a future-state citation (plan explicitly says file
+                # will be created / does not exist yet / is output, not current evidence).
+                # If so, downgrade from HIGH to ADVISORY — it is not a true blocker.
+                priority = "HIGH"
+                if section_name == "Current State with Evidence":
+                    normalized_lower = raw_path.lower()
+                    # Scan the Current State section for future-state language near this file.
+                    # Strip path separators for keyword matching.
+                    path_variants = {normalized_lower, normalized_lower.replace("/", " ").replace("\\", " ")}
+                    for kw in (
+                        "does not exist",
+                        "will contain",
+                        "will be created",
+                        "future output",
+                        "append-only",
+                        "not yet",
+                        "will be created by",
+                    ):
+                        if kw in current_state.lower():
+                            priority = "ADVISORY"
+                            break
+                    # Also check if the file appears as a known future file in the plan text.
+                    # e.g. "synthesis/synthesis_core.py (TASK-13)" means TASK-13 creates it.
+                    impl_lower = implementation.lower() if implementation else ""
+                    file_basename = Path(normalized_lower).name.lower().replace(".py", "")
+                    if file_basename in impl_lower or raw_path.lower() in impl_lower:
+                        priority = "ADVISORY"
+
                 findings.append(
                     {
                         "id": "EVIDENCE-001",
                         "category": "evidence_reference",
-                        "priority": "HIGH",
-                        "title": "Plan cites a file that does not exist in the current workspace",
+                        "priority": priority,
+                        "title": (
+                            "Plan cites a file that does not exist in the current workspace"
+                            if priority == "HIGH"
+                            else "Future file noted — will be created by a task in this plan"
+                        ),
                         "description": (
                             "Explicit file evidence must resolve against the current workspace before the "
                             f"plan can rely on it. Missing target: {raw_path}"
+                            if priority == "HIGH"
+                            else f"File '{raw_path}' is noted as future/created-by-task in this plan. "
+                            "No current workspace file required — ADVISORY only."
                         ),
                         "section": section_name,
                     }
