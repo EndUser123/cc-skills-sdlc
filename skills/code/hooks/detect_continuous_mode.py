@@ -67,9 +67,9 @@ INTERACTIVE_PATTERNS = [
     r"approve each phase",
 ]
 
-# State file location (persists across subprocess calls)
-STATE_DIR = Path(".claude/skills/code/.state")
-STATE_FILE = STATE_DIR / "continuous_mode.flag"
+# Workspace-level state location (persists across subprocess calls)
+STATE_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "P:/")) / ".claude" / "state"
+STATE_FILE = STATE_DIR / "code_continuous_mode.flag"
 
 
 def detect_continuous_mode(user_query: str) -> bool:

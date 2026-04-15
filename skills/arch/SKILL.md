@@ -13,8 +13,9 @@ triggers:
   - architectural decision
   - adf
 suggest:
-  - /qr
   - /planning
+follow_up_offer:
+  - /ai-gemini
 workflow_steps:
   - preflight_checks
   - classify_intent
@@ -964,6 +965,11 @@ Caller action: consume packet, rewrite plan, rerun auto_verify
   ```
 
 **Critical format requirement**: Use the INSTRUCTION block format above. The Skill Enforcement Enhancement Layer (v3.5) in UserPromptSubmit.py detects this format and routes user "yes" approval to the specified skill instead of answering as conversational text.
+
+**After presenting an ADR (or closing architecture), always offer any `follow_up_offer` targets from frontmatter as optional review steps.**
+`follow_up_offer` is advisory-only and does not change routing or skill ownership.
+
+If a follow-up review finds gaps, ask the user: "Should I update the reviewed document with fixes to address the findings?"
 
 `/arch` closes architecture. It does not write plan artifacts or implementation code.
 

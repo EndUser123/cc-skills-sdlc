@@ -2155,7 +2155,6 @@ def check_helper_reference_clarity(plan: str, plan_path: str | None = None) -> l
                 ),
             }
         )
-        break
     return findings
 
 

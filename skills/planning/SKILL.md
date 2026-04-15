@@ -6,7 +6,6 @@ enforcement: advisory
 depends_on:
   - sdlc: ">=0.1.0"
 suggest:
-  - /qr
   - /arch
 triggers:
   - /planning
@@ -35,6 +34,7 @@ workflow_steps:
   - auto_fix: Apply only non-semantic repairs (header normalization, metadata, and optional ordering when explicitly requested)
   - adversarial_review: Dispatch 6 adversarial subagents via Agent tool in parallel
   - synthesize: Rewrite plan incorporating accepted findings; remove stale steps; rerun verification
+  - integration_trace: Walk a concrete example query through all TASKS to verify every output has a named consumer and every consumer has defined handling
   - recommended_next_steps: When the plan is blocked, routed, or below implementation-ready, emit numbered Recommended Next Steps with owner, why, apply, proof, and `0 = apply all`
   - present_results: Show status header, verification result, and path to plan artifact only
   - cleanup_artifacts: |
@@ -44,6 +44,9 @@ workflow_steps:
       Run: python -c "from pathlib import Path,sys;sys.path.insert(0,str(Path('P:/.claude/skills/planning/__lib')));from auto_verify import cleanup_plan_artifacts;print(cleanup_plan_artifacts())"
 
 hooks: {}
+
+follow_up_offer:
+  - /ai-gemini
 
 suggest:
   - /search (context discovery for planning)
@@ -77,8 +80,88 @@ Before accepting a draft as semantically complete, `/planning` should ask itself
 - What prior decision packet, blocker, or correction most changed what this plan now needs to say? (`trace`)
 - What is the strongest execution-side objection to accepting this plan as implementation-ready? (`challenge`)
 - What repeated planning defect should be promoted into a validator or gate instead of rediscovered manually next time? (`graduate`)
+- Does this plan look complete but have hidden integration gaps when traced end-to-end with a concrete query? Specifically: does every TASK output have a named consumer, and is every consumer's handling of that output defined? (`integration_trace`)
 
 These are internal planning prompts, not user interview questions. Their job is to surface hidden execution ambiguity before `auto_verify.py` has to reject the artifact.
+
+## Integration Trace (Mandatory for Multi-TASK Plans)
+
+**Purpose**: Catch the most common planning failure — TASKs that look complete in isolation but have integration gaps when you try to code them.
+
+**When to run**: After `synthesize` rewrites the plan, before `present_results`. Mandatory for plans with 3 or more TASKS. Optional for simpler plans but recommended when the plan covers a new subsystem or cross-component flow.
+
+### What It Does
+
+Pick one **concrete example query** that exercises the full plan (not a hypothetical — a specific user intent or system event). Walk it through all TASKS in order, asking at each step:
+
+> **"What component consumes this output? Is that consumption defined in the plan?"**
+
+A TASK is **integration-complete** if both are true:
+1. Its output artifact/field/state is explicitly named
+2. The downstream consumer is identified, and what that consumer does with the output is stated somewhere in the plan
+
+A TASK has an **integration gap** if:
+- It produces something but no consumer is named
+- A consumer is named but the plan doesn't show what it does with the input
+- The consumer is another TASK that has its own unmet input dependencies
+- The "consumer" is "the system" or "the output" with no specific handler defined
+
+### Integration Trace Protocol
+
+```
+For each TASK in execution order:
+  1. Name the output artifact/field/state this TASK produces
+  2. Name the component that consumes this output (TASK-N, external component, or "none/unknown")
+  3. If the consumer is another TASK in this plan:
+     a. Does that consuming TASK list this input as a dependency?
+     b. Does the consuming TASK's description show how it uses this input?
+  4. If the consumer is external (filesystem, CLI, hook, API):
+     a. Is that consumer's handling of this output defined in the plan?
+  5. If no consumer is named → this is a gap
+  6. If consumer is named but usage is not shown → this is a gap
+```
+
+### Gap Handling
+
+If the Integration Trace finds a gap:
+- Flag it as a planning blocker (not a verification warning)
+- The plan cannot be `implementation-ready` while an integration gap is unresolved
+- Remediation options:
+  - Add the missing consumer/usage to the producing TASK
+  - Add a new TASK to handle the orphaned output
+  - Explicitly mark the output as terminal (no consumer) and define failure behavior
+- Route to `/arch` if the gap reveals a missing boundary contract
+
+### Common Gap Patterns (for fast recognition)
+
+| Gap Pattern | Looks Like | Reality |
+|---|---|---|
+| **Orphaned output** | "TASK-5 produces synthesis report" | No TASK or component consumes the report |
+| **Implied router** | "TASK-3 routes to appropriate handler" | No handler is defined; routing logic is not specified |
+| **Synthesis assumption** | "TASK-10 handles synthesis" | No `synthesis_core.py` or equivalent is specified as existing or to-be-built |
+| **Contradiction gap** | "TASK-5 detects contradiction" | No logic defines what to do when a contradiction is found |
+| **Branch undefined** | "TASK-4 branches based on type" | The branching condition and each branch's target are not named |
+
+### Output Format
+
+After running the trace, emit a brief Integration Trace Summary:
+
+```markdown
+## Integration Trace Summary
+
+**Example query:** [concrete user intent or system event]
+
+| TASK | Output | Consumer | Status |
+|------|--------|----------|--------|
+| TASK-1 | X | TASK-2 | ✓ Defined |
+| TASK-2 | Y | TASK-3 | ✓ Defined |
+| TASK-3 | Z | external (hook) | ✓ Defined |
+| TASK-4 | W | none | ⚠ Orphaned — define or mark terminal |
+| TASK-5 | V | TASK-4 | ✓ Defined |
+
+**Gaps found:** 1 (TASK-4 output is not consumed)
+**Status:** [draft / in-review / implementation-ready] — integration gaps remaining
+```
 
 ## Trace, Challenge, And Graduate
 
@@ -116,7 +199,7 @@ Internal blind-spot checks are run before final recommendations.
 ```
 Claude assembles draft -> Claude calls auto_verify.py -> if architecture blockers exist, Claude invokes /arch
 -> Claude rewrites the plan -> Claude dispatches adversarial agents
--> Claude synthesizes changes -> Claude presents results (plan path + status only)
+-> Claude synthesizes changes -> Claude runs Integration Trace -> Claude presents results (plan path + status only)
 ```
 
 **Claude's responsibilities:**
@@ -527,6 +610,9 @@ unresolved_blockers: 0
 
 Changes incorporated: 4 findings accepted, 2 rejected with rationale, 1 deferred to follow-up.
 ```
+
+**After presenting results, always offer any `follow_up_offer` targets from frontmatter as optional review steps.**
+`follow_up_offer` is advisory-only and does not change routing or skill ownership.
 
 If the plan is blocked, routed to `/arch`, or otherwise below `implementation-ready`, present the same summary plus:
 

@@ -1,5 +1,4 @@
-# Skill state files (runtime flags and temporary data)
-.state/
+# Skill runtime flags and temporary data
 *.flag
 
 # Python cache

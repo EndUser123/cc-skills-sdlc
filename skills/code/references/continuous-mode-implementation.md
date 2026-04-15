@@ -9,7 +9,7 @@ python .claude/skills/code/hooks/detect_continuous_mode.py "$USER_QUERY"
 
 # Hook creates:
 # - Environment variable: CODE_CONTINUOUS_MODE=1
-# - State file: .claude/skills/code/.state/continuous_mode.flag
+# - State file: .claude/state/code_continuous_mode.flag
 ```
 
 ### Step 2: Check continuous mode at each phase boundary
@@ -17,7 +17,7 @@ python .claude/skills/code/hooks/detect_continuous_mode.py "$USER_QUERY"
 # Before ANY phase completion summary or "Next Steps" menu:
 check_continuous_mode() {
   # Check state file first (persists across subprocess boundaries)
-  if [ -f ".claude/skills/code/.state/continuous_mode.flag" ]; then
+  if [ -f ".claude/state/code_continuous_mode.flag" ]; then
     return 0  # Continuous mode active
   fi
 
@@ -62,7 +62,7 @@ When `continuous_mode` is **NOT** active:
 ### Step 4: Cleanup after workflow completes
 ```bash
 # Remove state file after all phases complete
-rm -f .claude/skills/code/.state/continuous_mode.flag
+rm -f .claude/state/code_continuous_mode.flag
 unset CODE_CONTINUOUS_MODE
 ```
 
