@@ -14,10 +14,12 @@ triggers:
   - adf
 suggest:
   - /planning
+  - /specify
 follow_up_offer:
   - /ai-gemini
 workflow_steps:
   - preflight_checks
+  - explore_context
   - classify_intent
   - contract_sensitivity_classification
   - select_template

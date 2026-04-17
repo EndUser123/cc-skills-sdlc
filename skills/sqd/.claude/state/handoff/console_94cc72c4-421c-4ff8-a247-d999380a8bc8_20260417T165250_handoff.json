@@ -1,0 +1,118 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "c8050cda-1364-4ec0-a239-4852c98d15f1",
+    "terminal_id": "console_94cc72c4-421c-4ff8-a247-d999380a8bc8",
+    "source_session_id": "1e4efb47-62fe-4b66-8497-1a35ce7f4305",
+    "created_at": "2026-04-17T16:52:50.169599+00:00",
+    "expires_at": "2026-04-17T17:12:50.169599+00:00",
+    "status": "rejected_stale",
+    "goal": "test your sqd implementation.",
+    "current_task": "test your sqd implementation.",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:\\.claude\\hooks\\config\\directory_policy.json",
+      "P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py",
+      "P:\\files.csv",
+      "P:\\skills-lock.json",
+      "P:\\.claude\\skills\\cleanup\\SKILL.md",
+      "P:\\tests\\test_run_audit_multi_llm.py",
+      "P:\\.claude\\skills\\gto\\gto_orchestrator.py",
+      "P:/.claude/hooks/UserPromptSubmit_modules/verify_before_claim.py",
+      "P:/.claude/hooks/config/directory_policy.json",
+      "P:/.claude/skills/cleanup/scripts/cleanup.py"
+    ],
+    "pending_operations": [
+      {
+        "type": "skill",
+        "target": "skill: cleanup",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python \"P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py\" --dry-run 2>&1",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python \"P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py\" --max 20 2>&1",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "echo \"yes\" | python \"P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py\" --max 20 2>&1",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "python \"P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py\" --yes --max 20 2>&1",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "(advisory) Previous session had pending: skill on skill: cleanup.",
+    "decision_refs": [],
+    "evidence_refs": [
+      "ev_ada46e89a8474b1e8f380c75c05965a4",
+      "ev_a19d878e7dbb45b4a8323657aa1ddf8d",
+      "ev_ab9c6b98ab7c429ca0f9c2d476a2e9ea",
+      "ev_125ed8afc8ba4d54a489012009212b7c",
+      "ev_58073643ddce4353a3546ca7319c7cd7",
+      "ev_5873a502fb2b45fabf8636d20ce26dda"
+    ],
+    "n_1_transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\1e4efb47-62fe-4b66-8497-1a35ce7f4305.jsonl",
+    "n_2_transcript_path": null,
+    "message_intent": "instruction",
+    "goal_origin": "user_message",
+    "quality_score": 0.4,
+    "tasks_snapshot": [],
+    "rejected_at": "2026-04-17T16:54:09.647635+00:00",
+    "rejected_by_session_id": "1e4efb47-62fe-4b66-8497-1a35ce7f4305",
+    "rejection_reason": "snapshot evidence path outside project directory"
+  },
+  "decision_register": [],
+  "evidence_index": [
+    {
+      "id": "ev_ada46e89a8474b1e8f380c75c05965a4",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\1e4efb47-62fe-4b66-8497-1a35ce7f4305.jsonl",
+      "content_hash": "sha256:79ea4b0f3f7b041e87c356d7fed87ad05aedea571bd57639306aa6c6523d6eea"
+    },
+    {
+      "id": "ev_a19d878e7dbb45b4a8323657aa1ddf8d",
+      "type": "file",
+      "label": "directory_policy.json",
+      "path": "P:\\.claude\\hooks\\config\\directory_policy.json",
+      "content_hash": "sha256:a0a16224f4d76abc497074d80e152fd9b22bfd74b80fe9da1e9d0f1269889e47"
+    },
+    {
+      "id": "ev_ab9c6b98ab7c429ca0f9c2d476a2e9ea",
+      "type": "file",
+      "label": "cleanup.py",
+      "path": "P:\\.claude\\skills\\cleanup\\scripts\\cleanup.py",
+      "content_hash": "sha256:d21495f5b6b1b1b49bf7f46b17c53e837eba091562202c835ad696cb9aa112b8"
+    },
+    {
+      "id": "ev_125ed8afc8ba4d54a489012009212b7c",
+      "type": "file",
+      "label": "files.csv",
+      "path": "P:\\files.csv"
+    },
+    {
+      "id": "ev_58073643ddce4353a3546ca7319c7cd7",
+      "type": "file",
+      "label": "skills-lock.json",
+      "path": "P:\\skills-lock.json"
+    },
+    {
+      "id": "ev_5873a502fb2b45fabf8636d20ce26dda",
+      "type": "file",
+      "label": "SKILL.md",
+      "path": "P:\\.claude\\skills\\cleanup\\SKILL.md",
+      "content_hash": "sha256:d13ca487b45fc4152eda7c445d754bb5558b57321198dd4c65514d349d71d46f"
+    }
+  ],
+  "checksum": "sha256:5293882fad8f55779aeddd46d357174cbad830b0cde8841ec8dd6e526b5eb6d7"
+}
