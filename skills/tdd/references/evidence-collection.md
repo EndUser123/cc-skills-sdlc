@@ -129,7 +129,7 @@ success, error, count = safe_transform_file(
 - Regex on code structure
 - sed/awk for Python code
 
-**Reference**: `P:/packages/refactor/AST_HELPERS_GUIDE.md`
+**Reference**: `/refactor` skill (see `packages/sdlc/skills/refactor/`)
 
 ### REFACTOR Phase (Cleanup)
 
