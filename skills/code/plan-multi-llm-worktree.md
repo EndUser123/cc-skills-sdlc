@@ -61,31 +61,24 @@ P:/worktrees/<feature-slug>-deepseek/   # DeepSeek implementation
 
 State files keyed on `cwd` to prevent cross-worktree state contamination (per CLAUDE.md isolation pattern).
 
-### Kill Switch
-
-Set `SDLC_MULTI_LLM=0` in the environment to skip all external LLM slots. When set, worktree B is not created and the parallel workflow is bypassed entirely. Checked at invocation time, before any worktree or CLI call is made.
-
 ### LLM Invocation for Worktree B
 
 ```bash
-# DeepSeek implements the plan in worktree B (no cd — use absolute path via --cwd)
-# Kill switch: skip if SDLC_MULTI_LLM=0
+# DeepSeek implements the plan in worktree B
+cd P:/worktrees/<feature-slug>-deepseek
 opencode run \
-  --cwd P:/worktrees/<feature-slug>-deepseek \
   --model deepseek-v3.2 \
   --include-dir . \
-  --prompt "Implement the feature described in plan.md.
+  --prompt "Implement the feature described in plan.md. 
   Follow TDD: write failing tests first, then implement.
   Run: pytest after implementation.
-  Target dir: P:/worktrees/<feature-slug>-deepseek"
+  Target dir: $(pwd)"
 ```
 
 For GPT-5.4 variant (worktree C, if `--codex` flag added):
 ```bash
-# Kill switch: skip if SDLC_MULTI_LLM=0
 codex -a full-auto \
   -m gpt-5.4 \
-  --cwd P:/worktrees/<feature-slug>-codex \
   "Implement the feature in plan.md using TDD. Run pytest when done."
 ```
 
@@ -108,14 +101,6 @@ Written to `P:/worktrees/<feature-slug>-compare/compare.md`:
 **Reason**: [one sentence]
 ```
 
-### Compare Step Consumer
-
-**Consumer**: Claude in-context synthesis (not a subagent).
-
-After `compare.md` is written, Claude reads it in-context and makes the final recommendation call. The file is input to Claude's synthesis, not the output of a separate subagent. This avoids the orphaned-consumer problem where compare.md exists but no one acts on it.
-
-The comparison table provides structured data; Claude provides judgment. If the recommendation field is empty or the table is incomplete, Claude flags it rather than picking by default.
-
 ---
 
 ## Tasks
@@ -130,12 +115,6 @@ The comparison table provides structured data; Claude provides judgment. If the 
 - Invoke `/ai-oc-nvidia-ds-v32` with `--include-dir` on a test directory
 - Invoke `/codex` with a simple implementation task in a temp directory
 - **Output**: Verified invocation patterns for both CLIs or `[UNSUPPORTED]` flags
-
-### TASK-002b: Confirm plan.md is accessible from worktree B context
-- After worktree B is created, verify the plan.md absolute path is reachable from that worktree's working directory
-- Inject the plan.md absolute path into the DeepSeek/Codex invocation prompt (not a relative path)
-- If plan.md lives in the main repo, reference it as an absolute path in the LLM prompt so worktree B can read it
-- **Output**: plan.md path confirmed injectable; DeepSeek reports "plan.md not found" warning resolved
 
 ### TASK-003: Define compare step scoring rubric
 - Write `references/worktree-compare-rubric.md` with scoring criteria

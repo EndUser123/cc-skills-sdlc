@@ -1,1 +1,0 @@
-"""Refactor skill scripts package."""

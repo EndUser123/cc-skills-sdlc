@@ -1,1 +1,0 @@
-"""SQA skill hooks."""

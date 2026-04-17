@@ -422,3 +422,103 @@ else:
 **Why this works**: The idempotency pre-flight check (already in every agent prompt) means re-dispatching the current phase is safe -- completed agents return their existing file path instantly. You can re-dispatch the whole phase for simplicity, or just the failed agents for efficiency.
 
 **Retry dispatch pattern**: Use the exact same prompts from Step 4b. No modifications needed -- the idempotency check handles deduplication.
+
+## Slot 5: External LLM Adversarial (DeepSeek via /ai-cli)
+
+**Conditional**: This slot is ONLY dispatched when `SDLC_MULTI_LLM` env var is set to `"1"`.
+If `SDLC_MULTI_LLM` is `"0"` or unset, skip this slot entirely and proceed with 4 Claude agents.
+
+**Slot 5 dispatches via Bash (not Agent tool)** because it calls an external CLI.
+
+### Pre-flight check
+
+```bash
+python -c "import os; print(os.environ.get('SDLC_MULTI_LLM', '0'))"
+```
+
+If output is not `"1"`, skip this entire section.
+
+### Idempotency check
+
+```bash
+python -c "
+import json, os, time
+fpath = r'<findings_dir>/deepseek-adversarial-findings.json'
+if not os.path.exists(fpath):
+    exit(1)
+try:
+    data = json.loads(open(fpath, encoding='utf-8').read())
+    age = time.time() - os.path.getmtime(fpath)
+    if data.get('plan_path') == r'<plan_path>' and age < 86400:
+        print(fpath)
+        exit(0)
+    os.remove(fpath)
+except (json.JSONDecodeError, KeyError, OSError):
+    if os.path.exists(fpath):
+        os.remove(fpath)
+exit(1)
+"
+```
+
+If the above script prints a path, return ONLY that path.
+
+### Dispatch via /ai-cli
+
+```bash
+python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an adversarial plan reviewer. Review the plan at the provided context file for: 1) How would this plan fail under concurrent load or edge-case inputs? 2) What is the weakest assumption? 3) What contracts or schemas are implied but not defined? 4) What failure modes are most likely? Output findings as a JSON object with this exact schema: {\"plan_path\": \"<plan_path>\", \"agent\": \"deepseek-v3.2-adversarial\", \"model\": \"deepseek-v3.2\", \"findings\": [{\"severity\": \"HIGH|MEDIUM|LOW\", \"category\": \"string\", \"description\": \"string\", \"line_ref\": \"optional\"}], \"timestamp\": \"ISO8601\"}" --context "<plan_path>" --opencode-only --opencode-model chutes/deepseek-ai/DeepSeek-V3-0324-TEE --output-format json --no-critic --timeout 120
+```
+
+### Transform output to canonical findings path
+
+After ai-cli returns, parse the JSON and write to:
+
+```
+<findings_dir>/deepseek-adversarial-findings.json
+```
+
+The ai-cli output has shape `{model, output, error, latency_ms}`. Extract `output` and attempt JSON parse. If `output` is not valid JSON, wrap the raw text as a single finding:
+
+```python
+import json, sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ai_cli_output_path = sys.argv[1]  # path to ai-cli JSON output
+canonical_path = r'<findings_dir>/deepseek-adversarial-findings.json'
+
+raw = json.loads(Path(ai_cli_output_path).read_text(encoding='utf-8'))
+output_text = raw.get('output', '')
+
+try:
+    findings_data = json.loads(output_text)
+    if 'findings' not in findings_data:
+        findings_data = {'findings': [{'severity': 'MEDIUM', 'category': 'general', 'description': output_text}]}
+except json.JSONDecodeError:
+    findings_data = {'findings': [{'severity': 'MEDIUM', 'category': 'general', 'description': output_text}]}
+
+canonical = {
+    'plan_path': r'<plan_path>',
+    'agent': 'deepseek-v3.2-adversarial',
+    'model': 'deepseek-v3.2',
+    'findings': findings_data.get('findings', []),
+    'timestamp': datetime.now(timezone.utc).isoformat(),
+}
+Path(canonical_path).write_text(json.dumps(canonical, indent=2), encoding='utf-8')
+print(canonical_path)
+```
+
+### Fallback
+
+If the ai-cli command fails (timeout, CLI unavailable, invalid JSON), log a warning:
+
+```
+[SDLC_MULTI_LLM] Slot 5 (DeepSeek) failed: <error>. Skipping external slot — 4 Claude agents still provide full coverage.
+```
+
+Do NOT dispatch a fallback Claude agent. The 4 existing Claude phase-1 agents provide full adversarial coverage. The external slot is additive only.
+
+### Findings path
+
+`<findings_dir>/deepseek-adversarial-findings.json`
+
+The critic agent reads all `*-findings.json` from `<findings_dir>`, so this file is automatically ingested.

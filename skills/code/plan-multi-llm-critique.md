@@ -32,77 +32,52 @@ Step 7.1 in `audit-phase-details.md` dispatches `pr-review-toolkit:code-reviewer
 
 ### Integration Point
 
-Add DeepSeek review as Step 7.1b in parallel with Step 7.1, and add Step 7.2 as a **new** synthesis step. Verified: `audit-phase-details.md` ends at line 103 with no synthesis step — it must be added.
+Add DeepSeek review as Step 7.1b immediately after (or parallel to) Step 7.1:
 
 ```
 Step 7.1  (existing): Agent(pr-review-toolkit:code-reviewer)       → findings_claude.md
-Step 7.1b (new):      DeepSeek V3.2 via /ai-oc-nvidia-ds-v32      → findings_deepseek.json
-Step 7.2  (NEW):      Read both findings files, emit combined summary
+Step 7.1b (new):      DeepSeek V3.2 via /ai-oc-nvidia-ds-v32      → findings_deepseek.md
+Step 7.2  (existing): Synthesize findings from both files
 ```
 
-Both 7.1 and 7.1b run in parallel — neither depends on the other's output. Step 7.2 (new) waits for both.
+Both 7.1 and 7.1b run in parallel — neither depends on the other's output. Synthesis (7.2) waits for both.
 
 ### Output Contract
 
-DeepSeek findings written to `<audit_dir>/findings_deepseek.json` (JSON, consistent with Plan 1 schema):
+DeepSeek findings written to `<audit_dir>/findings_deepseek.md`:
 
-```json
-{
-  "reviewer": "deepseek-v3.2",
-  "files_reviewed": ["<list>"],
-  "confidence_threshold": 80,
-  "findings": [
-    {
-      "severity": "HIGH|MEDIUM|LOW",
-      "file": "<file>",
-      "line": "<n>",
-      "issue": "<description>",
-      "recommendation": "<fix>"
-    }
-  ],
-  "summary": "<1-2 sentence summary>"
-}
+```markdown
+## DeepSeek V3.2 Code Review
+
+**Reviewer**: deepseek-v3.2 via /ai-oc-nvidia-ds-v32
+**Files reviewed**: [list]
+**Confidence threshold**: 80% (same as pr-review-toolkit)
+
+### Findings
+
+| Severity | File | Line | Issue | Recommendation |
+|----------|------|------|-------|---------------|
+| HIGH     | ...  | ...  | ...   | ...           |
+
+### Summary
+[1-2 sentence summary]
 ```
 
 ### Invocation Pattern
 
 ```bash
-# Kill switch: skip if SDLC_MULTI_LLM=0
-
-# Diff against branch point (not HEAD~1 — feature spans multiple commits)
-$DIFF=$(git diff $(git merge-base HEAD origin/main) HEAD)
-
-# Idempotency check — skip if valid findings already exist
-python -c "
-import sys, json, time, os
-fpath = r'<audit_dir>/findings_deepseek.json'
-if not os.path.exists(fpath):
-    sys.exit(1)
-try:
-    data = json.loads(open(fpath, encoding='utf-8').read())
-    age = time.time() - os.path.getmtime(fpath)
-    if data.get('reviewer') == 'deepseek-v3.2' and age < 86400:
-        print(fpath)
-        sys.exit(0)
-    os.remove(fpath)
-except (json.JSONDecodeError, KeyError, OSError):
-    if os.path.exists(fpath):
-        os.remove(fpath)
-pass
-sys.exit(1)
-"
-If the above script prints a path, return ONLY that path.
-
-# Invoke DeepSeek via agentic-cli wrapper (verified syntax from /ai-oc-nvidia-ds-v32 SKILL.md)
-pwsh -File P:/scripts/agentic-cli.ps1 `
-  -cli "opencode" `
-  -command "run \"Review this diff for: (1) logic errors, (2) error handling gaps, (3) state mutation bugs, (4) security issues. Report findings with severity HIGH/MEDIUM/LOW, >= 80% confidence only. Output as JSON to <audit_dir>/findings_deepseek.json. Diff: $DIFF\" --model nvidia/deepseek-ai/deepseek-v3.2 --format json" `
-  -outputPath "<audit_dir>/findings_deepseek.json"
+# Read changed files, pipe diff to DeepSeek for review
+git diff HEAD~1 | opencode run \
+  --model deepseek-v3.2 \
+  --prompt "You are a code reviewer. Review the following diff for:
+  1. Logic errors (off-by-one, wrong operators, inverted conditions)
+  2. Error handling gaps (silent failures, swallowed exceptions)
+  3. State mutation bugs (shared state, missing resets)
+  4. Security issues (injection, path traversal, unsafe deserialization)
+  Report findings with severity HIGH/MEDIUM/LOW. Only report findings with >= 80% confidence."
 ```
 
-Note: full model name is `nvidia/deepseek-ai/deepseek-v3.2`. No `--prompt` flag.
-
-Fallback: if DeepSeek unavailable, emit `[WARNING: DeepSeek slot skipped — review coverage reduced]` in the AUDIT output header and continue with Claude-only review. DONE phase is not blocked.
+Fallback: if DeepSeek unavailable, log warning and continue with Claude-only review. DONE phase is not blocked.
 
 ---
 
@@ -120,9 +95,9 @@ Fallback: if DeepSeek unavailable, emit `[WARNING: DeepSeek slot skipped — rev
 - **Output**: Verified sample output or `[INSUFFICIENT_QUALITY]` flag
 
 ### TASK-003: Define output schema for DeepSeek findings
-- Write output template for `findings_deepseek.json` (JSON schema, consistent with Plan 1)
-- Confirm the existing synthesis step can consume JSON findings from multiple sources
-- **Output**: Schema file at `P:/packages/sdlc/skills/code/references/deepseek-critique-schema.json`
+- Write output template for `findings_deepseek.md` (markdown table format above)
+- Confirm the existing synthesis step can consume markdown findings from multiple sources
+- **Output**: Template file at `P:/packages/sdlc/skills/code/references/deepseek-critique-template.md`
 
 ### TASK-004: Add Step 7.1b to audit-phase-details.md
 - Insert new section "## Step 7.1b: DeepSeek V3.2 Independent Review" after Step 7.1
@@ -135,7 +110,7 @@ Fallback: if DeepSeek unavailable, emit `[WARNING: DeepSeek slot skipped — rev
 
 ### TASK-006: Integration test
 - Run `/code` on a small feature, check AUDIT phase output
-- Confirm `findings_deepseek.json` is created (or fallback log present)
+- Confirm `findings_deepseek.md` is created (or fallback log present)
 - Confirm synthesis output references both Claude and DeepSeek findings
 - **Pass criteria**: Both finding files exist, synthesis cites both
 

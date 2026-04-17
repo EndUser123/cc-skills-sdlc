@@ -133,15 +133,42 @@ Phase: {phase}
         return None
 
 
-def cleanup_old_evidence(evidence_dir: Path, max_days: int = 7) -> int:
+def _get_terminal_id() -> str:
+    """Get current terminal ID with sanitization (avoids importing hook_base).
+
+    Priority:
+    1. CLAUDE_TERMINAL_ID env var (highest)
+    2. TERMINAL_ID, TERM_ID, SESSION_TERMINAL env vars
+    3. Derive from PID + timestamp (fallback)
+    """
+    import hashlib
+    import re
+
+    _PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+    for env_var in ["CLAUDE_TERMINAL_ID", "TERMINAL_ID", "TERM_ID", "SESSION_TERMINAL"]:
+        value = os.environ.get(env_var, "").strip()
+        if value and _PATTERN.match(value):
+            return value
+    try:
+        pid = os.getpid()
+        timestamp = int(datetime.now().timestamp())
+        unique = f"{pid}_{timestamp}".encode()
+        return hashlib.sha1(unique).hexdigest()[:12]
+    except (OSError, RuntimeError):
+        return "unknown"
+
+
+def cleanup_old_evidence(evidence_dir: Path, max_days: int = 7, terminal_id: str | None = None) -> int:
     """Clean up evidence artifacts older than max_days.
 
     This function cleans up both JSON ledger files (from EvidenceManager)
-    and markdown files (legacy fallback mode).
+    and markdown files (legacy fallback mode). JSON ledger cleanup is scoped
+    to the current terminal to prevent cross-terminal deletion.
 
     Args:
         evidence_dir: Path to .evidence directory (for legacy markdown files)
         max_days: Maximum age in days (default: 7)
+        terminal_id: Terminal ID for ledger cleanup scope (default: auto-detect)
 
     Returns:
         Number of artifacts cleaned up
@@ -162,15 +189,15 @@ def cleanup_old_evidence(evidence_dir: Path, max_days: int = 7) -> int:
         except Exception as e:
             debug_log(f"cleanup_old_evidence: Error during markdown cleanup: {e}")
 
-    # Clean up JSON ledger files from EvidenceManager
+    # Clean up JSON ledger files from EvidenceManager (terminal-scoped)
     if EVIDENCE_MANAGER_AVAILABLE:
         try:
-            # Access the state directory where ledgers are stored
+            tid = terminal_id or _get_terminal_id()
             state_dir = Path(".claude/state")
             if state_dir.exists():
                 cutoff_time = time.time() - (max_days * 24 * 60 * 60)
-
-                for ledger_file in state_dir.glob("code_evidence_*.json"):
+                # Terminal-scoped: only delete ledgers belonging to current terminal
+                for ledger_file in state_dir.glob(f"code_evidence_{tid}*"):
                     if ledger_file.stat().st_mtime < cutoff_time:
                         ledger_file.unlink()
                         cleaned_count += 1

@@ -1,0 +1,117 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "3232e8c6-fcfa-413f-aed5-39b8d9035fb7",
+    "terminal_id": "console_e07ad480-f4d3-467b-ba85-5d20e91012e4",
+    "source_session_id": "57914d7b-4ecd-4f68-9094-2cd8301fb7d7",
+    "created_at": "2026-04-16T22:19:59.991531+00:00",
+    "expires_at": "2026-04-16T22:39:59.991531+00:00",
+    "status": "pending",
+    "goal": "[Request interrupted by user]",
+    "current_task": "[Request interrupted by user]",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:/packages/gitready/skills/gitready/SKILL.md",
+      "P:/packages/gitready/skills/gitready/references/package-type-detection.md",
+      "P:/packages/gitready/skills/gitready/references/stale-location-cleanup.md",
+      "P:/packages/gitready/skills/gitready/references/changelog.md",
+      "P:/packages/gitready/skills/gitready/references/exception-aware-validation.md",
+      "P:/packages/gitready/skills/gitready/resources/phases/validate_pointers.py",
+      "P:/packages/gitready/skills/gitready/resources/phases/track_phases.py",
+      "P:/packages/gitready/skills/gitready/references/completion-report.md",
+      "P:/packages/gitready/skills/gitready/references/exception-registry.md",
+      "P:/.claude/skills/skill-audit/audit.py"
+    ],
+    "pending_operations": [
+      {
+        "type": "skill",
+        "target": "skill: skill-audit",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/*",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/packages/gitready/skills/gitready/SKILL.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "files: **/*.md",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/packages/gitready/skills/gitready/references/package-type-detection.md",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "Resume skill on skill: skill-audit.",
+    "decision_refs": [],
+    "evidence_refs": [
+      "ev_ae0377cc27224c07a3aa3b059dd0cfe3",
+      "ev_c700a0e762c84de78a889d689138cdf8",
+      "ev_5adb75758b134e45bd4328c9097a8cfc",
+      "ev_8314e4f357d546d285c8cfccdaeb3183",
+      "ev_6a28db8094ef406dadf2196cd4414f9e",
+      "ev_52de8be6ed7043b99c4033c94aadefef"
+    ],
+    "n_1_transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\57914d7b-4ecd-4f68-9094-2cd8301fb7d7.jsonl",
+    "n_2_transcript_path": null,
+    "message_intent": "instruction",
+    "goal_origin": "user_message",
+    "quality_score": 0.4,
+    "tasks_snapshot": []
+  },
+  "decision_register": [],
+  "evidence_index": [
+    {
+      "id": "ev_ae0377cc27224c07a3aa3b059dd0cfe3",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\57914d7b-4ecd-4f68-9094-2cd8301fb7d7.jsonl",
+      "content_hash": "sha256:2d50f90be0824460e6bef73b898c0beb5c347d25c0fbc742334a4ad753ed933a"
+    },
+    {
+      "id": "ev_c700a0e762c84de78a889d689138cdf8",
+      "type": "file",
+      "label": "SKILL.md",
+      "path": "P:\\packages\\gitready\\skills\\gitready\\SKILL.md",
+      "content_hash": "sha256:077772846b2577a9b518ea70a78971c8e9f60933c656cdd1e1c596bf24418a6b"
+    },
+    {
+      "id": "ev_5adb75758b134e45bd4328c9097a8cfc",
+      "type": "file",
+      "label": "package-type-detection.md",
+      "path": "P:\\packages\\gitready\\skills\\gitready\\references\\package-type-detection.md",
+      "content_hash": "sha256:7e01909197e83bc65d269cb1bc026a47c2963617ee37ea70a3f2a3f51ef28560"
+    },
+    {
+      "id": "ev_8314e4f357d546d285c8cfccdaeb3183",
+      "type": "file",
+      "label": "stale-location-cleanup.md",
+      "path": "P:\\packages\\gitready\\skills\\gitready\\references\\stale-location-cleanup.md",
+      "content_hash": "sha256:2316a407dea9da15bcc629872a543275dbc0077c470b56f0c00ff793bceecbe1"
+    },
+    {
+      "id": "ev_6a28db8094ef406dadf2196cd4414f9e",
+      "type": "file",
+      "label": "changelog.md",
+      "path": "P:\\packages\\gitready\\skills\\gitready\\references\\changelog.md",
+      "content_hash": "sha256:fb9c2998d44e09570a431d5aa596fa50dfd9a826a3c1bde3faa68582d1abc475"
+    },
+    {
+      "id": "ev_52de8be6ed7043b99c4033c94aadefef",
+      "type": "file",
+      "label": "exception-aware-validation.md",
+      "path": "P:\\packages\\gitready\\skills\\gitready\\references\\exception-aware-validation.md",
+      "content_hash": "sha256:f84738c3182460871b5639bf8c01b80e3ef16668101a91e110bdf43d609349ed"
+    }
+  ],
+  "checksum": "sha256:3d86c151219ad25033c15de00014aa0d2e70ce05ba3bbbe70baf95e36bc24f63"
+}

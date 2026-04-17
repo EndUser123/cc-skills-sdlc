@@ -867,11 +867,23 @@ The critic should not block on stylistic preference, alternative architecture ta
 
 ### Invoking the Critic
 
-Stage 1.9 invokes `adr_critic` via the Agent tool:
+Stage 1.9 invokes `adr_critic` with conditional dispatch:
+
+```bash
+python -c "import os; print(os.environ.get('SDLC_MULTI_LLM', '0'))"
+```
+
+**If `SDLC_MULTI_LLM=1`** — dispatch via Gemini for a second-model perspective:
+
+```bash
+python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an ADR closure auditor. Review the ADR provided in the context file against 5 defect classes. Apply the rubric strictly — block only on concrete closure failures, not stylistic preference. The 5 defect classes are: 1) Safety Contradictions (conflicting timeout/stale-data/failure behavior), 2) Router Closure Defects (missing activation/bypass/ambiguous/failure criteria), 3) Packet Consistency Defects (summary drifts from Contract Authority Packet, prose weakens packet), 4) Downstream Alignment Defects (ADR claims contradict current skill contracts), 5) Unresolved Closure Fields (TBD/unknown/missing validators). Output: {review_metadata: {skill, adr_path, defects_found, defects_suppressed, scope}, findings: [{defect_class, severity, location, description, evidence, remediation}], passed_defect_classes, summary}" --context "<adr_path>" --context "P:/.claude/skills/arch/references/gemini-adr-critic-prompt.md" --gemini-only --output-format json --no-critic --timeout 120
+```
+
+Parse the JSON output. If valid, use it as the critic result. Write to `P:/.claude/state/adr_critic.json`.
+
+**If `SDLC_MULTI_LLM` is not `"1"` or Gemini dispatch fails** — fall back to Claude haiku:
 
 ```python
-# After Stage 1.8 passes, invoke adr_critic before saving the ADR
-# adr_path: absolute path to the draft ADR file
 Agent(
   subagent_type="general-purpose",
   model="haiku",
@@ -883,7 +895,7 @@ Output: P:/.claude/state/adr_critic.json"""
 )
 ```
 
-**Model selection**: `model="haiku"` — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
+**Model selection**: Haiku for the fallback — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
 
 **Blocking behavior**: If `adr_critic` returns `status: "blocked"`, `/arch` must repair the ADR's HIGH severity defects before saving or presenting it.
 

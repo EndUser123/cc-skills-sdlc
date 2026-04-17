@@ -561,6 +561,18 @@ The 5 phase-1 agents are: `adversarial-compliance`, `adversarial-logic`, `advers
 **IMPORTANT — Path safety**: Never dispatch a prompt that still contains `{sanitized_plan_name}`. That means Step 4a output was not consumed, and agents may write into the shared root or stale plan directory.
 **IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:/.claude/plans/adversarial/*.json` outputs as valid idempotent results.
 
+**Phase 1 Slot 5 — External LLM (conditional)**:
+
+After dispatching the 5 Claude agents, check `SDLC_MULTI_LLM`:
+
+```bash
+python -c "import os; print(os.environ.get('SDLC_MULTI_LLM', '0'))"
+```
+
+If `"1"`, dispatch DeepSeek adversarial via Bash (not Agent tool). Follow the Slot 5 instructions in `references/adversarial-agent-prompts.md` (Section: "Slot 5: External LLM Adversarial"). The critic agent reads all `*-findings.json` from `findings_dir`, so `deepseek-adversarial-findings.json` is automatically ingested.
+
+If not `"1"` or the dispatch fails, skip — the 5 Claude agents provide full adversarial coverage.
+
 **After Phase 1 completes**: Record stage checkpoint:
 ```python
 # Write stage file: adversarial-findings-complete

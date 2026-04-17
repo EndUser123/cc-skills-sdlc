@@ -17,9 +17,11 @@ AGENT_FINDINGS_FILENAMES = {
     "security": "security-findings.json",
     "failure-modes": "failure-modes-findings.json",
     "critic": "critic-findings.json",
+    "deepseek-adversarial": "deepseek-adversarial-findings.json",
 }
 PHASE1_AGENTS = ("compliance", "logic", "testing", "security", "failure-modes")
-ALL_AGENTS = PHASE1_AGENTS + ("critic",)
+PHASE1_OPTIONAL_EXTERNAL = ("deepseek-adversarial",)
+ALL_AGENTS = PHASE1_AGENTS + ("critic",) + PHASE1_OPTIONAL_EXTERNAL
 UNRESOLVED_PROMPT_TOKENS = (
     "{sanitized_plan_name}",
     "<plan_path>",
@@ -63,6 +65,10 @@ class DispatchSpec:
     description: str
     findings_path: Path
     prompt: str
+
+
+def is_multi_llm_enabled() -> bool:
+    return os.environ.get("SDLC_MULTI_LLM", "0") == "1"
 
 
 def detect_terminal_id() -> str:
@@ -171,7 +177,9 @@ def parse_reference_dispatch_prompts(
         agent = subagent_type.removeprefix("adversarial-")
         prompts[agent] = (subagent_type, description, prompt)
 
-    expected = set(ALL_AGENTS)
+    # External agents are dispatched via Bash/ai-cli, not Agent tool, so they have no
+    # Task() block in the reference prompts file. Exclude them from the validation check.
+    expected = set(ALL_AGENTS) - set(PHASE1_OPTIONAL_EXTERNAL)
     missing = sorted(expected - set(prompts))
     if missing:
         raise ValueError(
@@ -212,8 +220,11 @@ def build_dispatch_specs(
     if unknown:
         raise ValueError("Unknown adversarial agent(s): " + ", ".join(unknown))
 
+    # External agents (deepseek-adversarial) are dispatched via Bash, not prompts
+    prompt_dispatchable = tuple(a for a in agent_names if a not in PHASE1_OPTIONAL_EXTERNAL)
+
     specs: list[DispatchSpec] = []
-    for agent in agent_names:
+    for agent in prompt_dispatchable:
         subagent_type, description, template = prompts[agent]
         findings_path = context.findings_paths[agent]
         prompt = resolve_prompt_template(

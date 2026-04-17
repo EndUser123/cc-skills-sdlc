@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeepSeek V3.2 Adversarial Findings",
+  "description": "Schema for DeepSeek V3.2 adversarial review findings in the /planning workflow. Compatible with the critic subagent's JSON ingestion.",
+  "type": "object",
+  "required": ["schema_version", "plan_path", "agent", "model", "findings", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version identifier. Must be '1.0'."
+    },
+    "plan_path": {
+      "type": "string",
+      "description": "Absolute path to the plan file being reviewed."
+    },
+    "agent": {
+      "type": "string",
+      "const": "deepseek-v3.2-adversarial",
+      "description": "Agent identifier."
+    },
+    "model": {
+      "type": "string",
+      "const": "deepseek-v3.2",
+      "description": "Model used for this review."
+    },
+    "findings": {
+      "type": "array",
+      "description": "List of adversarial findings.",
+      "items": {
+        "type": "object",
+        "required": ["severity", "category", "description"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique finding identifier (e.g., 'COMP-001'). Optional for DeepSeek output."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["BLOCKER", "HIGH", "MEDIUM", "LOW"],
+            "description": "Severity level of the finding."
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the finding (e.g., 'compliance', 'logic', 'failure-mode')."
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong and why it matters."
+          },
+          "line_ref": {
+            "type": "string",
+            "description": "Optional reference to the specific line or section in the plan."
+          }
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp of when the review was run."
+    }
+  }
+}

@@ -32,23 +32,21 @@ The 5 phase-1 agents are Claude subagents (e.g., `adversarial-compliance`). The 
 
 ### Slot Assignment
 
-Add DeepSeek V3.2 as a **6th agent** running in parallel with the existing 5. All 5 current Claude agents are named and distinct — none are replaceable without losing coverage. The Claude critic (phase 2) remains unchanged — it reviews all findings regardless of which model produced them.
+Replace **one** phase-1 agent slot with a DeepSeek V3.2 review. Keep the other 4 as Claude subagents. The Claude critic (phase 2) remains unchanged — it reviews all findings regardless of which model produced them.
 
-Verified agent list from `references/adversarial-agent-prompts.md`:
 ```
 Phase 1 (parallel):
   [1] adversarial-compliance        (Claude — unchanged)
   [2] adversarial-logic             (Claude — unchanged)
-  [3] adversarial-testing           (Claude — unchanged)
-  [4] adversarial-security          (Claude — unchanged)
-  [5] adversarial-failure-modes     (Claude — unchanged)
-  [6] deepseek-v3.2-adversarial     (NEW — /ai-oc-nvidia-ds-v32 via Bash)
+  [3] adversarial-security          (Claude — unchanged)
+  [4] adversarial-failure-modes     (Claude — unchanged)
+  [5] deepseek-v3.2-adversarial     (NEW — /ai-oc-nvidia-ds-v32 via Bash)
 
 Phase 2 (sequential, after phase 1):
-  [7] adversarial-critic            (Claude — unchanged, reviews all 6 findings)
+  [6] adversarial-critic            (Claude — unchanged, reviews all 5 findings)
 ```
 
-**Rationale for adding as slot 6**: All 5 existing agents run in parallel — DeepSeek runs alongside them, critic waits for all 6.
+**Rationale for slot 5**: The 5th slot gets the independent model because all 5 run in parallel — DeepSeek latency does not block other agents. The critic runs after, so it naturally absorbs DeepSeek findings.
 
 ### Output Contract
 
@@ -76,39 +74,17 @@ DeepSeek findings must land in `<findings_dir>` as `deepseek_adversarial.finding
 Use the ACG DESIGN path from `/ai-oc-nvidia-ds-v32` (same ACG workflow as `/ai-gemini`):
 
 ```bash
-# Kill switch: skip if SDLC_MULTI_LLM=0
-
-# Idempotency check — skip if valid findings already exist
-python -c "
-import sys, json, time, os
-fpath = r'<findings_path>'
-if not os.path.exists(fpath):
-    sys.exit(1)
-try:
-    data = json.loads(open(fpath, encoding='utf-8').read())
-    age = time.time() - os.path.getmtime(fpath)
-    if data.get('plan_path') == r'<plan_path>' and age < 86400:
-        print(fpath)
-        sys.exit(0)
-    os.remove(fpath)
-except (json.JSONDecodeError, KeyError, OSError):
-    if os.path.exists(fpath):
-        os.remove(fpath)
-pass
-sys.exit(1)
-"
-If the above script prints a path, return ONLY that path.
-
-# Invoke DeepSeek via the agentic-cli wrapper (verified syntax from /ai-oc-nvidia-ds-v32 SKILL.md)
-pwsh -File P:/scripts/agentic-cli.ps1 `
-  -cli "opencode" `
-  -command "run \"Review plan at <plan_path> for: (1) failure modes under concurrent load, (2) weakest assumption, (3) implied contracts not defined. Output as JSON matching schema at <findings_path>.\" --model nvidia/deepseek-ai/deepseek-v3.2 --format json" `
-  -outputPath "<findings_path>"
+# Pipe plan content to DeepSeek via the OpenCode wrapper
+cat "<plan_path>" | opencode run \
+  --model deepseek-v3.2 \
+  --prompt "You are an adversarial plan reviewer. Apply the DESIGN adversarial path:
+  1. How would this plan fail under concurrent load or edge-case inputs?
+  2. What is the weakest assumption in this plan?
+  3. What contracts or schemas are implied but not defined?
+  Output findings as JSON array with severity (HIGH/MEDIUM/LOW), category, and description."
 ```
 
-Note: full model name is `nvidia/deepseek-ai/deepseek-v3.2`. No `--prompt` flag (prompt is positional). No `--include-dir` flag (OpenCode does not support it).
-
-Fallback if OpenCode unavailable: skip slot 6, emit `[WARNING: DeepSeek slot skipped — review coverage reduced]` in the adversarial review output header, proceed with 5 Claude agents. Do NOT block plan verification.
+Fallback if OpenCode unavailable: skip slot 5 (log warning), proceed with 4 Claude agents. Do NOT block plan verification.
 
 ---
 
@@ -162,6 +138,6 @@ Fallback if OpenCode unavailable: skip slot 6, emit `[WARNING: DeepSeek slot ski
 
 ## Open Questions for Review
 
-1. ~~Which of the 5 agents to drop~~ — resolved: all 5 are distinct, DeepSeek adds as slot 6.
-2. Should GPT-5.4 via `/codex` also be added as slot 7 (critic gets 7 findings), or is 1 non-Claude model sufficient for now?
+1. Which of the 5 current Claude agents is the best candidate to drop if we want to replace rather than add a 6th? (Adding a 6th is cleaner but increases latency.)
+2. Should GPT-5.4 via `/codex` also be added as slot 6 (full parallel, critic gets 6 findings), or is 1 non-Claude model sufficient for now?
 3. Latency budget: is the current adversarial phase blocking? If DeepSeek adds 30-60s, is that acceptable?
