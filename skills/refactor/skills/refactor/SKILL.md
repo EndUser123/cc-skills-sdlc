@@ -45,13 +45,15 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 
 **CRITICAL: When user invokes `/refactor continue`, execute ALL priority levels (P0->P1->P2->P3) without stopping.**
 
-1. **DISCOVER** -- Before launching agents, use CDS/`Grep`/CKS/CHS to locate hotspots; targeted `Read`s on those files. Then launch 3+ parallel Task agents:
+1. **DISCOVER** -- Before launching agents, use CDS/`Grep`/CKS/CHS to locate hotspots; targeted `Read`s on those files. Then launch 3+ staggered Task agents (30s apart to avoid context flooding):
    - Agent 1: `adversarial-compliance` -- Bugs/Logic (race conditions, error handling, TOCTOU)
    - Agent 2: `adversarial-performance` -- DRY/Simplicity (duplication, extraction, concurrency)
    - Agent 3: `adversarial-quality` -- Conventions (type hints, patterns, maintainability)
    - **For Python**: Add `python-simplifier` (Agent 4)
    - **For Python async**: Run `` `ruff` + `/p` `` to detect existing async bugs before refactoring
-2. **DEDUPLICATE** -- Merge findings where multiple agents flagged the same code location
+   - **Agent output format**: Each agent MUST use the `Write` tool (not `Bash`) to write findings JSON to `{target}/.refactor/findings-{agent-name}.json`. Shell quoting in Bash commands causes 3-4 wasted turns per agent. Write tool avoids this entirely.
+   - **Findings reuse**: If `{target}/.refactor/findings-*.json` files exist from a prior `--dry-run`, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified.
+2. **DEDUPLICATE** -- Merge findings where multiple agents flagged the same code location. Assign canonical IDs (e.g., `COMP-001/DRY-003` for cross-agent duplicates).
 3. **PRIORITIZE** -- P0: Bugs/Race -> P1: Error Handling -> P2: DRY -> P3: Conventions
 4. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
    - **If `--dry-run`**: Continue to steps 4.5-4.6, then STOP
@@ -133,6 +135,7 @@ For subagent output routing rules, see `references/subagent-routing.md`.
 | `--max-effort LEVEL` | Filter by effort (low, medium, high) |
 | `--include-aid` | Run /aid refactor on each file |
 | `--dry-run` | Analysis only, no changes |
+| `--rediscover` | Force re-discovery even if `.refactor/findings-*.json` exists |
 | `--no-confidence-filter` | Disable confidence filtering |
 | `--no-recent` | Analyze all files |
 | `--no-explore` | Disable exploration phase |
@@ -181,6 +184,22 @@ Characterization tests MUST be created and verified FAILING before any findings 
 | **RED** | `{test_file} must FAIL before changes` | Write test capturing current behavior |
 | **GREEN** | `{test_file} must PASS after changes` | Fix code or revert |
 | **REGRESSION** | `REGRESSION failed: {N} new failures` | Fix regressions before completing |
+
+### TDD Exemptions
+
+Not all findings require characterization tests. Skip RED phase when:
+
+| Finding Type | TDD Required? | Rationale |
+|-------------|---------------|-----------|
+| **P0: Crash bugs** (missing import, AttributeError, NameError) | **NO** | The "behavior" is "it crashes." A test that asserts `crash == True` adds no value. Fix directly. |
+| **P0: Data loss** (INSERT OR REPLACE destroying rows) | **YES** | Characterize what data is preserved vs lost before changing the SQL strategy. |
+| **P1: Race conditions** (missing locks) | **NO** | Race conditions are probabilistic; characterization tests for them are unreliable. Add the lock. |
+| **P2: DRY extraction** | **YES** | Must verify extracted helpers produce identical output to the original duplicated code. |
+| **P2: Parameter reduction** | **YES** | Must verify all callers still pass correct arguments after signature change. |
+| **P3: Dead code removal** | **NO** | If no callers exist (verified by Grep), removing it is safe without tests. |
+| **P3: Naming/convention** | **NO** | Renaming doesn't change behavior. |
+
+**Principle**: TDD protects against behavior change. If the fix changes broken behavior to correct behavior (crash → works), tests add ceremony without protection. If the fix changes working behavior to different working behavior (SQL strategy), tests prevent regression.
 
 ## See Also
 

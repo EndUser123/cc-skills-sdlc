@@ -1,54 +1,65 @@
 #!/usr/bin/env python3
-"""Reusable opencode dispatch for multi-LLM skill reviews.
+"""Reusable pi dispatch for multi-LLM skill reviews.
 
 Usage:
-    python opencode_dispatch.py --model <model> --prompt "<prompt>" --output <path>
+    python pi_dispatch.py --model <model> --prompt "<prompt>" --output <path>
 
 Example:
-    python opencode_dispatch.py --model minimax-coding-plan/MiniMax-M2.7 --prompt "Review..." --output findings.json
+    python pi_dispatch.py --model minimax-coding-plan/MiniMax-M2.7 --prompt "Review..." --output findings.json
 """
 
 import argparse
 import subprocess
 import sys
 import json
-import re
 from pathlib import Path
-
-OPENCODE = "C:/Users/brsth/AppData/Roaming/npm/opencode.cmd"
 
 
 def parse_jsonl(raw_output: str) -> dict | None:
-    """Parse opencode JSONL output, extracting dict from part.text fields."""
+    """Parse Pi JSONL output, extracting final assistant message."""
     try:
-        # opencode --format json emits newline-delimited JSON objects
+        full_text = ""
         for line in raw_output.strip().splitlines():
             if not line.strip():
                 continue
             try:
                 obj = json.loads(line)
-                # Look for the actual text content in step_finish or text parts
                 if isinstance(obj, dict):
-                    if obj.get("type") == "text":
-                        inner = obj.get("part", {}).get("text", "")
-                        if inner:
-                            # Might be a JSON string
-                            try:
-                                return json.loads(inner)
-                            except json.JSONDecodeError:
-                                return {"text": inner}
-                    elif obj.get("type") == "step_finish":
+                    etype = obj.get("type")
+                    if etype == "message_update":
+                        part = obj.get("part", {})
+                        if isinstance(part, dict):
+                            ame = part.get("assistantMessageEvent", {})
+                            if ame.get("type") == "text_delta":
+                                delta = ame.get("delta", "")
+                                if delta:
+                                    full_text += delta
+                    elif etype == "agent_end":
+                        # Final message collection
+                        msgs = obj.get("messages", [])
+                        for msg in msgs:
+                            if msg.get("role") == "assistant":
+                                content = msg.get("content", "")
+                                if content:
+                                    return {"text": content}
+                        # Fallback: if we accumulated text during streaming
+                        if full_text:
+                            return {"text": full_text}
                         return obj
             except json.JSONDecodeError:
                 continue
-        return None
+        return {"text": full_text} if full_text else None
     except Exception:
         return None
 
 
 def run_dispatch(model: str, prompt: str, output_path: Path) -> int:
-    """Run opencode with model and prompt, write JSON output to output_path."""
-    cmd = [OPENCODE, "run", prompt, "--model", model, "--format", "json"]
+    """Run pi with model and prompt, write JSON output to output_path."""
+    # model format: provider/model-id (e.g. openrouter/anthropic/claude-sonnet-4)
+    parts = model.split("/", 1)
+    provider = parts[0]
+    model_id = parts[1] if len(parts) > 1 else model
+    cmd = ["pi", "--mode", "json", "--provider", provider, "--model", model_id, prompt]
 
     try:
         proc = subprocess.Popen(

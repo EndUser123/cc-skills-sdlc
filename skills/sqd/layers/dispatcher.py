@@ -7,39 +7,50 @@ from pathlib import Path
 
 MODELS = {"deepseek", "gemini", "claude", "gpt"}
 
-# opencode model identifiers used by opencode_dispatch.py
-OPENCODE_MODEL_MAP = {
+# pi model identifiers: provider/model-id format
+PI_MODEL_MAP = {
     "deepseek": "deepseek/deepseek-chat-v3",
     "gemini": "google/gemini-2.5-flash",
     "claude": "anthropic/claude-3.5-sonnet",
     "gpt": "openai/gpt-4o",
 }
 
-OPENCODE_BIN = "C:/Users/brsth/AppData/Roaming/npm/opencode.cmd"
+PI_BIN = "pi"
 DISPATCH_TIMEOUT_SEC = 300
 
 
-def _parse_opencode_jsonl(raw_output: str) -> dict | None:
-    """Parse opencode JSONL output, extracting dict from part.text fields."""
+def _parse_pi_jsonl(raw_output: str) -> dict | None:
+    """Parse pi JSONL output, extracting final assistant message."""
     try:
+        full_text = ""
         for line in raw_output.strip().splitlines():
             if not line.strip():
                 continue
             try:
                 obj = json.loads(line)
                 if isinstance(obj, dict):
-                    if obj.get("type") == "text":
-                        inner = obj.get("part", {}).get("text", "")
-                        if inner:
-                            try:
-                                return json.loads(inner)
-                            except json.JSONDecodeError:
-                                return {"text": inner}
-                    elif obj.get("type") == "step_finish":
+                    etype = obj.get("type")
+                    if etype == "message_update":
+                        part = obj.get("part", {})
+                        if isinstance(part, dict):
+                            ame = part.get("assistantMessageEvent", {})
+                            if ame.get("type") == "text_delta":
+                                delta = ame.get("delta", "")
+                                if delta:
+                                    full_text += delta
+                    elif etype == "agent_end":
+                        msgs = obj.get("messages", [])
+                        for msg in msgs:
+                            if msg.get("role") == "assistant":
+                                content = msg.get("content", "")
+                                if content:
+                                    return {"text": content}
+                        if full_text:
+                            return {"text": full_text}
                         return obj
             except json.JSONDecodeError:
                 continue
-        return None
+        return {"text": full_text} if full_text else None
     except Exception:
         return None
 
@@ -62,7 +73,7 @@ def _score_from_finding(finding: dict) -> float:
 
 
 async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
-    """Dispatch adversarial review to a single LLM provider via opencode.
+    """Dispatch adversarial review to a single LLM provider via pi.
 
     Args:
         target: Path or description of artifact to review.
@@ -72,10 +83,14 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
     Returns:
         dict with at least keys: score (float 0-1), model, finding_text, raw
     """
-    if model not in OPENCODE_MODEL_MAP:
-        raise ValueError(f"Unknown model: {model}. Must be one of {list(OPENCODE_MODEL_MAP)}")
+    if model not in PI_MODEL_MAP:
+        raise ValueError(f"Unknown model: {model}. Must be one of {list(PI_MODEL_MAP)}")
 
-    opencode_model = OPENCODE_MODEL_MAP[model]
+    pi_model = PI_MODEL_MAP[model]
+    # pi uses --provider and --model as separate args
+    pi_parts = pi_model.split("/", 1)
+    provider = pi_parts[0]
+    model_id = pi_parts[1] if len(pi_parts) > 1 else pi_model
     output_path = output_dir / f"finding_{model}.json"
 
     # Build the adversarial review prompt
@@ -86,7 +101,7 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
         f'{{"score": <0.0-1.0>, "summary": "<1 sentence>", "issues": ["<issue1>", ...]}}'
     )
 
-    cmd = [OPENCODE_BIN, "run", prompt, "--model", opencode_model, "--format", "json"]
+    cmd = [PI_BIN, "--mode", "json", "--provider", provider, "--model", model_id, prompt]
 
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -102,24 +117,24 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
         return_code = proc.returncode
     except asyncio.TimeoutError:
         proc.kill()
-        raise RuntimeError(f"opencode ({model}) timed out after {DISPATCH_TIMEOUT_SEC}s")
+        raise RuntimeError(f"pi ({model}) timed out after {DISPATCH_TIMEOUT_SEC}s")
     except OSError as e:
-        raise RuntimeError(f"Failed to spawn opencode ({model}): {e}")
+        raise RuntimeError(f"Failed to spawn pi ({model}): {e}")
 
     stdout = stdout_bytes.decode("utf-8", errors="replace")
     stderr = stderr_bytes.decode("utf-8", errors="replace")
 
     if return_code != 0:
-        raise RuntimeError(f"opencode ({model}) exited {return_code}: {stderr[:500]}")
+        raise RuntimeError(f"pi ({model}) exited {return_code}: {stderr[:500]}")
 
     # Parse JSONL output
-    result = _parse_opencode_jsonl(stdout)
+    result = _parse_pi_jsonl(stdout)
     if result is None:
         # Fallback: try raw JSON
         try:
             result = json.loads(stdout)
         except json.JSONDecodeError:
-            raise RuntimeError(f"No parseable JSON from opencode ({model}). stdout: {stdout[:500]}")
+            raise RuntimeError(f"No parseable JSON from pi ({model}). stdout: {stdout[:500]}")
 
     score = _score_from_finding(result)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -139,8 +154,7 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
 async def dispatch_parallel(target: str, models: list[str], output_dir: Path) -> int:
     """Dispatch adversarial review to multiple LLM providers.
 
-    Models are dispatched sequentially to avoid opencode's SQLite backend
-    locking when multiple instances run simultaneously.
+    Models are dispatched sequentially via pi.
 
     Args:
         target: Path or description of artifact to review.

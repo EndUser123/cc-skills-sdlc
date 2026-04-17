@@ -1,5 +1,5 @@
 ---
-name: arch
+name: design
 description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Supports: fast, deep, cli, python, data-pipeline, precedent. Configuration: .archconfig.json (project) → ~/.archconfig.json (user) → ARCH_DEFAULT_DOMAIN (env var). Override with template=<name> parameter. Enhanced with Graph-of-Thought (GoT) for architecture alternatives analysis (v2.5), Hook Registration Consistency Checking (v5.1)."
 version: "5.3"
 status: stable
@@ -8,13 +8,12 @@ depends_on:
   - sdlc: ">=0.1.0"
 category: architecture
 triggers:
-  - arch
+  - design
   - architecture
   - architectural decision
   - adf
 suggest:
   - /planning
-  - /specify
 follow_up_offer:
   - /ai-gemini
 workflow_steps:
@@ -67,7 +66,7 @@ This skill routes architecture queries to specialized templates based on domain 
 
 ## Context & Scope
 
-`/arch` targets **solo development on Windows 11 with CLI-centric workflows**. Multi-terminal safety is always evaluated. Out-of-scope queries (multi-team governance, cloud infra, web UX, deployment) are redirected.
+`/design` targets **solo development on Windows 11 with CLI-centric workflows**. Multi-terminal safety is always evaluated. Out-of-scope queries (multi-team governance, cloud infra, web UX, deployment) are redirected.
 
 See `references/scope-and-contract.md` for full scope constraints, input contract, and "when not to use" routing.
 
@@ -77,7 +76,7 @@ See `references/scope-and-contract.md` for full scope constraints, input contrac
 
 **MANDATORY**: When you execute, always start your response with:
 
-`/arch [STANDARD enforcement]`
+`/design [STANDARD enforcement]`
 
 ---
 
@@ -85,7 +84,7 @@ See `references/scope-and-contract.md` for full scope constraints, input contrac
 
 All architectural decisions MUST evaluate multi-terminal concurrency safety and stale data immunity. Hook design constraints prohibit external API calls and require standalone operation.
 
-For persistence, history, archive, provider, transcript, watermark, multi-terminal, or event-driven designs, `/arch` must also close the stateful contracts explicitly before presenting an implementation-ready recommendation:
+For persistence, history, archive, provider, transcript, watermark, multi-terminal, or event-driven designs, `/design` must also close the stateful contracts explicitly before presenting an implementation-ready recommendation:
 - identity model
 - ordering contract
 - dedupe contract
@@ -93,7 +92,7 @@ For persistence, history, archive, provider, transcript, watermark, multi-termin
 - event source of truth
 - decision-closure status
 
-For any producer/consumer boundary, `/arch` must also close the handoff contract explicitly before presenting an implementation-ready recommendation:
+For any producer/consumer boundary, `/design` must also close the handoff contract explicitly before presenting an implementation-ready recommendation:
 - boundary name
 - producer
 - consumer
@@ -105,11 +104,11 @@ For any producer/consumer boundary, `/arch` must also close the handoff contract
 - failure behavior
 - verification/test binding
 
-For any contract-sensitive design, `/arch` must emit a **Contract Authority Packet** for downstream phases instead of relying on prose alone. The packet is the authoritative closure artifact for `/planning`, `/code`, `/verify`, and `/sqa`.
+For any contract-sensitive design, `/design` must emit a **Contract Authority Packet** for downstream phases instead of relying on prose alone. The packet is the authoritative closure artifact for `/planning`, `/code`, `/verify`, and `/sqa`.
 
-When `/arch` produces an ADR that is intended to feed `/planning`, it must also emit a **Planning Handoff Packet**. The ADR remains the architecture record, but the planning handoff packet is the authoritative extraction surface for `/planning` so the planner does not have to infer canonical plan sections from ADR prose headings.
+When `/design` produces an ADR that is intended to feed `/planning`, it must also emit a **Planning Handoff Packet**. The ADR remains the architecture record, but the planning handoff packet is the authoritative extraction surface for `/planning` so the planner does not have to infer canonical plan sections from ADR prose headings.
 
-When `/arch` writes or revises an ADR, it must also make the packet machine-parseable enough for `arch_validate.py` and downstream validators. If the validator and prose disagree, the validator failure is authoritative until the ADR is repaired.
+When `/design` writes or revises an ADR, it must also make the packet machine-parseable enough for `arch_validate.py` and downstream validators. If the validator and prose disagree, the validator failure is authoritative until the ADR is repaired.
 
 Authority rules:
 - the Contract Authority Packet is authoritative for boundary semantics and closure status
@@ -150,7 +149,7 @@ artifact wins. Update the prose to match, never the artifact.
 Structured artifacts have machine-checkable schemas. Placing authority in prose
 creates invisible drift that `/planning` cannot detect automatically.
 
-`/arch` must also close conflict semantics explicitly before handoff:
+`/design` must also close conflict semantics explicitly before handoff:
 - what wins if transcript and artifact disagree
 - what happens if freshness is unknown
 - what happens on schema mismatch
@@ -161,13 +160,13 @@ Default safety policy for contract-sensitive work:
 - unknown freshness -> block and reconstruct from authoritative source
 - schema mismatch -> reject and surface incompatibility
 - validator timeout -> block or escalate, not fail-open by default
-- degrade/fail-open is allowed only when `/arch` names the bounded blast radius and why the degraded path is safe
+- degrade/fail-open is allowed only when `/design` names the bounded blast radius and why the degraded path is safe
 
 No contract-sensitive design may be handed to `/planning` without a closed Contract Authority Packet.
 
-If any of those remain ambiguous or intentionally deferred, `/arch` must label the design as incomplete and name the remaining gap instead of presenting it as settled architecture.
+If any of those remain ambiguous or intentionally deferred, `/design` must label the design as incomplete and name the remaining gap instead of presenting it as settled architecture.
 
-When `/arch` is invoked by `/planning` to remediate blockers, `/arch` must return a decision packet rather than editing the plan. That packet should contain:
+When `/design` is invoked by `/planning` to remediate blockers, `/design` must return a decision packet rather than editing the plan. That packet should contain:
 - chosen identity model
 - chosen ordering contract
 - chosen dedupe contract
@@ -179,19 +178,19 @@ When `/arch` is invoked by `/planning` to remediate blockers, `/arch` must retur
 - unreachable mechanisms or invariant collisions, if any
 - rejected alternatives and why they were rejected
 
-When the caller is `/planning`, `/arch` must treat the call as a nested remediation substep. It must not ask the user whether `/planning` should continue, and it must not tell the user to rerun `/planning`. Its job is to return closure artifacts to the caller.
+When the caller is `/planning`, `/design` must treat the call as a nested remediation substep. It must not ask the user whether `/planning` should continue, and it must not tell the user to rerun `/planning`. Its job is to return closure artifacts to the caller.
 
-If `/arch` is nested under `/planning` and architecture closure succeeds, `/arch` should assume automatic return-to-caller. Asking the user whether planning should continue is a workflow error unless `/arch` genuinely cannot close the architecture without new user input.
+If `/design` is nested under `/planning` and architecture closure succeeds, `/design` should assume automatic return-to-caller. Asking the user whether planning should continue is a workflow error unless `/design` genuinely cannot close the architecture without new user input.
 
-If the resulting architecture is still intended to flow back into `/planning`, `/arch` must pair that decision packet with a Planning Handoff Packet so `/planning` can rewrite the plan without re-interpreting ADR prose.
+If the resulting architecture is still intended to flow back into `/planning`, `/design` must pair that decision packet with a Planning Handoff Packet so `/planning` can rewrite the plan without re-interpreting ADR prose.
 
-`/arch` closes the architecture. `/planning` remains the only writer of the plan artifact.
+`/design` closes the architecture. `/planning` remains the only writer of the plan artifact.
 
 See `references/constitutional-principles.md` for full evaluation criteria, red flags, and hook design constraints.
 
 ## Downstream-Closure Prompts
 
-Before closing an ADR or emitting handoff packets, `/arch` should ask itself:
+Before closing an ADR or emitting handoff packets, `/design` should ask itself:
 
 - What downstream execution semantics must be explicit so `/planning` does not invent them?
 - What boundaries here are still named but not operationally closed?
@@ -211,12 +210,12 @@ These are internal self-check prompts. They are not default prompts to ask the u
 
 ## Trace And Challenge Passes
 
-For architecture-heavy work, `/arch` should treat `trace` and `challenge` as first-class internal passes:
+For architecture-heavy work, `/design` should treat `trace` and `challenge` as first-class internal passes:
 
 - `trace`: reconstruct the evolution of the design problem across prior plans, ADRs, blockers, and corrections so the final packet closes the actual current problem, not an older version
 - `challenge`: pressure-test the preferred design against contradictory evidence, existing mechanisms, simpler alternatives, and downstream ownership conflicts
 
-Use `trace` whenever `/arch` is inheriting unresolved planning blockers or conflicting prior guidance.
+Use `trace` whenever `/design` is inheriting unresolved planning blockers or conflicting prior guidance.
 Use `challenge` whenever the architecture introduces a new boundary, state mechanism, gate, packet, or fallback contract.
 
 Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
@@ -240,7 +239,7 @@ Internal blind-spot checks are run before final recommendations.
 
 ## Critique-Agent Review Policy
 
-`/arch` should use a critique agent whenever the architecture closure depends on subtle contract semantics, downstream ownership, or ambiguous fallback behavior.
+`/design` should use a critique agent whenever the architecture closure depends on subtle contract semantics, downstream ownership, or ambiguous fallback behavior.
 
 Critique-agent review is mandatory for:
 - contract-sensitive boundaries
@@ -260,7 +259,7 @@ The critic’s job is to find the hidden contradiction or edge case before `/pla
 
 ## Architectural Lenses & Quality Model
 
-`/arch` applies 8 architectural lenses through the Lean System Design and GoT frameworks. Every option must differ meaningfully from alternatives and articulate tradeoffs explicitly (favored quality, degraded quality, failure conditions, ISO 25010 mapping).
+`/design` applies 8 architectural lenses through the Lean System Design and GoT frameworks. Every option must differ meaningfully from alternatives and articulate tradeoffs explicitly (favored quality, degraded quality, failure conditions, ISO 25010 mapping).
 
 See `references/quality-model.md` for full lens descriptions, ISO 25010 analogical mapping, and Cloud Framework Pillar lenses.
 
@@ -426,7 +425,7 @@ Before suggesting architectural changes, verify the gap actually exists. Require
 
 ### If Out-of-Scope Detected
 
-Offer user choice: (1) Run suggested skill, or (2) Continue with /arch anyway. **WAIT for user selection.**
+Offer user choice: (1) Run suggested skill, or (2) Continue with /design anyway. **WAIT for user selection.**
 
 ### Step 0.3: Scope Check — Is This an Architecture Decision?
 
@@ -508,7 +507,7 @@ Valid templates: `fast`, `deep`, `cli`, `python`, `data-pipeline`, `precedent`
 
 ### 2. ADF Delegation
 
-Route to `/adf` when query asks about extraction/justification: "should i extract", "new boundary", "over-engineering", "is X worth it", etc. Offer choice between `/adf` and continuing with `/arch`.
+Route to `/adf` when query asks about extraction/justification: "should i extract", "new boundary", "over-engineering", "is X worth it", etc. Offer choice between `/adf` and continuing with `/design`.
 
 ### 3. Detect Intent Type
 
@@ -554,18 +553,18 @@ Do **not** mark the design as contract-sensitive by default for:
 Classification rule:
 
 - default to **not** contract-sensitive unless the design introduces, changes, restores, routes, persists, or relies on a cross-boundary artifact or shared state contract
-- if classification is ambiguous, `/arch` must not silently escalate to full packet mode; instead mark the design as needing clarification before calling it implementation-ready
+- if classification is ambiguous, `/design` must not silently escalate to full packet mode; instead mark the design as needing clarification before calling it implementation-ready
 
 When contract-sensitive:
 
 - Stage 1.5 inventory is mandatory
 - Stage 1.6 closure is mandatory
 - Contract Authority Packet emission is mandatory
-- `/arch` may not present the result as implementation-ready until all required boundaries are closed
+- `/design` may not present the result as implementation-ready until all required boundaries are closed
 
 When not contract-sensitive:
 
-- `/arch` may still inventory boundaries if helpful, but Contract Authority Packet emission is optional
+- `/design` may still inventory boundaries if helpful, but Contract Authority Packet emission is optional
 
 ## Stage 1.5: Contract Boundary Inventory
 
@@ -597,11 +596,11 @@ For each boundary, record:
 | Failure behavior | What happens when required data is missing or stale? |
 | Verification | Which test or trace proves this boundary works end-to-end? |
 
-`/arch` must not accept "the consumer probably has this field" as a valid design assumption.
+`/design` must not accept "the consumer probably has this field" as a valid design assumption.
 
 ## Stage 1.6: Contract Boundary Closure
 
-Inventory is not enough. For each contract-sensitive boundary, `/arch` must close the design.
+Inventory is not enough. For each contract-sensitive boundary, `/design` must close the design.
 
 Closure requires:
 
@@ -618,11 +617,11 @@ Closure requires:
 
 If any boundary still depends on implied fields, implied freshness, "verified later", or consumer assumptions not backed by a named validator, the architecture remains incomplete.
 
-`/arch` should prefer the smallest contract that closes the boundary safely. Do not add fields, packet sections, or validator requirements that are not necessary for the named boundary to function correctly.
+`/design` should prefer the smallest contract that closes the boundary safely. Do not add fields, packet sections, or validator requirements that are not necessary for the named boundary to function correctly.
 
 ## Stage 1.7: Contract Authority Packet
 
-For contract-sensitive work, `/arch` must emit a Contract Authority Packet as part of the architecture output.
+For contract-sensitive work, `/design` must emit a Contract Authority Packet as part of the architecture output.
 
 The packet must stay minimal:
 
@@ -660,24 +659,24 @@ contract_authority_packet:
 
 The packet may be rendered in YAML or JSON, but it must be machine-readable and complete enough for downstream validators to consume directly.
 
-If the work is not contract-sensitive, `/arch` should explicitly say so and omit the packet unless the user requests a contract artifact anyway.
+If the work is not contract-sensitive, `/design` should explicitly say so and omit the packet unless the user requests a contract artifact anyway.
 
 ## Stage 1.7b: Planning Handoff Packet
 
-When the output ADR is meant to feed `/planning` for implementation work, `/arch` must also emit a Planning Handoff Packet.
+When the output ADR is meant to feed `/planning` for implementation work, `/design` must also emit a Planning Handoff Packet.
 
 Purpose:
 
 - bridge ADR structure to `/planning`'s canonical v2 plan shape
 - prevent `/planning` from shallow-copying ADR headings into legacy plan sections
-- make schema rewrite local to `/planning` and architecture closure local to `/arch`
+- make schema rewrite local to `/planning` and architecture closure local to `/design`
 
 Minimum shape:
 
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/arch_decisions/ADR-001-example.md"
+  source_adr: "P:/packages/example/design_decisions/ADR-001-example.md"
   plan_title: "Example implementation"
   goal: "What the implementation must achieve."
   current_state_with_evidence:
@@ -710,26 +709,26 @@ planning_handoff_packet:
 
 Rules:
 
-- The packet is required whenever `/arch` recommends `INSTRUCTION: Execute skill planning` for implementation work.
+- The packet is required whenever `/design` recommends `INSTRUCTION: Execute skill planning` for implementation work.
 - `implementation_changes` must already be mapped into planning task units; do not make `/planning` infer tasks from ADR section names.
 - If the design is not contract-sensitive, `contract_authority_reference` must explicitly say `contract_sensitive: false` rather than omitting the field.
-- If `/arch` chooses to defer questions, those questions must be emitted in `open_questions`; they must not be hidden only in ADR prose.
-- `/arch` must not leave `/planning` to infer whether `Context`, `Design`, or `Consequences` prose should become `Goal`, `Current state`, or `Implementation changes`.
-- If `/arch` was invoked by `/planning` during blocker remediation, the packet must be returned in a form the caller can consume immediately, and `/arch` must assume automatic return-to-caller behavior rather than requiring a new user command.
+- If `/design` chooses to defer questions, those questions must be emitted in `open_questions`; they must not be hidden only in ADR prose.
+- `/design` must not leave `/planning` to infer whether `Context`, `Design`, or `Consequences` prose should become `Goal`, `Current state`, or `Implementation changes`.
+- If `/design` was invoked by `/planning` during blocker remediation, the packet must be returned in a form the caller can consume immediately, and `/design` must assume automatic return-to-caller behavior rather than requiring a new user command.
 - If the design extends an existing mode, phase, or workflow system, the packet must explicitly state whether the new flow replaces, coexists with, or routes around the existing flow.
 - If the design adds a selector or discriminator such as `hypothesis_mode`, the packet must name the discriminator, the selection rule, and the default behavior when the field is absent or false.
 - If the design adds or repurposes hook-visible fields, the packet must name who writes them, who reads them, the expected shape, and where the data comes from.
-- If downstream logic reads a field like `hypothesis_details`, `/arch` must close its provenance explicitly instead of leaving `/planning` to infer it from prose.
+- If downstream logic reads a field like `hypothesis_details`, `/design` must close its provenance explicitly instead of leaving `/planning` to infer it from prose.
 - If the design parses LLM output or free-form text into structured state, the packet must name the minimum valid output, malformed/incomplete-output behavior, and any retry, fallback, or abort rule.
 - For stateful or hook-driven extensions, the packet and test matrix must include at least one unhappy-path proof covering interruption, malformed state, TTL expiry, backward compatibility, or fallback behavior.
 
 ## Stage 1.8: ADR Closure Consistency Check
 
-Before `/arch` presents an ADR or architecture recommendation as closed, it must run a final consistency pass over the output.
+Before `/design` presents an ADR or architecture recommendation as closed, it must run a final consistency pass over the output.
 
 This pass is mandatory for any contract-sensitive design and any ADR that defines routing, validators, packets, or downstream ownership.
 
-`/arch` must reject its own draft ADR if any of these checks fail:
+`/design` must reject its own draft ADR if any of these checks fail:
 
 ### 1. Safety Policy Gate
 
@@ -756,9 +755,9 @@ Phrases like "detects patterns" or "routes to validators" are not sufficient clo
 
 If a `Contract Authority Packet` or `Planning Handoff Packet` exists, all summary tables, boundary matrices, handoff summaries, and prose summaries must derive from the authoritative packet(s).
 
-`/arch` must reject the ADR as inconsistent if:
+`/design` must reject the ADR as inconsistent if:
 
-- the packet itself does not match the canonical shape required by `/arch`
+- the packet itself does not match the canonical shape required by `/design`
 - required packet sections are emitted at the wrong nesting level
 - the packet and summary matrix name different required fields
 - the packet and summary matrix name different freshness authorities
@@ -778,7 +777,7 @@ Packet shape validation is mandatory:
 
 ### 4. Downstream Contract Alignment Gate
 
-If the ADR assigns blocking/advisory behavior or ownership to downstream skills, `/arch` must verify those claims match the current skill contracts.
+If the ADR assigns blocking/advisory behavior or ownership to downstream skills, `/design` must verify those claims match the current skill contracts.
 
 At minimum, check alignment against:
 
@@ -787,17 +786,17 @@ At minimum, check alignment against:
 - `/verify`
 - `/sqa`
 
-`/arch` must reject the ADR as not closed if it says a downstream rule is advisory, blocking, optional, or owned by a skill in a way that contradicts the actual skill definition.
+`/design` must reject the ADR as not closed if it says a downstream rule is advisory, blocking, optional, or owned by a skill in a way that contradicts the actual skill definition.
 
 Evidence freshness is part of downstream alignment:
 
-- if the ADR cites a current file or line as proof of downstream behavior, `/arch` must reread that file state before treating the citation as valid evidence
+- if the ADR cites a current file or line as proof of downstream behavior, `/design` must reread that file state before treating the citation as valid evidence
 - stale evidence cannot be used to justify closure
 - if the cited line no longer says what the ADR claims, the ADR must be updated or the evidence removed
 
 ### Output Rule
 
-If any gate fails, `/arch` must not present the ADR as settled architecture. It must instead:
+If any gate fails, `/design` must not present the ADR as settled architecture. It must instead:
 
 - mark the ADR draft as inconsistent or incomplete
 - name the failing gate explicitly
@@ -805,9 +804,9 @@ If any gate fails, `/arch` must not present the ADR as settled architecture. It 
 
 ## Stage 1.9: ADR Critic Review
 
-After Stage 1.8 passes, `/arch` should run a narrow critic review before saving or presenting the ADR.
+After Stage 1.8 passes, `/design` should run a narrow critic review before saving or presenting the ADR.
 
-This critic is not a second architecture designer. It is a closure auditor for the defect classes `/arch` is most likely to miss in its own ADR output.
+This critic is not a second architecture designer. It is a closure auditor for the defect classes `/design` is most likely to miss in its own ADR output.
 
 Run `adr_critic_review` automatically when the ADR includes any of:
 
@@ -835,7 +834,7 @@ The critic must check and block on concrete closure failures only:
    - missing failure behavior when routing cannot determine the correct path
 
 3. Packet consistency defects
-   - packet shape does not match the canonical schema required by `/arch`
+   - packet shape does not match the canonical schema required by `/design`
    - required packet sections appear at the wrong nesting level
    - summary matrix drifts from the `Contract Authority Packet`
    - prose weakens packet authority
@@ -857,7 +856,7 @@ The critic must check and block on concrete closure failures only:
 
 ### Critic Output Rule
 
-If the critic finds a closure defect, `/arch` must not save or present the ADR as settled.
+If the critic finds a closure defect, `/design` must not save or present the ADR as settled.
 
 It must:
 
@@ -878,7 +877,7 @@ python -c "import os; print(os.environ.get('SDLC_MULTI_LLM', '0'))"
 **If `SDLC_MULTI_LLM=1`** — dispatch via Gemini for a second-model perspective:
 
 ```bash
-python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an ADR closure auditor. Review the ADR provided in the context file against 5 defect classes. Apply the rubric strictly — block only on concrete closure failures, not stylistic preference. The 5 defect classes are: 1) Safety Contradictions (conflicting timeout/stale-data/failure behavior), 2) Router Closure Defects (missing activation/bypass/ambiguous/failure criteria), 3) Packet Consistency Defects (summary drifts from Contract Authority Packet, prose weakens packet), 4) Downstream Alignment Defects (ADR claims contradict current skill contracts), 5) Unresolved Closure Fields (TBD/unknown/missing validators). Output: {review_metadata: {skill, adr_path, defects_found, defects_suppressed, scope}, findings: [{defect_class, severity, location, description, evidence, remediation}], passed_defect_classes, summary}" --context "<adr_path>" --context "P:/.claude/skills/arch/references/gemini-adr-critic-prompt.md" --gemini-only --output-format json --no-critic --timeout 120
+python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an ADR closure auditor. Review the ADR provided in the context file against 5 defect classes. Apply the rubric strictly — block only on concrete closure failures, not stylistic preference. The 5 defect classes are: 1) Safety Contradictions (conflicting timeout/stale-data/failure behavior), 2) Router Closure Defects (missing activation/bypass/ambiguous/failure criteria), 3) Packet Consistency Defects (summary drifts from Contract Authority Packet, prose weakens packet), 4) Downstream Alignment Defects (ADR claims contradict current skill contracts), 5) Unresolved Closure Fields (TBD/unknown/missing validators). Output: {review_metadata: {skill, adr_path, defects_found, defects_suppressed, scope}, findings: [{defect_class, severity, location, description, evidence, remediation}], passed_defect_classes, summary}" --context "<adr_path>" --context "P:/.claude/skills/design/references/gemini-adr-critic-prompt.md" --gemini-only --output-format json --no-critic --timeout 120
 ```
 
 Parse the JSON output. If valid, use it as the critic result. Write to `P:/.claude/state/adr_critic.json`.
@@ -899,13 +898,13 @@ Output: P:/.claude/state/adr_critic.json"""
 
 **Model selection**: Haiku for the fallback — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
 
-**Blocking behavior**: If `adr_critic` returns `status: "blocked"`, `/arch` must repair the ADR's HIGH severity defects before saving or presenting it.
+**Blocking behavior**: If `adr_critic` returns `status: "blocked"`, `/design` must repair the ADR's HIGH severity defects before saving or presenting it.
 
 ---
 
 ## Stage 1.10: Intelligent Quality Check
 
-After ADR passes critic review, `/arch` automatically triggers `/qr --strategic-only` to validate the architectural decision:
+After ADR passes critic review, `/design` automatically triggers `/qr --strategic-only` to validate the architectural decision:
 
 ```python
 # After ADR is saved and passes critic
@@ -946,7 +945,7 @@ else → fast
 
 ## Downstream Routing
 
-When architecture decisions are closed, `/arch` may suggest the next owning skill using **INSTRUCTION format** so the Skill Enforcement Layer recognizes user approval:
+When architecture decisions are closed, `/design` may suggest the next owning skill using **INSTRUCTION format** so the Skill Enforcement Layer recognizes user approval:
 
 - When the design is settled and every contract-sensitive boundary is closed with a Contract Authority Packet:
 
@@ -959,7 +958,7 @@ When architecture decisions are closed, `/arch` may suggest the next owning skil
   Do NOT treat this as a conversational question — the INSTRUCTION format signals routing approval.
   ```
 
-When `/arch` is nested inside an active `/planning` workflow, do **not** emit the above as a user-facing next step. Instead, return the packet plus a brief caller note such as:
+When `/design` is nested inside an active `/planning` workflow, do **not** emit the above as a user-facing next step. Instead, return the packet plus a brief caller note such as:
 
 ```text
 RETURN TO CALLER: /planning
@@ -985,7 +984,7 @@ Caller action: consume packet, rewrite plan, rerun auto_verify
 
 If a follow-up review finds gaps, ask the user: "Should I update the reviewed document with fixes to address the findings?"
 
-`/arch` closes architecture. It does not write plan artifacts or implementation code.
+`/design` closes architecture. It does not write plan artifacts or implementation code.
 
 | Template | Type | Complexity | Output Size | Extends |
 |----------|------|------------|-------------|---------|
@@ -1055,7 +1054,7 @@ See `references/routing-contract.md` for input-to-template routing with expected
 ## Philosophy
 
 - **Constitutional first:** All architecture decisions MUST evaluate multi-terminal isolation (no exceptions)
-- **Contract closure, not inventory:** For contract-sensitive work, `/arch` must close boundaries and emit a Contract Authority Packet
+- **Contract closure, not inventory:** For contract-sensitive work, `/design` must close boundaries and emit a Contract Authority Packet
 - **Domain-first routing:** Domain-specific expertise beats generic complexity
 - **Three intent paths:** ARCHITECTURE_REVIEW, IMPROVE_SYSTEM, DEFAULT
 - **Review-first:** Architecture reviews valid for theoretical designs -- never gate behind implementation
@@ -1063,7 +1062,7 @@ See `references/routing-contract.md` for input-to-template routing with expected
 - **Template-based execution:** Read and execute, don't delegate
 - **ADR-first output:** Default output is concise ADR format; `--verbose` for full analysis
 - **Edge case awareness:** Every output must document edge cases
-- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:/.claude/arch_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
+- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:/.claude/design_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
 
 ---
 
@@ -1082,8 +1081,8 @@ See `references/routing-contract.md` for input-to-template routing with expected
 
 - **Default output**: ADR format (concise)
 - **Verbose mode**: `--verbose` or `-v` for full analysis
-- **Template override**: `/arch "query" template=<name>`
-- **Template chaining**: `/arch "query" template=deep+python+cli`
+- **Template override**: `/design "query" template=<name>`
+- **Template chaining**: `/design "query" template=deep+python+cli`
 - **Quick presets**: `multi-term`, `multi-terminal`, `terminal-isolation`
 - **Config**: `.archconfig.json` (project) or `~/.archconfig.json` (user)
 
@@ -1115,7 +1114,7 @@ Adjust evaluation weights by decision policy:
 | `risk_averse` | 2.0x | 0.5x | After critical incident, before release cut, multi-terminal data safety |
 | `exploratory` | 0.5x | 2.0x | During prototyping, exploring alternatives, when stuck on large problems |
 
-Override with: `/arch "query" --policy=risk_averse`
+Override with: `/design "query" --policy=risk_averse`
 
 Score formula: `(reliability_score * rel_wt) * (flexibility_score * flex_wt) * GoT_multiplier`
 

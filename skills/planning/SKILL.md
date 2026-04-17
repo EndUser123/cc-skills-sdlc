@@ -6,7 +6,7 @@ enforcement: advisory
 depends_on:
   - sdlc: ">=0.1.0"
 suggest:
-  - /arch
+  - /design
 triggers:
   - /planning
   - /planning-v2
@@ -30,7 +30,7 @@ workflow_steps:
   - discover_existing: Search codebase for existing implementations of proposed components (catches duplicates before verification)
   - verify: Run auto_verify.py for deterministic checks (sections, placeholders, contradictions, explicit file/line evidence, and execution semantics)
   - contract_boundary_check: Reject plans with implied producer/consumer boundaries, missing artifact schemas, missing required Contract Authority Packet consumption, or missing freshness/invalidation rules
-  - remediate_blockers: Route architecture blockers to /arch for decision closure; planning keeps sole ownership of plan edits
+  - remediate_blockers: Route architecture blockers to /design for decision closure; planning keeps sole ownership of plan edits
   - auto_fix: Apply only non-semantic repairs (header normalization, metadata, and optional ordering when explicitly requested)
   - adversarial_review: Dispatch 6 adversarial subagents via Agent tool in parallel
   - synthesize: Rewrite plan incorporating accepted findings; remove stale steps; rerun verification
@@ -130,7 +130,7 @@ If the Integration Trace finds a gap:
   - Add the missing consumer/usage to the producing TASK
   - Add a new TASK to handle the orphaned output
   - Explicitly mark the output as terminal (no consumer) and define failure behavior
-- Route to `/arch` if the gap reveals a missing boundary contract
+- Route to `/design` if the gap reveals a missing boundary contract
 
 ### Common Gap Patterns (for fast recognition)
 
@@ -171,7 +171,7 @@ After running the trace, emit a brief Integration Trace Summary:
 - `challenge`: pressure-test the plan for hidden execution ambiguity, weak fallback behavior, or downstream guesswork
 - `graduate`: identify repeated planning failures that should become durable verifier rules instead of review folklore
 
-Use `trace` when the plan depends on `/arch` packets, prior blocker closure, or evolving contract decisions.
+Use `trace` when the plan depends on `/design` packets, prior blocker closure, or evolving contract decisions.
 Use `challenge` whenever the plan is layered, stateful, hook-driven, or overlap-sensitive.
 Use `graduate` when the same class of plan defect appears repeatedly across reviews or verifier failures.
 
@@ -197,7 +197,7 @@ Internal blind-spot checks are run before final recommendations.
 ## Orchestration Model
 
 ```
-Claude assembles draft -> Claude calls auto_verify.py -> if architecture blockers exist, Claude invokes /arch
+Claude assembles draft -> Claude calls auto_verify.py -> if architecture blockers exist, Claude invokes /design
 -> Claude rewrites the plan -> Claude dispatches adversarial agents
 -> Claude synthesizes changes -> Claude runs Integration Trace -> Claude presents results (plan path + status only)
 ```
@@ -205,10 +205,10 @@ Claude assembles draft -> Claude calls auto_verify.py -> if architecture blocker
 **Claude's responsibilities:**
 - Generate initial draft with concrete content (no placeholder scaffolding)
 - Call verification scripts when needed
-- Invoke `/arch` automatically when verification reports architecture-class blockers
-- Rewrite the plan itself after consuming `/arch` decisions; `/arch` must not directly edit the plan
-- Treat `/arch` as a nested substep of the same `/planning` invocation; after `/arch` returns a usable packet, resume `/planning` automatically without asking the user to rerun `/planning`
-- Treat any "would you like me to continue /planning?" question after a successful nested `/arch` call as a workflow violation; the default is to continue automatically until the plan is rewritten and re-verified
+- Invoke `/design` automatically when verification reports architecture-class blockers
+- Rewrite the plan itself after consuming `/design` decisions; `/design` must not directly edit the plan
+- Treat `/design` as a nested substep of the same `/planning` invocation; after `/design` returns a usable packet, resume `/planning` automatically without asking the user to rerun `/planning`
+- Treat any "would you like me to continue /planning?" question after a successful nested `/design` call as a workflow violation; the default is to continue automatically until the plan is rewritten and re-verified
 - Dispatch adversarial subagents via Task tool in a single message
 - Synthesize accepted findings into a rewritten plan
 - Present only the plan path and status -- NOT raw findings
@@ -237,27 +237,27 @@ The critique agents should explicitly challenge:
 Do not treat critique-agent review as optional polish on these plan classes; it is part of closing the execution design before `/code` or `/tdd` consume the plan.
 
 **Remediation boundary:**
-- `/arch` owns architecture decision closure
+- `/design` owns architecture decision closure
 - `/planning` owns the plan artifact and all plan rewrites
-- `auto_verify.py` decides when the blocker set requires `/arch`
+- `auto_verify.py` decides when the blocker set requires `/design`
 
 **Authoritative precedence:**
 - The latest `auto_verify.py` result is authoritative for current blocker state
-- The latest `Contract Authority Packet` from `/arch` is authoritative for closed boundary semantics on contract-sensitive work
-- The latest `Planning Handoff Packet` from `/arch` is authoritative for ADR-to-plan extraction when an ADR is the source artifact
+- The latest `Contract Authority Packet` from `/design` is authoritative for closed boundary semantics on contract-sensitive work
+- The latest `Planning Handoff Packet` from `/design` is authoritative for ADR-to-plan extraction when an ADR is the source artifact
 - The latest `Planning Source Packet` from a non-ADR source artifact is authoritative for source-to-plan extraction when present
 - Current workspace files are authoritative over notes embedded in the plan
 - Older review notes, “false positive” commentary, or stale summaries are non-authoritative once verification has been rerun
 
 Readiness is computed, not asserted by prose. If frontmatter, review artifacts, the contract matrix, or the active packet disagree, the validator result wins and the plan must be downgraded until rewritten.
 
-If `next_action.type` is `invoke_arch_then_rewrite_plan`, `/planning` must not debate whether those architecture blockers are “real enough.” It must invoke `/arch` with the listed blocker IDs and rewrite the plan from the returned decision packet.
+If `next_action.type` is `invoke_arch_then_rewrite_plan`, `/planning` must not debate whether those architecture blockers are “real enough.” It must invoke `/design` with the listed blocker IDs and rewrite the plan from the returned decision packet.
 
-If `next_action.type` is `invoke_arch_then_rewrite_plan`, the `/arch` call is a nested remediation subworkflow, not a user-visible handoff. `/planning` remains the active owning workflow and must continue automatically after `/arch` returns unless `/arch` explicitly leaves the architecture incomplete or requests clarification that cannot be derived locally.
+If `next_action.type` is `invoke_arch_then_rewrite_plan`, the `/design` call is a nested remediation subworkflow, not a user-visible handoff. `/planning` remains the active owning workflow and must continue automatically after `/design` returns unless `/design` explicitly leaves the architecture incomplete or requests clarification that cannot be derived locally.
 
-If `/arch` emits a `Contract Authority Packet`, `/planning` must consume it as authoritative for boundary semantics. The plan may restate or organize those semantics, but it must not weaken, replace, or contradict them.
+If `/design` emits a `Contract Authority Packet`, `/planning` must consume it as authoritative for boundary semantics. The plan may restate or organize those semantics, but it must not weaken, replace, or contradict them.
 
-If `/arch` emits a `Planning Handoff Packet`, `/planning` must consume it as authoritative for canonical section mapping. `/planning` must not shallow-copy ADR headings like `Context`, `Design`, or `Consequences` into the plan. It must rewrite the plan into the v2 plan shape using the packet's mapped fields.
+If `/design` emits a `Planning Handoff Packet`, `/planning` must consume it as authoritative for canonical section mapping. `/planning` must not shallow-copy ADR headings like `Context`, `Design`, or `Consequences` into the plan. It must rewrite the plan into the v2 plan shape using the packet's mapped fields.
 
 If the source is not an ADR but does include a `Planning Source Packet`, `/planning` must consume that packet as authoritative for intake normalization. Unstructured notes, transcripts, solution writeups, and similar source material must be normalized into the v2 plan shape from the packet or from an explicit extraction map before readiness checks are interpreted as architecture blockers.
 
@@ -285,7 +285,7 @@ For plans with hooks, handoff envelopes, restore artifacts, ledgers, evidence fi
 - invalidation trigger
 - failure behavior
 - contract-to-test mapping
-- contract authority source when `/arch` marked the boundary contract-sensitive
+- contract authority source when `/design` marked the boundary contract-sensitive
 
 Those are readiness gates, not polish issues.
 
@@ -299,7 +299,7 @@ Those are architecture/execution-semantics blockers, not reviewer preference.
 
 ## Routing Behavior
 
-`/planning` auto-invokes `/arch` for architecture-class blockers because that is a hard gate.
+`/planning` auto-invokes `/design` for architecture-class blockers because that is a hard gate.
 
 `/planning` may suggest:
 
@@ -308,7 +308,7 @@ Those are architecture/execution-semantics blockers, not reviewer preference.
 
 `/planning` owns the plan artifact and must not offload plan writing to downstream skills.
 
-When routing or remediation is required, `/planning` must emit a numbered `✅ RECOMMENDED NEXT STEPS` section instead of leaving the user with a generic "go use `/arch`" handoff. The section must name the owning skill, the reason, the exact apply action, the proof action, and a `0` option for applying the full set in dependency order.
+When routing or remediation is required, `/planning` must emit a numbered `✅ RECOMMENDED NEXT STEPS` section instead of leaving the user with a generic "go use `/design`" handoff. The section must name the owning skill, the reason, the exact apply action, the proof action, and a `0` option for applying the full set in dependency order.
 
 ## Quick Start
 
@@ -319,7 +319,7 @@ When routing or remediation is required, `/planning` must emit a numbered `✅ R
 Claude will:
 1. Generate a concrete plan draft (no placeholder content)
 2. Run deterministic verification
-3. If architecture blockers are found, invoke `/arch`, then rewrite the plan and re-verify
+3. If architecture blockers are found, invoke `/design`, then rewrite the plan and re-verify
 4. Launch adversarial review agents automatically
 5. Synthesize findings into a rewritten plan
 6. Present the plan path and status
@@ -373,7 +373,7 @@ When invoked with a non-ADR source artifact such as solution notes, a transcript
 2. If present, use it as the authoritative extraction surface
 3. If absent, build an explicit extraction map first, then write the plan from that map
 4. Never mirror arbitrary source headings directly into the plan
-5. Treat malformed first-draft normalization as local `/planning` rewrite work, not as `/arch` proof
+5. Treat malformed first-draft normalization as local `/planning` rewrite work, not as `/design` proof
 
 ### Source-to-Plan Mapping Contract
 
@@ -403,7 +403,7 @@ For ADR-sourced plans, `/planning` must produce the v2 plan shape from a stable 
 
 Preferred input:
 
-- `Planning Handoff Packet` from `/arch`
+- `Planning Handoff Packet` from `/design`
 
 Fallback input when no packet exists:
 
@@ -421,7 +421,7 @@ The extraction map must cover:
 - `Assumptions/defaults`
 - `Open questions`
 
-`/planning` must not treat a malformed first draft as an `/arch` problem merely because the source was an ADR. If the issue is that the draft does not match the canonical plan schema, `/planning` must repair the draft locally before deciding whether any remaining blockers truly belong to `/arch`.
+`/planning` must not treat a malformed first draft as an `/design` problem merely because the source was an ADR. If the issue is that the draft does not match the canonical plan schema, `/planning` must repair the draft locally before deciding whether any remaining blockers truly belong to `/design`.
 
 ## Verification Workflow (Steps 1-4)
 
@@ -453,29 +453,29 @@ Not every plan edit requires a full verification pass. `/planning` uses three gr
 
 `auto_verify.py` also treats stale sibling review artifacts as non-authoritative. If an existing `.review.summary.md` contradicts the latest verification result, `/planning` must treat it as stale and regenerate it rather than debating which artifact is true.
 
-### Nested `/arch` Resume Contract
+### Nested `/design` Resume Contract
 
-When `/planning` invokes `/arch` because `next_action.type == invoke_arch_then_rewrite_plan`:
+When `/planning` invokes `/design` because `next_action.type == invoke_arch_then_rewrite_plan`:
 
 1. `/planning` stays the owning workflow.
-2. `/arch` is a nested closure substep, not a terminal handoff.
+2. `/design` is a nested closure substep, not a terminal handoff.
 3. User re-entry is not required.
-4. `/planning` must resume automatically after `/arch` returns a usable packet.
-5. **DO NOT ASK the user whether to continue** — Immediately consume the packets and rewrite the plan. Only ask if `/arch` returned an unresolved clarification need or an incomplete architecture state.
-6. The transition from `/arch` back to `/planning` is automatic. Do not treat it as a user-visible handoff.
+4. `/planning` must resume automatically after `/design` returns a usable packet.
+5. **DO NOT ASK the user whether to continue** — Immediately consume the packets and rewrite the plan. Only ask if `/design` returned an unresolved clarification need or an incomplete architecture state.
+6. The transition from `/design` back to `/planning` is automatic. Do not treat it as a user-visible handoff.
 
 ## Blocker Remediation Loop
 
 When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 1. Extract the blocking findings and relevant plan excerpts
-2. Invoke `/arch` automatically to close the architecture decisions
-3. Require `/arch` to return a decision packet, not plan edits
-4. Resume `/planning` automatically in the same workflow after `/arch` returns
+2. Invoke `/design` automatically to close the architecture decisions
+3. Require `/design` to return a decision packet, not plan edits
+4. Resume `/planning` automatically in the same workflow after `/design` returns
 5. Rewrite the plan itself using that decision packet
 6. Remove any now-resolved open questions
 7. Re-run `auto_verify.py`
 
-**Architecture-class blockers that should route to `/arch`:**
+**Architecture-class blockers that should route to `/design`:**
 - `contract_ambiguity`
 - `state_model`
 - `schema_consistency`
@@ -487,7 +487,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 - `artifact_schema_gap`
 - `consumer_validation_gap`
 
-**Do NOT invoke `/arch` for:**
+**Do NOT invoke `/design` for:**
 - placeholders
 - missing sections
 - malformed frontmatter
@@ -505,7 +505,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 - If `next_action.resume_policy` is `automatic_return_to_caller`, do not ask the user to rerun `/planning`; continue the same workflow automatically
 - If the plan or sibling artifacts changed since the last verification run, discard the previous blocker model and rerun verification
 - When both architecture blockers and artifact/status blockers exist, resolve the architecture blockers first, then rerun verification, then clean up the remaining artifact/status blockers
-- Do not create workaround notes arguing a verifier finding is a false positive; either satisfy the contract or escalate to `/arch`
+- Do not create workaround notes arguing a verifier finding is a false positive; either satisfy the contract or escalate to `/design`
 
 ## Adversarial Review (Step 4)
 
@@ -626,13 +626,13 @@ Changes incorporated: 4 findings accepted, 2 rejected with rationale, 1 deferred
 **After presenting results, always offer any `follow_up_offer` targets from frontmatter as optional review steps.**
 `follow_up_offer` is advisory-only and does not change routing or skill ownership.
 
-If the plan is blocked, routed to `/arch`, or otherwise below `implementation-ready`, present the same summary plus:
+If the plan is blocked, routed to `/design`, or otherwise below `implementation-ready`, present the same summary plus:
 
 ```md
 ## ✅ RECOMMENDED NEXT STEPS
 
-1 (/arch|/planning|/code|/verify) - Short action title
-  Owner: `/arch` | `/planning` | `/code` | `/verify`
+1 (/design|/planning|/code|/verify) - Short action title
+  Owner: `/design` | `/planning` | `/code` | `/verify`
   Why: Concrete reason this step is needed.
   Apply: Exact change or command to perform.
   Proof: Exact validation that confirms the step worked.
@@ -651,10 +651,10 @@ unresolved_blockers: 3
 
 ## ✅ RECOMMENDED NEXT STEPS
 
-1 (/arch) - Close stale CAP semantics for `plan-artifact`
-  Owner: `/arch`
+1 (/design) - Close stale CAP semantics for `plan-artifact`
+  Owner: `/design`
   Why: The active packet drifts from current `/planning` readiness semantics.
-  Apply: Reinvoke `/arch` to revise the `plan-artifact` boundary and return an updated Contract Authority Packet.
+  Apply: Reinvoke `/design` to revise the `plan-artifact` boundary and return an updated Contract Authority Packet.
   Proof: Re-run `/planning review` and confirm packet alignment is `Exact match to CAP`.
 
 2 (/planning) - Repair matrix schema
@@ -720,7 +720,7 @@ When the source is an ADR, `/planning` must still emit the same v2 plan shape. A
 
 If the plan includes hooks, handoff envelopes, restore artifacts, ledgers, evidence files, subagent outputs, or any cross-phase file/payload, the plan must include a contract boundary matrix.
 
-If `/arch` produced a `Contract Authority Packet` for those boundaries, the matrix must derive from that packet rather than planner inference.
+If `/design` produced a `Contract Authority Packet` for those boundaries, the matrix must derive from that packet rather than planner inference.
 
 Minimum fields:
 
@@ -736,12 +736,12 @@ Minimum fields:
 | Freshness authority | Which source is authoritative |
 | Invalidation trigger | What makes this stale |
 | Failure behavior | Stop, retry, reconstruct, or reject |
-| Packet alignment | State whether the row matches the packet exactly or explain why `/arch` must be reinvoked |
+| Packet alignment | State whether the row matches the packet exactly or explain why `/design` must be reinvoked |
 | Test binding | Which test/trace proves the contract |
 
 Plans that say "consumer will use this" without naming the expected fields are not implementation-ready.
 Plans that omit a required `Contract Authority Packet` reference or drift from packet semantics are not implementation-ready.
-Plans that hand-author stale boundary semantics copied from an older packet are not implementation-ready; `/arch` must be reinvoked when the active packet drifts from the current skill contract.
+Plans that hand-author stale boundary semantics copied from an older packet are not implementation-ready; `/design` must be reinvoked when the active packet drifts from the current skill contract.
 
 ## Recommended Next Steps (RNS)
 
@@ -751,9 +751,9 @@ Rules:
 
 - Number every actionable step.
 - Every item must include `Owner`, `Why`, `Apply`, and `Proof`.
-- Use `/arch` as the owner for CAP drift, state-model closure, identity/ordering/dedupe/invalidation gaps, and stale boundary semantics.
+- Use `/design` as the owner for CAP drift, state-model closure, identity/ordering/dedupe/invalidation gaps, and stale boundary semantics.
 - Use `/planning` as the owner for plan rewrites, status corrections, matrix completion, and disposition cleanup.
-- Use `/code` or `/verify` only when the plan is already ready enough for those skills to act without first routing back through `/planning` or `/arch`.
+- Use `/code` or `/verify` only when the plan is already ready enough for those skills to act without first routing back through `/planning` or `/design`.
 - `0` means "apply the entire recommended set in dependency order."
 - If an action depends on a prior one, order it later rather than hiding the dependency in prose.
 - Do not emit freeform prose recommendations when RNS is required.
