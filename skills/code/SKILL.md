@@ -152,6 +152,7 @@ See `references/code-quality-standards.md` for full details including naming con
 | **6. TDD** | RED -> GREEN -> REFACTOR | test-first implementation via subagents | `references/tdd-phase-details.md` |
 | **7. TEST** | Full Test Suite | pytest, integration tests, regression tests | `references/test-phase-details.md` |
 | **8. AUDIT** | Quality Checks | ruff, mypy, pylint, eslint, tsc, code-reviewer | `references/audit-phase-details.md` |
+| **8.5. FIX VERIFICATION** | Confirm fixes + edge cases | per-fix verification, adversarial-failure-modes agent | `__lib/fix-verification-protocol.md` |
 | **9. TRACE** | Verify Logic | `/trace` manual code trace-through, ToT enhancement | `references/trace-phase-details.md` |
 | **10. PRODUCER/CONSUMER TRACE** | Verify actual handoff path | Consumer handshake, field presence, end-to-end boundary proof | `references/trace-phase-details.md` |
 | **11. DONE** | Final Certification | build verification, done checklist, deployment guidance | `references/done-phase-details.md` |
@@ -170,6 +171,7 @@ See `references/code-quality-standards.md` for full details including naming con
 6. **TDD (Phase 6)** -- RED -> GREEN -> REFACTOR loop
 7. **TEST (Phase 7)** -- Full test suite
 8. **AUDIT (Phase 8)** -- Quality checks (can run parallel with TEST)
+8.5. **FIX VERIFICATION (Phase 8.5)** -- Confirm fixes applied + edge case analysis (see `__lib/fix-verification-protocol.md`)
 9. **TRACE (Phase 9)** -- Manual code trace-through
 10. **PRODUCER/CONSUMER TRACE (Phase 10)** -- Verify actual handoff path end-to-end
 11. **DONE (Phase 11)** -- Final certification
