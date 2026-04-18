@@ -1,0 +1,28 @@
+{
+  "version": "3.0.0",
+  "terminal_id": "test",
+  "timestamp": "2026-03-28T06:52:16.221331",
+  "session_id": "2026-03-28T06:52:16.172092",
+  "gaps": [],
+  "metadata": {
+    "timestamp": "2026-03-28T06:52:16.172092",
+    "project_root": "P:\\.claude\\skills\\critique",
+    "terminal_id": "test",
+    "ttl_evicted": 0,
+    "viability_check": {
+      "is_viable": true,
+      "failure_reason": null
+    },
+    "git_context": {
+      "branch": "main",
+      "branch_display": "main",
+      "is_detached": false,
+      "is_worktree": false,
+      "worktree_count": 1,
+      "error": null
+    },
+    "subagent_results": {
+      "gap_finder": []
+    }
+  }
+}
