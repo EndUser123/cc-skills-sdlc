@@ -5,14 +5,14 @@ import json
 import sys
 from pathlib import Path
 
-MODELS = {"deepseek", "gemini", "claude", "gpt"}
+MODELS = {"deepseek", "claude", "gpt", "gemma"}
 
 # pi model identifiers: provider/model-id format
 PI_MODEL_MAP = {
     "deepseek": "deepseek/deepseek-chat-v3",
-    "gemini": "google/gemini-2.5-flash",
     "claude": "anthropic/claude-3.5-sonnet",
     "gpt": "openai/gpt-4o",
+    "gemma": "google/gemma-4-31b-it",
 }
 
 PI_BIN = "pi"
