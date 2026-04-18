@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from layers.dispatcher import (
-    _parse_opencode_jsonl,
+    _parse_pi_jsonl,
     _score_from_finding,
     dispatch_parallel,
     dispatch_single,
@@ -54,44 +54,32 @@ class TestScoreFromFinding:
 # _parse_opencode_jsonl
 # ---------------------------------------------------------------------------
 
-class TestParseOpencodeJsonl:
-    def test_step_finish_type(self):
-        raw = '{"type": "step_finish", "result": {"score": 0.8}}\n'
-        result = _parse_opencode_jsonl(raw)
-        assert result == {"type": "step_finish", "result": {"score": 0.8}}
+class TestParsePiJsonl:
+    def test_agent_end_with_assistant_content(self):
+        # pi JSONL: assistant message in agent_end.messages
+        raw = '{"type": "agent_end", "messages": [{"role": "assistant", "content": "{\\"score\\": 0.8, \\"summary\\": \\"good\\"}"}]}\n'
+        result = _parse_pi_jsonl(raw)
+        assert result == {"text": '{"score": 0.8, "summary": "good"}'}
 
-    def test_text_type_with_json_inner(self):
-        # Inner JSON must be properly escaped within outer JSON
-        raw = '{"type": "text", "part": {"text": "{\\"score\\": 0.75, \\"summary\\": \\"good\\"}"}}\n'
-        result = _parse_opencode_jsonl(raw)
-        assert result == {"score": 0.75, "summary": "good"}
+    def test_agent_end_with_error(self):
+        # pi JSONL: error surfaced via stopReason=error in message
+        raw = '{"type": "agent_end", "messages": [{"role": "assistant", "stopReason": "error", "errorMessage": "NVIDIA NIM: key not set"}]}\n'
+        result = _parse_pi_jsonl(raw)
+        assert result == {"error": "NVIDIA NIM: key not set"}
 
-    def test_text_type_with_plain_inner(self):
-        raw = '{"type": "text", "part": {"text": "just a string"}}\n'
-        result = _parse_opencode_jsonl(raw)
-        assert result == {"text": "just a string"}
-
-    def test_mixed_lines_picks_first_text(self):
-        raw = '\n\n{"type": "text", "part": {"text": "{\\"score\\": 0.6}"}}\n{"type": "other"}\n'
-        result = _parse_opencode_jsonl(raw)
-        assert result == {"score": 0.6}
-
-    def test_invalid_lines_skipped(self):
-        raw = 'not json at all\n{"type": "step_finish", "score": 0.5}\n'
-        result = _parse_opencode_jsonl(raw)
-        assert result == {"type": "step_finish", "score": 0.5}
+    def test_message_update_text_delta_accumulates(self):
+        raw = '{"type": "message_update", "part": {"assistantMessageEvent": {"type": "text_delta", "delta": "hello"}}}\n{"type": "message_update", "part": {"assistantMessageEvent": {"type": "text_delta", "delta": " world"}}}\n{"type": "agent_end", "messages": []}\n'
+        result = _parse_pi_jsonl(raw)
+        assert result == {"text": "hello world"}
 
     def test_empty_input(self):
-        assert _parse_opencode_jsonl("") is None
-        assert _parse_opencode_jsonl("\n\n  \n") is None
+        assert _parse_pi_jsonl("") is None
+        assert _parse_pi_jsonl("\n\n  \n") is None
 
-    def test_only_whitespace_lines(self):
-        raw = "   \n\t\n\n   \n"
-        assert _parse_opencode_jsonl(raw) is None
-
-    def test_all_invalid_json(self):
-        raw = 'hello world\nfoo bar\n'
-        assert _parse_opencode_jsonl(raw) is None
+    def test_invalid_lines_skipped(self):
+        raw = 'not json at all\n{"type": "agent_end", "messages": []}\n'
+        result = _parse_pi_jsonl(raw)
+        assert result is not None
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +150,7 @@ class TestDispatchParallel:
         orig = disp.dispatch_single
 
         async def patched(target, model, output_dir):
-            raise RuntimeError(f"opencode ({model}) failed")
+            raise RuntimeError(f"pi ({model}) failed")
 
         disp.dispatch_single = patched
         try:
@@ -211,14 +199,16 @@ class TestDispatchSingleErrors:
 
 def test_cli_importable():
     """The sqd package is importable and has dispatch_parallel."""
-    from layers.dispatcher import dispatch_parallel, MODELS
+    from layers.dispatcher import dispatch_parallel, MODELS, PI_MODEL_MAP
 
-    assert MODELS == {"deepseek", "gemini", "claude", "gpt"}
     assert callable(dispatch_parallel)
+    assert MODELS == set(PI_MODEL_MAP.keys())
 
 
-def test_opencode_model_map_coverage():
-    """All MODELS names are mapped in OPENCODE_MODEL_MAP."""
-    from layers.dispatcher import MODELS, OPENCODE_MODEL_MAP
+def test_pi_model_map_coverage():
+    """All MODELS names are mapped in PI_MODEL_MAP."""
+    from layers.dispatcher import MODELS, PI_MODEL_MAP
 
-    assert MODELS == set(OPENCODE_MODEL_MAP.keys())
+    assert MODELS == set(PI_MODEL_MAP.keys())
+    # nvidia-nim uses multi-part model ID with 3 parts
+    assert PI_MODEL_MAP["nvidia-nim"].count("/") == 2
