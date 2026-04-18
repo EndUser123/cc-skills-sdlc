@@ -1,0 +1,117 @@
+{
+  "resume_snapshot": {
+    "schema_version": 2,
+    "snapshot_id": "73564c72-366a-4264-83f6-13f175db02e3",
+    "terminal_id": "console_94cc72c4-421c-4ff8-a247-d999380a8bc8",
+    "source_session_id": "0557dac2-cc5d-49da-bea1-aebadd58dc54",
+    "created_at": "2026-04-18T17:33:37.345608+00:00",
+    "expires_at": "2026-04-18T17:53:37.345608+00:00",
+    "status": "rejected_stale",
+    "goal": "don't be dumb.  you know you are supposed to pass useful information to the llm.  how can you be a good helper next time?",
+    "current_task": "don't be dumb. you know you are supposed to pass useful information to the llm. how can you be a good helper next time?",
+    "progress_percent": 65,
+    "progress_state": "in_progress",
+    "blockers": [],
+    "active_files": [
+      "P:/.env",
+      "packages/coding-agent/docs/providers.md",
+      "C:/Users/brsth/.pi/agent/auth.json",
+      "packages/coding-agent/docs/models.md",
+      "P:/packages/sdlc/scripts/opencode_dispatch.py",
+      "P:/packages/ai-cli/skills/ai-cli/scripts/cli_detector.py",
+      "P:/.claude/skills/s/scripts/run_heavy.py",
+      "packages/coding-agent/docs/sdk.md",
+      "packages/coding-agent/docs/rpc.md",
+      "packages/coding-agent/docs/json.md"
+    ],
+    "pending_operations": [
+      {
+        "type": "investigation",
+        "target": "files: **/.env",
+        "state": "in_progress"
+      },
+      {
+        "type": "read",
+        "target": "P:/.env",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "mkdir -p \"$HOME/.pi/agent\"",
+        "state": "in_progress"
+      },
+      {
+        "type": "command",
+        "target": "cat > \"$HOME/.pi/agent/auth.json\" << 'EOF'\n{\n  \"google\": { \"type\": \"api_key\", \"k",
+        "state": "in_progress"
+      },
+      {
+        "type": "investigation",
+        "target": "search: opencode",
+        "state": "in_progress"
+      }
+    ],
+    "next_step": "(advisory) Previous session had pending: investigation on files: **/.env.",
+    "decision_refs": [],
+    "evidence_refs": [
+      "ev_638d24f70eaa4832a10954c34c1321a7",
+      "ev_fcabb4dda7a74779a7e030a189a32d14",
+      "ev_7c5ec40f0dfe45eb8dc33f1b55fa702e",
+      "ev_2bb5700189d7413b9b8357eb669a0cad",
+      "ev_5c0443568e604078a99416a2e78067aa",
+      "ev_fd119d99ff454d3a9604cbe7d36e8c87"
+    ],
+    "n_1_transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\0557dac2-cc5d-49da-bea1-aebadd58dc54.jsonl",
+    "n_2_transcript_path": "C:\\Users\\brsth\\.claude\\projects\\P--\\1e4efb47-62fe-4b66-8497-1a35ce7f4305.jsonl",
+    "message_intent": "question",
+    "goal_origin": "user_message",
+    "quality_score": 0.4,
+    "tasks_snapshot": [],
+    "rejected_at": "2026-04-18T17:35:13.096038+00:00",
+    "rejected_by_session_id": "0557dac2-cc5d-49da-bea1-aebadd58dc54",
+    "rejection_reason": "snapshot evidence path outside project directory"
+  },
+  "decision_register": [],
+  "evidence_index": [
+    {
+      "id": "ev_638d24f70eaa4832a10954c34c1321a7",
+      "type": "transcript",
+      "label": "Current compact transcript",
+      "path": "C:\\Users\\brsth\\.claude\\projects\\P--\\0557dac2-cc5d-49da-bea1-aebadd58dc54.jsonl",
+      "content_hash": "sha256:d83d3c9710106d45b1bb79cd5ae9ce174ae6c55570b85723646e5369881e8cb7"
+    },
+    {
+      "id": "ev_fcabb4dda7a74779a7e030a189a32d14",
+      "type": "file",
+      "label": ".env",
+      "path": "P:\\.env",
+      "content_hash": "sha256:8643a602c2aeaab9a52b11194f6f67956bb27b295ab2f293a49877ef9aee217a"
+    },
+    {
+      "id": "ev_7c5ec40f0dfe45eb8dc33f1b55fa702e",
+      "type": "file",
+      "label": "providers.md",
+      "path": "P:\\packages\\cc-skills-sdlc\\skills\\sqd\\packages\\coding-agent\\docs\\providers.md"
+    },
+    {
+      "id": "ev_2bb5700189d7413b9b8357eb669a0cad",
+      "type": "file",
+      "label": "auth.json",
+      "path": "C:\\Users\\brsth\\.pi\\agent\\auth.json",
+      "content_hash": "sha256:90cacda060fbda534ea8d4ea26b69e7b34785c50e73a45250ce19bbe98ac6060"
+    },
+    {
+      "id": "ev_5c0443568e604078a99416a2e78067aa",
+      "type": "file",
+      "label": "models.md",
+      "path": "P:\\packages\\cc-skills-sdlc\\skills\\sqd\\packages\\coding-agent\\docs\\models.md"
+    },
+    {
+      "id": "ev_fd119d99ff454d3a9604cbe7d36e8c87",
+      "type": "file",
+      "label": "opencode_dispatch.py",
+      "path": "P:\\packages\\sdlc\\scripts\\opencode_dispatch.py"
+    }
+  ],
+  "checksum": "sha256:9c977745e5b4c2fddf647bb7bf855a6019247e61fc9e3e25fcd0d4a06b474dc3"
+}

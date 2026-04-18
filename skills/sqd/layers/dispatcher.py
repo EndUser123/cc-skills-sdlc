@@ -22,6 +22,43 @@ PI_MODEL_MAP = {
 
 PI_BIN = "pi.cmd"
 DISPATCH_TIMEOUT_SEC = 300
+MAX_TARGET_READ_BYTES = 200_000  # cap content at 200KB to avoid token limits
+
+
+def _read_target_content(target: str) -> str:
+    """Read target file or directory content for embedding in prompt.
+
+    For files: returns full content (capped at MAX_TARGET_READ_BYTES).
+    For directories: returns a tree listing + key file contents (SKILL.md, *.py).
+    Returns empty string if target not found or unreadable.
+    """
+    p = Path(target)
+    if not p.exists():
+        return ""
+
+    try:
+        if p.is_file():
+            content = p.read_text("utf-8", errors="replace")
+            return content[:MAX_TARGET_READ_BYTES]
+
+        if p.is_dir():
+            parts = [f"Directory: {target}\n"]
+            # Walk the tree
+            for entry in sorted(p.rglob("*")):
+                if entry.is_file() and not any(x in entry.parts for x in (".git", "__pycache__", ".claude", "node_modules")):
+                    rel = entry.relative_to(p)
+                    parts.append(f"\n--- {rel} ---\n")
+                    try:
+                        content = entry.read_text("utf-8", errors="replace")
+                        parts.append(content[:10_000])  # cap individual files at 10KB
+                    except Exception:
+                        parts.append("[binary or unreadable]")
+            combined = "\n".join(parts)
+            return combined[:MAX_TARGET_READ_BYTES]
+    except Exception:
+        return ""
+
+    return ""
 
 
 def _parse_pi_jsonl(raw_output: str) -> dict | None:
@@ -125,38 +162,75 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
         f"Score 0.0 = critical issues found, 1.0 = no issues."
     )
 
-    # pi's internal wrapper (regardless of provider) checks NVIDIA_NIM_API_KEY.
+    # pi's internal wrapper checks NVIDIA_NIM_API_KEY regardless of provider.
     # Env vars set in shell may not propagate to Python subprocess env,
-    # so read the key from auth.json as a fallback and always forward it.
+    # so read keys from auth.json as a fallback and always forward them.
     env = os.environ.copy()
+    auth_path = Path.home() / ".pi" / "agent" / "auth.json"
+    auth_data = {}
+    try:
+        with open(auth_path) as f:
+            auth_data = json.load(f)
+    except Exception:
+        pass
+
+    # Forward NVIDIA_NIM_API_KEY if not already present
     if "NVIDIA_NIM_API_KEY" not in env:
         nvidia_key = env.get("NVIDIA_API_KEY")
         if not nvidia_key:
-            auth_path = Path.home() / ".pi" / "agent" / "auth.json"
-            try:
-                with open(auth_path) as f:
-                    auth_data = json.load(f)
-                for provider_key in ("nvidia", "nvidia-nim"):
-                    if provider_key in auth_data:
-                        entry = auth_data[provider_key]
-                        if isinstance(entry, dict) and entry.get("type") == "api_key":
-                            nvidia_key = entry.get("key")
-                            if nvidia_key:
-                                break
-            except Exception:
-                pass
+            for provider_key in ("nvidia", "nvidia-nim"):
+                if provider_key in auth_data:
+                    entry = auth_data[provider_key]
+                    if isinstance(entry, dict) and entry.get("type") == "api_key":
+                        nvidia_key = entry.get("key")
+                        if nvidia_key:
+                            break
         if nvidia_key:
             env["NVIDIA_NIM_API_KEY"] = nvidia_key
 
-    # Build the adversarial review prompt — be explicit about JSON-only output
-    prompt = (
-        f"You are an adversarial code reviewer.\n"
-        f"Review the artifact at: {target}\n\n"
-        f"IMPORTANT: Respond with ONLY valid JSON. No markdown, no code fences, no explanation.\n"
-        f"Your entire response must be parseable by json.loads().\n"
-        f'Format: {{"score": <0.0-1.0>, "summary": "<1 sentence>", "issues": ["<issue1>", ...]}}\n'
-        f"Score 0.0 = critical issues found, 1.0 = no issues."
-    )
+    # Forward MISTRAL_API_KEY if not already present (for mistral provider)
+    if "MISTRAL_API_KEY" not in env:
+        if "mistral" in auth_data:
+            entry = auth_data["mistral"]
+            if isinstance(entry, dict) and entry.get("type") == "api_key":
+                mistral_key = entry.get("key")
+                if mistral_key:
+                    env["MISTRAL_API_KEY"] = mistral_key
+
+    # pi uses -p which has a ~8K char prompt limit on some models.
+    # Only embed content if it fits a reasonable budget (~6000 chars).
+    # Otherwise fall back to path reference.
+    MAX_EMBED_CHARS = 6_000
+    target_content = _read_target_content(target)
+    if target_content and len(target_content) <= MAX_EMBED_CHARS:
+        prompt = (
+            f"You are an adversarial code reviewer.\n"
+            f"Review the following code:\n\n{target_content}\n\n"
+            f"IMPORTANT: Respond with ONLY valid JSON. No markdown, no code fences, no explanation.\n"
+            f"Your entire response must be parseable by json.loads().\n"
+            f'Format: {{"score": <0.0-1.0>, "summary": "<1 sentence>", "issues": ["<issue1>", ...]}}\n'
+            f"Score 0.0 = critical issues found, 1.0 = no issues."
+        )
+    elif target_content:
+        # Large target — truncate to first 6000 chars (models can at least see the start)
+        truncated = target_content[:MAX_EMBED_CHARS] + "\n... [truncated]"
+        prompt = (
+            f"You are an adversarial code reviewer.\n"
+            f"Review the following code:\n\n{truncated}\n\n"
+            f"IMPORTANT: Respond with ONLY valid JSON. No markdown, no code fences, no explanation.\n"
+            f"Your entire response must be parseable by json.loads().\n"
+            f'Format: {{"score": <0.0-1.0>, "summary": "<1 sentence>", "issues": ["<issue1>", ...]}}\n'
+            f"Score 0.0 = critical issues found, 1.0 = no issues."
+        )
+    else:
+        prompt = (
+            f"You are an adversarial code reviewer.\n"
+            f"Review the artifact at: {target}\n\n"
+            f"IMPORTANT: Respond with ONLY valid JSON. No markdown, no code fences, no explanation.\n"
+            f"Your entire response must be parseable by json.loads().\n"
+            f'Format: {{"score": <0.0-1.0>, "summary": "<1 sentence>", "issues": ["<issue1>", ...]}}\n'
+            f"Score 0.0 = critical issues found, 1.0 = no issues."
+        )
 
     # Use -p/--print to avoid piped stdin hanging in --mode json
     cmd = [PI_BIN, "--mode", "json", "--provider", provider, "--model", model_id, "-p", prompt]
