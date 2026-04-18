@@ -48,7 +48,7 @@ def test_resolve_prompt_template_rejects_unresolved_dispatch_tokens() -> None:
 
 def test_reference_prompt_contract_uses_explicit_findings_paths() -> None:
     reference = Path(
-        "P:/packages/sdlc/skills/planning/references/adversarial-agent-prompts.md"
+        "P:/packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md"
     ).read_text(encoding="utf-8")
 
     assert "{sanitized_plan_name}" not in reference

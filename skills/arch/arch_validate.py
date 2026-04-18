@@ -23,7 +23,7 @@ from typing import Literal
 _ROOT = Path(__file__).resolve()
 _CONTRACT_PRIMITIVES_CANDIDATES = [
     _ROOT.parents[4] / "contract-primitives" / "src",
-    Path(_ROOT.anchor) / "packages" / "sdlc" / "contract-primitives" / "src",
+    Path(_ROOT.anchor) / "packages" / "cc-skills-sdlc" / "contract-primitives" / "src",
 ]
 for _candidate in _CONTRACT_PRIMITIVES_CANDIDATES:
     if _candidate.exists() and str(_candidate) not in sys.path:

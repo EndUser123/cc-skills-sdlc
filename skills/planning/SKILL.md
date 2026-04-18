@@ -518,7 +518,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 python -c "
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r'P:/packages/sdlc/skills/planning/__lib')))
+sys.path.insert(0, str(Path(r'P:/packages/cc-skills-sdlc/skills/planning/__lib')))
 from adversarial_review import prepare_adversarial_review_context
 
 context = prepare_adversarial_review_context(sys.argv[1])

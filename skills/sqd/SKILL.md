@@ -28,7 +28,7 @@ Parallel multi-LLM adversarial review dispatcher. Spawns adversarial review agen
 ## Execution
 
 ```bash
-cd "P:/packages/sdlc" && python -m sqd dispatch --target "<path or description>" --models deepseek gemini claude --parallel
+cd "P:/packages/cc-skills-sdlc" && python -m sqd dispatch --target "<path or description>" --models deepseek gemini claude --parallel
 ```
 
 ## Architecture

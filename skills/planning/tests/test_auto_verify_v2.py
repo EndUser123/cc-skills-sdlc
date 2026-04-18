@@ -1527,7 +1527,7 @@ Use Windows junction points and keep skill behavior unchanged.
 
 ## Test Matrix
 
-pytest P:/packages/sdlc/contract-primitives/tests/
+pytest P:/packages/cc-skills-sdlc/contract-primitives/tests/
 
 ## Contract Authority Reference
 

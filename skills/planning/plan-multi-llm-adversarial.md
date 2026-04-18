@@ -21,8 +21,8 @@
 ## Background
 
 Current adversarial dispatch is defined in:
-- `P:/packages/sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
-- `P:/packages/sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
+- `P:/packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
+- `P:/packages/cc-skills-sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
 
 The 5 phase-1 agents are Claude subagents (e.g., `adversarial-compliance`). The critic is a meta-agent that reviews phase-1 findings. Both phases write findings to disk under `<findings_dir>` with idempotency checks.
 
@@ -105,7 +105,7 @@ Fallback if OpenCode unavailable: skip slot 5 (log warning), proceed with 4 Clau
 ### TASK-003: Define DeepSeek findings schema
 - Write `references/deepseek-adversarial-schema.json` with the findings schema above
 - Confirm schema is compatible with what the critic subagent reads
-- **Output**: Schema file at `P:/packages/sdlc/skills/planning/references/deepseek-adversarial-schema.json`
+- **Output**: Schema file at `P:/packages/cc-skills-sdlc/skills/planning/references/deepseek-adversarial-schema.json`
 
 ### TASK-004: Add DeepSeek dispatch to adversarial-agent-prompts.md
 - Append a new section "## Slot 5: DeepSeek V3.2 Adversarial" to `references/adversarial-agent-prompts.md`

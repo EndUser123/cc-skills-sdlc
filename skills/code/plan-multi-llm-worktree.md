@@ -120,7 +120,7 @@ Written to `P:/worktrees/<feature-slug>-compare/compare.md`:
 - Write `references/worktree-compare-rubric.md` with scoring criteria
 - Criteria: test pass rate (weight 0.5), coverage (0.2), implementation clarity (0.2), line count (0.1)
 - Define "Manual merge required" threshold: test pass rate differs by >10% or both have unique valid patterns
-- **Output**: `P:/packages/sdlc/skills/code/references/worktree-compare-rubric.md`
+- **Output**: `P:/packages/cc-skills-sdlc/skills/code/references/worktree-compare-rubric.md`
 
 ### TASK-004: Add --parallel-llm flag to SKILL.md
 - Add `--parallel-llm [deepseek|codex]` to the argument-hint in SKILL.md frontmatter

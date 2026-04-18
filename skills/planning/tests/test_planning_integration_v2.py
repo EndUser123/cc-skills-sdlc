@@ -341,7 +341,7 @@ The plan currently assumes replay and handoff semantics but does not close ident
 
 ## Test Matrix
 
-pytest P:/packages/sdlc/skills/planning/tests/test_planning_integration_v2.py
+pytest P:/packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py
 
 ## Contract Authority Reference
 
@@ -437,7 +437,7 @@ Keep artifact rewriting in one local planning path and keep behavior unchanged.
 
 ## Test Matrix
 
-pytest P:/packages/sdlc/skills/planning/tests/test_planning_integration_v2.py::TestArchHandoffResumePersistence::test_pending_arch_receipt_prevents_reinvocation_and_marks_consumed_after_rewrite
+pytest P:/packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py::TestArchHandoffResumePersistence::test_pending_arch_receipt_prevents_reinvocation_and_marks_consumed_after_rewrite
 
 ## Contract Authority Reference
 
