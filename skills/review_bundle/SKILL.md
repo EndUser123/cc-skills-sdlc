@@ -12,6 +12,11 @@ aliases:
 
 parallel_agents: true
 execution_mode: hybrid
+workflow_steps:
+  - scope_selection
+  - file_count_mode
+  - generate_bundle
+  - deliver
 ---
 
 # Review Bundle Creation
@@ -38,6 +43,37 @@ Generate one self-contained Markdown document with:
 - Output directory: `P:\__csf\.staging\` (Windows path)
 - Size-based routing: <10 files (single agent), 10-50 files (2 agents), 50+ files (4 agents)
 - Parallel agents: Explorer, Core Reader, Config Reader, Dependency Scanner
+
+### Standard Exclusion Patterns
+
+The skill automatically excludes the following directory patterns when counting files and generating bundles:
+
+| Pattern | Description |
+|---------|-------------|
+| `.mypy_cache/` | Type checker cache |
+| `.ruff_cache/` | Linter cache |
+| `.pytest_cache/` | Pytest cache |
+| `__pycache__/` | Python bytecode cache |
+| `.git/` | Git repository metadata |
+| `.state/` | Session/terminal state directories |
+| `benchmarks/` | Benchmark outputs |
+| `.evidence/` | Evidence outputs |
+| `_archive*` / `.archive/` | Archived code |
+| `venv/` / `env/` | Virtual environments |
+| `.venv/` / `.env/` | Hidden virtual environments |
+| `node_modules/` | NPM dependencies |
+| `.claude/worktrees/` | Git worktrees |
+| `.ruff_cache/` | Ruff linter cache |
+| `logs/` | Log directories |
+| `.staging/` | Staging directories |
+| `site-packages/` | Installed packages |
+
+**File patterns excluded:**
+- `*.pyc`, `*.pyo`, `*.pyd` — Python compiled files
+- `*.so`, `*.dll`, `*.dylib` — Native binaries
+- `*.whl` — Python wheels
+- `*.log` — Log files
+- `*.tmp`, `*.temp` — Temporary files
 
 ---
 
@@ -303,8 +339,35 @@ Which system?
 
 ### Step 2: File Count & Mode Selection
 
-1. Use Explorer agent (or Glob) to count files in scope
+1. Use Explorer agent (or Glob) to count files in scope, **excluding** the standard exclusion patterns listed above
 2. Route based on count and apply the REVIEW BUNDLE CONTRACT above
+
+**Exclusion-aware file counting command:**
+```bash
+find "SCOPE_PATH" -type f \( -name "*.py" -o -name "*.md" -o -name "*.yaml" -o -name "*.json" \) \
+  ! -path "*/.mypy_cache/*" \
+  ! -path "*/.ruff_cache/*" \
+  ! -path "*/.pytest_cache/*" \
+  ! -path "*/__pycache__/*" \
+  ! -path "*/.git/*" \
+  ! -path "*/.state/*" \
+  ! -path "*/benchmarks/*" \
+  ! -path "*/.evidence/*" \
+  ! -path "*/_archive*/*" \
+  ! -path "*/.archive/*" \
+  ! -path "*/venv/*" \
+  ! -path "*/.venv/*" \
+  ! -path "*/node_modules/*" \
+  ! -path "*/.claude/worktrees/*" \
+  ! -path "*/logs/*" \
+  ! -path "*/.staging/*" \
+  ! -path "*/site-packages/*" \
+  ! -name "*.pyc" \
+  ! -name "*.pyo" \
+  ! -name "*.log" \
+  ! -name "*.tmp" \
+  | wc -l
+```
 
 ### Step 3: Generate Bundle
 

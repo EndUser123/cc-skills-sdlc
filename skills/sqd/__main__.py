@@ -5,7 +5,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from layers.dispatcher import dispatch_parallel, MODELS
+from skills.sqd.layers.dispatcher import dispatch_parallel, MODELS
 
 
 def main() -> int:
