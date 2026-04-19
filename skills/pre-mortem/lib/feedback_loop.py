@@ -16,7 +16,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Resolve STAGING_ROOT consistent with premortem_io.py
-STAGING_ROOT = Path.cwd().resolve() / ".evidence" / "pre-mortem"
+def _resolve_artifacts_dir(skill_name: str) -> Path:
+    base = Path.cwd().resolve() / ".claude" / ".artifacts"
+    terminal_id = os.environ.get("CLAUDE_TERMINAL_ID", "default")
+    return base / terminal_id / skill_name
+
+STAGING_ROOT = _resolve_artifacts_dir("pre-mortem")
 
 
 def _get_terminal_id() -> str:

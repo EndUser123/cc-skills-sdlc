@@ -11,6 +11,7 @@ Only speaks up when confident - requires actual risk signal in code.
 from __future__ import annotations
 
 import json
+import os
 import logging
 import re
 from collections import defaultdict
@@ -176,7 +177,7 @@ class BlindSpotDetector:
             state_dir: Directory with review state files
             lookback_days: How far back to look for prior reviews
         """
-        self.state_dir = state_dir or Path.cwd().resolve() / ".claude" / "state"
+        self.state_dir = state_dir or Path.cwd().resolve() / ".claude" / ".artifacts" / os.environ.get("CLAUDE_TERMINAL_ID", "default") / "uci"
         self.lookback_days = lookback_days
 
     def scan_code_for_risk_signals(

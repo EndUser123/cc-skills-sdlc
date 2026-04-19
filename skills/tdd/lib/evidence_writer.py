@@ -90,8 +90,9 @@ def generate_evidence_artifact(
             debug_log(f"generate_evidence_artifact: EvidenceManager unavailable, using markdown fallback for {task_id} {phase}")
             debug_log(f"generate_evidence_artifact: EVIDENCE_MANAGER_AVAILABLE={EVIDENCE_MANAGER_AVAILABLE}, terminal_id={terminal_id}")
 
-            # Create .evidence directory under project root (not inside package)
-            evidence_dir = Path.cwd().resolve() / ".evidence" / "tdd"
+            # Create artifacts directory: P:/.claude/.artifacts/{terminal_id}/tdd/
+            tid = terminal_id or os.environ.get("CLAUDE_TERMINAL_ID", "default")
+            evidence_dir = Path.cwd().resolve() / ".claude" / ".artifacts" / tid / "tdd"
             evidence_dir.mkdir(parents=True, exist_ok=True)
 
             # Generate artifact filename with UTC timestamp

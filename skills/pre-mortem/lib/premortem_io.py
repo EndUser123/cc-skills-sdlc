@@ -61,8 +61,13 @@ except ImportError:
 # GTO skill coverage for GTO session tracking — imported lazily inside write_phase
 # to avoid hard dependency on gto package being present at module load time
 
-# Staging root - resolves to P:/.evidence/pre-mortem via cwd (always P:/ in Claude Code)
-STAGING_ROOT = Path.cwd().resolve() / ".evidence" / "pre-mortem"
+# Staging root - P:/.claude/.artifacts/{terminal_id}/pre-mortem/
+def _resolve_artifacts_dir(skill_name: str) -> Path:
+    base = Path.cwd().resolve() / ".claude" / ".artifacts"
+    terminal_id = os.environ.get("CLAUDE_TERMINAL_ID", "default")
+    return base / terminal_id / skill_name
+
+STAGING_ROOT = _resolve_artifacts_dir("pre-mortem")
 PHASES = Literal[1, 2, 3]
 
 
