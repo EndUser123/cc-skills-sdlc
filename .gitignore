@@ -9,3 +9,8 @@ build/
 .benchmarks/
 *.json.bak
 findings/
+
+# Session state artifacts
+.claude/
+.evidence/
+.state/

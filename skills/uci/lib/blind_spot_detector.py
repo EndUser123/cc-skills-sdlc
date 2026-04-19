@@ -176,7 +176,7 @@ class BlindSpotDetector:
             state_dir: Directory with review state files
             lookback_days: How far back to look for prior reviews
         """
-        self.state_dir = state_dir or Path(".claude/state")
+        self.state_dir = state_dir or Path.cwd().resolve() / ".claude" / "state"
         self.lookback_days = lookback_days
 
     def scan_code_for_risk_signals(

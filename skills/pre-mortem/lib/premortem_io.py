@@ -61,9 +61,8 @@ except ImportError:
 # GTO skill coverage for GTO session tracking — imported lazily inside write_phase
 # to avoid hard dependency on gto package being present at module load time
 
-# Staging root - consistent with GTO's .evidence pattern
-# Uses P:\.claude\.evidence\pre-mortem (not Path.home()) to match SKILL.md paths
-STAGING_ROOT = Path(__file__).parent.parent.parent.parent / ".evidence" / "pre-mortem"
+# Staging root - resolves to P:/.evidence/pre-mortem via cwd (always P:/ in Claude Code)
+STAGING_ROOT = Path.cwd().resolve() / ".evidence" / "pre-mortem"
 PHASES = Literal[1, 2, 3]
 
 

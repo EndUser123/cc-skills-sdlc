@@ -16,8 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Resolve STAGING_ROOT consistent with premortem_io.py
-# Goes up from pre-mortem/lib/ to .claude/ to P:\
-STAGING_ROOT = Path(__file__).parent.parent.parent.parent / ".evidence" / "pre-mortem"
+STAGING_ROOT = Path.cwd().resolve() / ".evidence" / "pre-mortem"
 
 
 def _get_terminal_id() -> str:

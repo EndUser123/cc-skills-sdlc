@@ -10,14 +10,15 @@ from pathlib import Path
 # Maps to real pi providers/models from `pi --list-models`
 # Only includes providers verified to work with ~/.pi/agent/auth.json keys
 MODELS = {
-    "mistral", "nvidia-nim",
+    "mistral", "nvidia-nim", "openrouter",
 }
 
 # pi model identifiers: full model ID for --model flag
 # Use "provider/model-id" format with --model (not --provider + --model separate)
 PI_MODEL_MAP = {
-    "mistral":    "mistral/devstral-2512",
-    "nvidia-nim": "nvidia-nim/mistralai/devstral-2-123b-instruct-2512",
+    "mistral":     "mistral/devstral-2512",
+    "nvidia-nim":  "nvidia-nim/mistralai/devstral-2-123b-instruct-2512",
+    "openrouter":  "openrouter/elephant-alpha",
 }
 
 PI_BIN = "pi.cmd"
@@ -289,6 +290,17 @@ async def dispatch_single(target: str, model: str, output_dir: Path) -> dict:
                 mistral_key = entry.get("key")
                 if mistral_key:
                     env["MISTRAL_API_KEY"] = mistral_key
+
+    # Forward OPENROUTER_API_KEY if not already present (for openrouter provider)
+    if "OPENROUTER_API_KEY" not in env:
+        for provider_key in ("openrouter",):
+            if provider_key in auth_data:
+                entry = auth_data[provider_key]
+                if isinstance(entry, dict) and entry.get("type") == "api_key":
+                    openrouter_key = entry.get("key")
+                    if openrouter_key:
+                        env["OPENROUTER_API_KEY"] = openrouter_key
+                        break
 
     # Use @{path} syntax — pi reads the file and includes content in context
     # This works for files of any size and is more reliable than --tools read or embedding
