@@ -2,7 +2,7 @@
 
 SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (32)
+## Skills (39)
 
 | Skill | Purpose |
 |-------|---------|
@@ -26,6 +26,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | planning | Implementation plan creation and verification |
 | prd | Product requirement documents |
 | pre-mortem | Failure-mode analysis with phased output |
+| prrp | Production-ready code review prompt |
 | python-backend-reviewer | Python-specific code review |
 | qmd-wiki | Wiki page generation |
 | rca | Root cause analysis with hook enforcement |
@@ -34,7 +35,13 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | spec-compliance | Spec compliance validation |
 | sqa | Software quality assurance (8-layer) |
 | sqd | Software quality diagnostics |
+| t | Context-aware adaptive testing with ToT enhancement |
 | tdd | Test-driven development with evidence |
+| tldr-code | Token-efficient code analysis (5-layer stack) |
+| tldr-deep | Full 5-layer analysis of specific functions |
+| tldr-overview | Overview-level code analysis |
+| tldr-router | Router for tldr analysis variants |
+| tldr-stats | Statistics for tldr analysis |
 | uci | Unified code inspection |
 | wiki | Wiki management |
 

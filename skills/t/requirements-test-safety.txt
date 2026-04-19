@@ -1,0 +1,4 @@
+# Test Safety Dependencies
+pytest-timeout>=2.3.0  # Global test timeout to prevent hanging
+pytest>=8.0.0          # Core testing framework
+psutil>=6.0.0          # Process/thread monitoring (optional, for advanced tracking)
