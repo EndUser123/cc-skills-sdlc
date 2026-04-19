@@ -1,22 +1,37 @@
 # cc-skills-sdlc
 
-SDLC skills for Claude Code — architecture, planning, code quality, testing, and review.
+SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (17)
+## Skills (32)
 
 | Skill | Purpose |
 |-------|---------|
+| adversarial-review | Parallel adversarial code review with 8 specialized perspectives |
 | arch | Architecture validation and ADR workflow |
+| av | Adversarial review variant |
 | code | Code implementation with evidence tracking |
+| code-flow-visualizer | Code flow analysis and visualization |
+| code-review | General code review |
+| code-reviewer-business-logic | Business logic focused review |
+| critical-code-reviewer | Critical path review |
+| diagnose | Diagnostic workflow |
+| docs | Documentation generation |
+| docs-validate | Documentation validation |
 | mermaid-c4 | C4 architecture diagrams |
 | mermaid-davila7 | Davila7 architecture diagrams |
+| meta-review | Review of reviews |
+| multi-file-refactor | Cross-file refactoring |
+| perf | Performance analysis |
+| performance-profiler | Detailed performance profiling |
 | planning | Implementation plan creation and verification |
 | prd | Product requirement documents |
 | pre-mortem | Failure-mode analysis with phased output |
+| python-backend-reviewer | Python-specific code review |
 | qmd-wiki | Wiki page generation |
 | rca | Root cause analysis with hook enforcement |
 | refactor | Refactoring with plan-and-review |
 | review_bundle | Review bundle aggregation |
+| spec-compliance | Spec compliance validation |
 | sqa | Software quality assurance (8-layer) |
 | sqd | Software quality diagnostics |
 | tdd | Test-driven development with evidence |

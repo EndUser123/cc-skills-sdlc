@@ -1,0 +1,30 @@
+{
+  "name": "diagnose",
+  "version": "1.0.0",
+  "description": "Structured Diagnostic Protocol - Enforce systematic hypothesis testing",
+  "triggers": [
+    "investigating",
+    "debugging",
+    "debug",
+    "diagnose",
+    "what's causing",
+    "why is",
+    "troubleshoot",
+    "root cause"
+  ],
+  "negative_triggers": [
+    "fix",
+    "implement",
+    "add feature",
+    "create",
+    "simple fix",
+    "just"
+  ],
+  "frontmatter": {
+    "title": "/diagnose - Structured Diagnostics",
+    "category": "debugging",
+    "tags": ["protocol", "verification", "testing"],
+    "priority": "P0",
+    "enforcement": "stop-hook"
+  }
+}
