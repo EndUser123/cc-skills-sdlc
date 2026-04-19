@@ -75,8 +75,8 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 4. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
    - **If `--dry-run`**: Continue to steps 4.5-4.6, then STOP
    - **If "continue" or no `--dry-run`**: Execute steps 5-9 for ALL priority levels
-   4.5. **CREATE PLAN** -- `scripts/refactor_plan.py` (see `references/plan-and-review-libraries.md`)
-   4.6. **ADVERSARIAL REVIEW** -- `scripts/plan_review.py` (see `references/plan-and-review-libraries.md`)
+   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
+   4.6. **ADVERSARIAL REVIEW** -- Call `adversarial_review_plan(plan)` from `scripts/plan_review.py`. Also runnable as CLI for testing: `python scripts/plan_review.py <plan.json>`.
 5. **RED PHASE** -- Create characterization tests, verify they FAIL (see `references/tdd-implementation.md`)
 6. **ADVERSARIAL REVIEW** -- Stress-test characterization tests via `adversarial-review` (8 perspectives)
 7. **REFACTOR** -- Apply changes (GREEN phase). Must use AST-based refactoring (see `references/ast-refactoring.md`)

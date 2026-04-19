@@ -1,0 +1,168 @@
+# Template contracts define machine-checkable output requirements for each template
+# Violations trigger immediate error (fail-fast, no graceful fallback)
+# No artificial token/time limits - quality enforced via must_include checklists
+
+fast:
+  required_headings:
+    - "# Quick Architecture Decision"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+  must_include:
+    - "DECISION: One sentence recommendation, as specific as possible"
+    - "RATIONALE: 2-3 key reasons, each citing CKS/ADR/constraint"
+    - "ALTERNATIVES: Brief list with rejection reasons"
+    - "RISKS: Specific to system, not generic"
+    - "NEXT_STEPS: 1-2 concrete actions"
+  prerequisite_gates:
+    - escalate_if: "affects >2 loosely-coupled services"
+      escalate_to: "deep.md"
+      reason: "multi-system analysis needed"
+    - escalate_if: "irreversible or breaks backwards compatibility"
+      escalate_to: "precedent.md"
+      reason: "precedent review required"
+    - escalate_if: "requires database schema changes"
+      escalate_to: "data-pipeline.md"
+      reason: "domain-specific analysis needed"
+  capability_boundaries:
+    max_files: 1
+    max_loc_change: 100
+    scope: "single-file decisions"
+    can_handle:
+      - "simple decisions"
+      - "small refactors"
+    cannot_handle:
+      - "multi-module analysis"
+      - "service boundaries"
+      - "schema changes"
+
+deep:
+  required_headings:
+    - "# Comprehensive Architecture Analysis"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+  must_include:
+    - "SYSTEMS_THINKING: Dependencies, feedback loops, fragile points identified"
+    - "TRADE_OFF_MATRIX: Top 3 patterns with scores"
+    - "STRESS_TESTS: 3+ failure scenarios analyzed"
+    - "PRE_MORTEM: 3+ ways this could fail with mitigation"
+    - "PHASED_PLAN: MVP → Expand → Full rollout with timelines"
+    - "ROLLBACK: Specific steps, timeline, decision authority"
+    - "QUANTIFIED_PAYOFF: Time saved, capacity freed, reliability improved"
+  prerequisite_gates:
+    - none: "deep.md is the escalation target, has no upstream gates"
+  capability_boundaries:
+    max_files: "unlimited"
+    scope: "multi-module, cross-cutting"
+    can_handle:
+      - "service boundaries"
+      - "schema changes"
+      - "breaking API changes"
+    cannot_handle:
+      - "deployment decisions"
+      - "infrastructure scaling"
+
+cli:
+  required_headings:
+    - "# CLI Architecture"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+    - "## Final Output Block"
+  must_include:
+    - "DECISION: CLI-specific recommendation"
+    - "RATIONALE: POSIX/terminal-specific reasoning"
+    - "ALTERNATIVES: CLI patterns considered"
+    - "RISKS: Signal handling, exit code, terminal interaction risks"
+  prerequisite_gates:
+    - escalate_if: "web application or GUI design"
+      escalate_to: "appropriate domain template or deep.md"
+      reason: "out of domain scope"
+  capability_boundaries:
+    domain: "CLI/POSIX"
+    can_handle:
+      - "signal handling"
+      - "exit codes"
+      - "terminal interaction"
+    cannot_handle:
+      - "web applications"
+      - "GUI design"
+
+python:
+  required_headings:
+    - "# Python Architecture"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+    - "## Final Output Block"
+  must_include:
+    - "DECISION: Python 3.12+ specific recommendation"
+    - "RATIONALE: asyncio, type hints, GIL considerations addressed"
+    - "ALTERNATIVES: Python patterns considered"
+    - "RISKS: Version-specific or runtime-specific risks"
+  prerequisite_gates:
+    - escalate_if: "other languages or framework-specific questions"
+      escalate_to: "deep.md or appropriate template"
+      reason: "out of domain scope"
+  capability_boundaries:
+    domain: "Python 3.12+"
+    can_handle:
+      - "asyncio patterns"
+      - "type hints"
+      - "GIL considerations"
+    cannot_handle:
+      - "other languages"
+      - "framework-specific questions"
+
+data-pipeline:
+  required_headings:
+    - "# Data Pipeline Architecture"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+    - "## Final Output Block"
+  must_include:
+    - "DECISION: Data systems specific recommendation"
+    - "RATIONALE: ETL/streaming/batch reasoning"
+    - "ALTERNATIVES: Pipeline patterns considered"
+    - "RISKS: Data consistency, ordering, throughput risks"
+  prerequisite_gates:
+    - escalate_if: "UI/UX or frontend decisions"
+      escalate_to: "deep.md or appropriate template"
+      reason: "out of domain scope"
+  capability_boundaries:
+    domain: "Data Systems"
+    can_handle:
+      - "ETL patterns"
+      - "streaming"
+      - "batch processing"
+    cannot_handle:
+      - "UI/UX decisions"
+      - "frontend architecture"
+
+precedent:
+  required_headings:
+    - "# ADR Documentation Analysis"
+    - "## Stage 0"
+    - "## IMPROVE_SYSTEM"
+    - "## DEFAULT"
+  must_include:
+    - "STATUS: PROPOSED/ACCEPTED/IMPLEMENTED/DEPRECATED"
+    - "CONTEXT: Problem statement, constraints, business drivers"
+    - "DECISION: What was decided"
+    - "RATIONALE: Why this decision"
+    - "CONSEQUENCES: Positive and negative outcomes"
+    - "RELATED_ADRS: Links to precedent decisions"
+  prerequisite_gates:
+    - escalate_if: "implementation details or code-level decisions"
+      escalate_to: "deep.md or appropriate template"
+      reason: "precedent is for architectural decisions, not implementation"
+  capability_boundaries:
+    scope: "architectural decision records"
+    can_handle:
+      - "documenting decisions"
+      - "alternatives analysis"
+    cannot_handle:
+      - "implementation details"
+      - "code-level decisions"
