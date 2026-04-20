@@ -75,7 +75,7 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 4. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
    - **If `--dry-run`**: Continue to steps 4.5-4.6, then STOP
    - **If "continue" or no `--dry-run`**: Execute steps 5-9 for ALL priority levels
-   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <artifacts_dir> <target> <session> [--output-dir <dir>]`.
+   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
    4.6. **ADVERSARIAL REVIEW** -- Call `adversarial_review_plan(plan)` from `scripts/plan_review.py`. Also runnable as CLI for testing: `python scripts/plan_review.py <plan.json>`.
 5. **RED PHASE** -- Create characterization tests, verify they FAIL (see `references/tdd-implementation.md`)
 6. **ADVERSARIAL REVIEW** -- Stress-test characterization tests via `adversarial-review` (8 perspectives)
@@ -133,13 +133,13 @@ For subagent output routing rules, see `references/subagent-routing.md`.
 
 | Focus | Agent Tuning | Emphasizes |
 |-------|-------------|-----------|
-| **default** | All agents: full scope | Publication-ready refactoring |
+| **default** | All 8 agents + modernize | Publication-ready refactoring |
 | `--focus security` | Agent 1: race, injection, auth | Vulnerabilities first |
 | `--focus complexity` | Agent 2: CC >= 10, nested logic | High-CC targets first |
-| `--focus performance` | Agent 1: leaks, bottlenecks, N+1 | Performance issues first |
+| `--focus performance` | Agent 3: leaks, bottlenecks, N+1 | Performance issues first |
 | `--focus architecture` | All: boundary violations, coupling | Structure and boundaries |
-| `--focus test` | Agent 3: missing tests, coverage | Test coverage first |
-| `--focus quality` | Agent 2 & 3: standards, conventions | Code quality and style |
+| `--focus test` | Agent 4: missing tests, coverage | Test coverage first |
+| `--focus quality` | Agent 4 & 5: standards, conventions | Code quality and style |
 
 ## Options
 

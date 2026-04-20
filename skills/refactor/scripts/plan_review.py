@@ -7,6 +7,7 @@ and suggests alternatives before any code is changed.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -309,3 +310,14 @@ def review_to_markdown(review: dict[str, Any]) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    import argparse, json
+    parser = argparse.ArgumentParser(description="Adversarial review of refactoring plan")
+    parser.add_argument("plan_json", type=Path, help="Path to plan JSON file")
+    args = parser.parse_args()
+
+    plan = json.loads(args.plan_json.read_text())
+    review = adversarial_review_plan(plan)
+    print(review_to_markdown(review))
