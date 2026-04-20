@@ -42,23 +42,26 @@ def _resolve_target_path(target: str | None = None) -> Path:
         target: Target path (file, directory, or None for CWD)
 
     Returns:
-        Resolved directory path
+        Resolved directory path (project root containing tests/)
     """
     if target is None:
         return Path.cwd()
 
     target_path = Path(target).resolve()
 
-    # If target is a file, use its parent directory
-    if target_path.is_file():
-        return target_path.parent
+    # If target is a file, start from its parent directory
+    search_dir = target_path.parent if target_path.is_file() else target_path
 
-    # If target is a directory, use it directly
-    if target_path.is_dir():
-        return target_path
+    # Walk up the directory tree to find a directory containing tests/
+    # This handles targets in subdirectories of the project root
+    current = search_dir
+    while current != current.parent:
+        if (current / "tests").is_dir():
+            return current
+        current = current.parent
 
-    # Target doesn't exist, return as-is (will fail later)
-    return target_path
+    # Fallback: return the original search directory
+    return search_dir
 
 
 def _get_terminal_id() -> str:
