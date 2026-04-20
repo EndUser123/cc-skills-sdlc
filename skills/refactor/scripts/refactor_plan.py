@@ -87,7 +87,7 @@ def create_refactor_plan(
                 {
                     "id": f.get("id", "unknown"),
                     "title": f.get("title", "Untitled"),
-                    "file": f.get("file_path", "unknown"),
+                    "file": f.get("file", "unknown"),
                     "change_description": f.get("description", ""),
                     "risk_analysis": _assess_change_risk(f),
                     "rollback_strategy": _suggest_rollback(f),
@@ -299,19 +299,3 @@ def load_plan(plan_path: Path) -> dict[str, Any] | None:
         return json.loads(content)
     except (json.JSONDecodeError, OSError):
         return None
-
-
-if __name__ == "__main__":
-    import argparse, json, sys
-    parser = argparse.ArgumentParser(description="Generate refactoring plan from deduplicated findings")
-    parser.add_argument("findings_json", type=Path, help="Path to deduplicated.json")
-    parser.add_argument("target_path", help="Target being refactored (e.g. csf/)")
-    parser.add_argument("session_id", help="Current session ID")
-    parser.add_argument("--output-dir", type=Path, default=Path("."), help="Output directory")
-    args = parser.parse_args()
-
-    data = json.loads(args.findings_json.read_text())
-    plan = create_refactor_plan(data["findings"], args.target_path, args.session_id)
-    out = save_plan(plan, args.output_dir)
-    print(f"Plan saved: {out}")
-    print(plan_to_markdown(plan))

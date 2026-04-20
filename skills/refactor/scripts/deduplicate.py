@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -128,17 +130,30 @@ def _tier_for_confidence(confidence: int) -> str:
 def deduplicate_and_save(
     artifacts_dir: Path,
     target_name: str,
+    terminal_id: str | None = None,
 ) -> Path:
     """Convenience wrapper using standard artifacts path.
 
     Args:
         artifacts_dir: Base .artifacts directory (e.g. P:/.claude/.artifacts/)
         target_name: Target identifier (e.g. "yt-is")
+        terminal_id: Terminal ID for multi-terminal isolation. If None, reads
+            CLAUDE_TERMINAL_ID env var. If env var is also empty, uses "default".
 
     Returns:
         Path to deduplicated findings JSON
     """
-    refactor_dir = artifacts_dir / target_name / "refactor"
+    if terminal_id is None:
+        terminal_id = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+        if not terminal_id:
+            try:
+                hostname = socket.gethostname()
+                cwd = str(Path.cwd())
+                pid = os.getpid()
+                terminal_id = hashlib.sha256(f"{hostname}/{cwd}/{pid}".encode()).hexdigest()[:12]
+            except Exception:
+                terminal_id = "default"
+    refactor_dir = artifacts_dir / terminal_id / target_name / "refactor"
     findings_files = list(refactor_dir.glob("findings-*.json"))
     output_path = refactor_dir / "deduplicated.json"
     if findings_files:

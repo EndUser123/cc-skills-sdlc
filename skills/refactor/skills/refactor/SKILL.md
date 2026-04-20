@@ -55,17 +55,17 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
    - Agent 7: `/ai-pi-mm-m27` -- Testing lens: coverage gaps, missing test scenarios, edge cases not covered, brittle tests. Each finding MUST be verified by reading the actual file before writing.
    - Agent 8: `/ai-gemini` -- Deep insight lens: semantic bugs, idiom violations, improvement opportunities that static analysis misses. Each finding MUST be verified by reading the actual file before writing.
    - **modernize synergy** (default ON): Context7 lookups for deprecated patterns — runs automatically unless `--synergy-type` is explicitly set to a non-modernize value
-   - **For Python async**: Run `ruff` + `/p` to detect existing async bugs before refactoring
+   - **For Python async**: Run `` `ruff` + `/p` `` to detect existing async bugs before refactoring
    - **Agent output format**: Each agent MUST use the `Write` tool (not `Bash`) to write findings JSON. The orchestrator MUST substitute the actual path before launching agents:
-     - Artifacts dir: `P:/.claude/.artifacts/` (NOT `.refactor/` subdirectory of target)
+     - Artifacts dir: `P:/.claude/.artifacts/{terminal_id}/refactor/` (NOT `.refactor/` subdirectory of target)
      - Output path: `{artifacts_dir}/{target}/refactor/findings-{agent-name}.json`
-     - Example: `P:/.claude/.artifacts/yt-is/refactor/findings-adversarial-compliance.json`
+     - Example: `P:/.claude/.artifacts/console_1c309c3a-1fef-477f-b394-d22cc53057e4/yt-is/refactor/findings-adversarial-compliance.json`
      - Shell quoting in Bash commands causes 3-4 wasted turns per agent. Write tool avoids this entirely.
    - **Minimum finding quality**: Every finding MUST have a non-empty `description`, `file`, `line`, and `confidence` score. Findings with empty descriptions or confidence=0 indicate the agent failed to analyze the code — do not include them in deduplication.
    - **Verification in DISCOVER**: Each agent verifies every finding by reading the actual file at the reported line before including it. Confidence is raised to 95+ for verified findings. Confidence is left as-is (or lowered) for unverified findings. The agent must distinguish: confirmed code exists at (file, line) = VERIFIED; code structure matches description = VERIFIED; description-only inference = UNVERIFIED.
    - **Graceful degradation**: If any agent fails or times out, skip it and continue with remaining agents. All findings are merged in step 2 regardless of source.
-   - **Findings reuse**: If `{artifacts}/{target}/refactor/findings-*.json` files exist from a prior `--dry-run`, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified.
-2. **DEDUPLICATE** -- Run `scripts/deduplicate.py` to merge findings by file+line, assign canonical IDs (e.g., `COMP-001/DRY-003` for cross-agent duplicates), and annotate evidence tiers. Output goes to `{artifacts}/{target}/refactor/deduplicated.json`.
+   - **Findings reuse**: If `{artifacts_dir}/{target}/refactor/findings-*.json` files exist from a prior `--dry-run`, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified.
+2. **DEDUPLICATE** -- Run `scripts/deduplicate.py` to merge findings by file+line, assign canonical IDs (e.g., `COMP-001/DRY-003` for cross-agent duplicates), and annotate evidence tiers. Output goes to `{artifacts_dir}/{target}/refactor/deduplicated.json`.
 2.5. **EVIDENCE TIER** (optional checkpoint) -- Only run if findings lack `[VERIFIED]` annotations from DISCOVER agents, or if a prior run's findings are being reused. Targeted reads for unverified findings. Labels:
    - `[VERIFIED]` — Tier 1: confirmed via targeted read or test execution
    - `[UNVERIFIED]` — Tier 3: static analysis only, claim could not be confirmed
@@ -75,7 +75,7 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 4. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
    - **If `--dry-run`**: Continue to steps 4.5-4.6, then STOP
    - **If "continue" or no `--dry-run`**: Execute steps 5-9 for ALL priority levels
-   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
+   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <artifacts_dir> <target> <session> [--output-dir <dir>]`.
    4.6. **ADVERSARIAL REVIEW** -- Call `adversarial_review_plan(plan)` from `scripts/plan_review.py`. Also runnable as CLI for testing: `python scripts/plan_review.py <plan.json>`.
 5. **RED PHASE** -- Create characterization tests, verify they FAIL (see `references/tdd-implementation.md`)
 6. **ADVERSARIAL REVIEW** -- Stress-test characterization tests via `adversarial-review` (8 perspectives)
@@ -133,13 +133,13 @@ For subagent output routing rules, see `references/subagent-routing.md`.
 
 | Focus | Agent Tuning | Emphasizes |
 |-------|-------------|-----------|
-| **default** | All 8 agents + modernize | Publication-ready refactoring |
+| **default** | All agents: full scope | Publication-ready refactoring |
 | `--focus security` | Agent 1: race, injection, auth | Vulnerabilities first |
 | `--focus complexity` | Agent 2: CC >= 10, nested logic | High-CC targets first |
-| `--focus performance` | Agent 3: leaks, bottlenecks, N+1 | Performance issues first |
+| `--focus performance` | Agent 1: leaks, bottlenecks, N+1 | Performance issues first |
 | `--focus architecture` | All: boundary violations, coupling | Structure and boundaries |
-| `--focus test` | Agent 4: missing tests, coverage | Test coverage first |
-| `--focus quality` | Agent 4 & 5: standards, conventions | Code quality and style |
+| `--focus test` | Agent 3: missing tests, coverage | Test coverage first |
+| `--focus quality` | Agent 2 & 3: standards, conventions | Code quality and style |
 
 ## Options
 
