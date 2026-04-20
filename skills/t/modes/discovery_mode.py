@@ -313,7 +313,7 @@ def _run_pytest_coverage(_target: str | None = None) -> dict | None:
                 coverage_data = json.load(f)
                 return {
                     "percent": coverage_data.get("totals", {}).get("percent_covered", 0.0),
-                    "missing": coverage_data.get("files", [{}]).get("summary", {}).get("missing_lines", "")
+                    "missing": coverage_data.get("files", {}).get("summary", {}).get("missing_lines", "")
                 }
 
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:

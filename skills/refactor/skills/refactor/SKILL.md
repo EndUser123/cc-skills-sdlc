@@ -1,7 +1,7 @@
 ---
 name: refactor
 description: Multi-file refactoring with orchestration - discovers synergies and assigns tasks to agents.
-version: 1.0.0
+version: 2.0.0
 status: stable
 category: refactoring
 enforcement: advisory

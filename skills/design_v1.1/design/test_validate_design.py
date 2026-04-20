@@ -43,7 +43,7 @@ def _minimal_payload(run_id: str = "test-run-001") -> DesignPayload:
         template_name="system_precedent_deep",
         cap=cap,
         critic_findings=[finding],
-        adr_markdown="# ADR-Test\n\n## Status\nAccepted\n\n## Context\nTest.",
+        adr_markdown="# ADR-Test\n\n## Status\nAccepted\n\n## Context\nTest ADR for smoke-test validation.\n\n## Decision\nUse minimal valid ADR format for testing.\n\n## Consequences\nNone — this is a test fixture.",
     )
 
 

@@ -1,6 +1,6 @@
 ---
 name: code
-version: 2.29.0
+version: 3.0.0
 description: AI-assisted feature development workflow (Idea to PR) with mandatory consumer handshake proof and Contract Authority Packet consumption for contract-sensitive work.
 category: development
 enforcement: advisory

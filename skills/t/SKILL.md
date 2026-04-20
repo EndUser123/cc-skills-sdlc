@@ -14,12 +14,12 @@ aliases:
 metadata:
   version: "2.4.0"
   compatibility: "claude-code"
-
-suggest:
-  - /test
-  - /tdd
-  - /verify
-  - /qa
+enforcement: advisory
+workflow_steps:
+  - discovery: Scan codebase for test files, classify by type, detect gaps
+  - planning: Risk-based test strategy based on coverage level
+  - execute: Run tests with incremental scope and analytics
+  - verify: Generate director report with coverage gaps and next steps
 
 do_not:
   - summarize this skill instead of executing it
@@ -128,7 +128,7 @@ Choose the smallest sufficient test mix for the change:
   - **Low coverage (<50%)** -> `comprehensive` - run full test suite
   - **Medium coverage (50-80%)** -> `targeted` - focus on affected modules
   - **Good coverage (>80%)** -> `incremental` - run affected tests only
-- If no tests found -> HALT and recommend `/tdd` or manual test creation
+- If no tests found -> automatically delegate to `/tdd` to create tests for the target, then resume
 
 **Phase 3: Execute - Running Tests**
 - Execute tests according to plan

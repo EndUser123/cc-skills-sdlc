@@ -1,6 +1,6 @@
 ---
 name: tdd
-version: 2.26.0
+version: 3.0.0
 description: Test-Driven Development with PARALLEL subagent delegation + Core Plan v1 evidence tracking. RED-GREEN-REFACTOR cycle with timestamped artifacts and 7-day cleanup.
 status: stable
 depends_on:

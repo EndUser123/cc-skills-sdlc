@@ -1,12 +1,13 @@
 ---
 name: local-pr-ready
-version: 0.4.0
+version: 1.0.0
 description: Local-only Ralph loop with worktree enforcement, auto-detected review depth, simplify override signal, and PR artifact generation.
 category: execution
 enforcement: blocking
 triggers:
   - '/go'
 aliases:
+  - '/go'
   - '/go-local'
   - '/local-pr-ready'
 workflow_steps:
@@ -38,10 +39,9 @@ This skill is a Ralph loop: autonomous iteration until `<promise>PR_READY</promi
 
 ---
 
-## STEP 0: WORKTREE ENFORCEMENT (BLOCKING)
+## STEP 0: WORKTREE ENFORCEMENT (AUTO-CREATE)
 
-**STOP IMMEDIATELY if not in a worktree:**
-
+**Check worktree status:**
 ```bash
 git worktree list --porcelain | head -1
 pwd
@@ -53,17 +53,21 @@ git branch --show-current
 - Branch name must contain task identifier
 - cwd must be inside worktree directory
 
-**If any condition fails:**
+**If not in a worktree, auto-create one:**
+1. Derive branch name from current task (e.g., from plan.md or argument)
+2. Create worktree at `../worktrees/{branch}` with `-b {branch}`
+3. cd into it automatically
+4. Retry STEP 0 to confirm
+
+**Example auto-creation:**
+```bash
+# Extract ticket/branch from plan.md or use timestamp-based identifier
+TICKET=$(grep -m1 "^- \[" plan.md | sed 's/^- \[//' | sed 's/\].*//' || echo "task-$(date +%Y%m%d%H%M%S)")
+git worktree add ../worktrees/$TICKET -b $TICKET
+cd ../worktrees/$TICKET
 ```
-ERROR: /go only works inside task worktrees.
 
-Create one:
-  git worktree add ../worktrees/{ticket} -b {ticket}
-
-Then cd into it and retry /go.
-```
-
-**Do not proceed to STEP 1 without worktree confirmation.**
+**Do not error out — create and continue.**
 
 ---
 

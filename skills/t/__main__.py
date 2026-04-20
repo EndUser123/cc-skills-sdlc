@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 # Add skills directory to path (must come before skill imports that need it)
@@ -189,7 +190,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
             result_file = f.name
 
         coverage_results = None
-        test_start_time = __import__('time').time()
+        test_start_time = time.time()
         result = None
 
         try:
@@ -215,7 +216,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                 timeout=300
             )
 
-            test_runtime = __import__('time').time() - test_start_time
+            test_runtime = time.time() - test_start_time
 
             # Show pytest output
             print(result.stdout)
@@ -227,7 +228,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                     coverage_data = json.load(f)
                     coverage_results = {
                         "percent": coverage_data.get("totals", {}).get("percent_covered", 0.0),
-                        "missing": coverage_data.get("files", [{}]).get("summary", {}).get("missing_lines", "")
+                        "missing": coverage_data.get("files", {}).get("summary", {}).get("missing_lines", "")
                     }
 
             # Phase 3.1: Test Execution Profiling
@@ -297,7 +298,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                             "trace": ""
                         })
 
-                if failed_tests and len(failed_tests) > 1:
+                if failed_tests and len(failed_tests) >= 1:
                     grouped = failure_grouper.group_failures(failed_tests)
                     print(f"**Grouped {len(failed_tests)} failures into {len(grouped)} root cause(s)**")
                     for group in grouped[:3]:
@@ -327,7 +328,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                                 passed_tests = int(part.split()[0])
                             except (ValueError, IndexError):
                                 pass
-                elif ' passed' in line and 'failed' not in line and 'warnings' not in line:
+                elif ' passed' in line and 'failed' not in line:
                     # All tests passed: "340 passed in 2.34s"
                     try:
                         passed_tests = int(line.split()[0])
@@ -410,7 +411,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
         print("\n**Note:** Exit code 1 indicates test failures, not orchestration errors.")
         print("The /t workflow completed successfully - see test results above for details.")
 
-        return result.returncode
+        return result.returncode if result else 1
     if mode == "discovery":
         from modes import discover_tests, format_discovery_report
 
@@ -545,7 +546,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
 
     # Run pytest if required
     coverage_results = None
-    test_start_time = __import__('time').time()  # Import time here to avoid conflicts
+    test_start_time = time.time()
 
     if strictness.run_pytest_cov:
         # Run pytest with coverage and profiling
@@ -573,7 +574,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                 timeout=300  # 5 minute timeout
             )
 
-            test_runtime = __import__('time').time() - test_start_time
+            test_runtime = time.time() - test_start_time
 
             # Parse coverage JSON if it exists
             coverage_path = Path("test_coverage.json")
@@ -582,7 +583,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                     coverage_data = json.load(f)
                     coverage_results = {
                         "percent": coverage_data.get("totals", {}).get("percent_covered", 0.0),
-                        "missing": coverage_data.get("files", [{}]).get("summary", {}).get("missing_lines", "")
+                        "missing": coverage_data.get("files", {}).get("summary", {}).get("missing_lines", "")
                     }
 
             # Phase 4: Record profiling data
@@ -633,7 +634,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
                             "trace": ""
                         })
 
-                if failed_tests and len(failed_tests) > 1:
+                if failed_tests and len(failed_tests) >= 1:
                     grouped = failure_grouper.group_failures(failed_tests)
                     print(f"Grouped {len(failed_tests)} failures into {len(grouped)} root cause(s)")
                     for group in grouped[:3]:
@@ -678,20 +679,6 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
     )
 
     print(report)
-
-    # Cache results
-    if lock_status == "acquired":
-        cache_data = {
-            "work_context": {
-                "target_files": work_ctx.target_files,
-                "work_type": work_ctx.work_type,
-                "affected_modules": work_ctx.affected_modules,
-            },
-            "risk_score": {"value": risk_score},
-            "test_results": test_results,
-        }
-        lock.write_cache(cache_data)
-        lock.release()
 
     return 0
 
