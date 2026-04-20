@@ -13,11 +13,37 @@ workflow_steps:
   - Launch Phase 2 (cross-agent meta-critique)
   - Launch Phase 3 (synthesis)
   - Deliver final output in RNS format
+  - Evidence-bound verification
   - Log skill coverage
   - Execute "0 — Do ALL" directive
 suggest:
 enforcement: advisory
 parallel_agents: true
+
+# Evidence-bound verification (anti-confabulation)
+verification:
+  commands:
+    - description: "Confirm p3.md synthesis exists"
+      tool: "Bash"
+      args:
+        command: "ls -la P:/.claude/.evidence/pre-mortem/pre-mortem-*/p3.md 2>/dev/null | tail -1 || echo 'NO P3 FOUND'"
+    - description: "Confirm Phase 1 findings exist"
+      tool: "Bash"
+      args:
+        command: "ls -la P:/.claude/.evidence/pre-mortem/pre-mortem-*/p1_findings.md 2>/dev/null | tail -1 || echo 'NO P1 FOUND'"
+    - description: "Confirm Phase 2 meta-critique exists"
+      tool: "Bash"
+      args:
+        command: "ls -la P:/.claude/.evidence/pre-mortem/pre-mortem-*/p2.md 2>/dev/null | tail -1 || echo 'NO P2 FOUND'"
+    - description: "Count findings with severity levels"
+      tool: "Bash"
+      args:
+        command: "grep -cP '\\[(CRITICAL|HIGH|MEDIUM|LOW)\\]' P:/.claude/.evidence/pre-mortem/pre-mortem-*/p3.md 2>/dev/null || echo '0'"
+  summary_mode: evidence_only
+  expected_artifacts:
+    - "P:/.claude/.evidence/pre-mortem/{session_id}/p1_findings.md"
+    - "P:/.claude/.evidence/pre-mortem/{session_id}/p2.md"
+    - "P:/.claude/.evidence/pre-mortem/{session_id}/p3.md"
 ---
 
 # Critique — Adaptive Adversarial Review
@@ -237,6 +263,17 @@ _append_skill_coverage(
 )
 "
 ```
+
+### Step 6b: Evidence-Bound Verification (MANDATORY)
+
+Before cleanup, you MUST complete verification. Do NOT write a freeform summary.
+
+1. Run each command from the `verification.commands` frontmatter
+2. **Write results to artifact:** `P:/.claude/.artifacts/{terminal_id}/pre-mortem/verification.json`
+3. Paste each tool's output verbatim with PASS/FAIL status
+4. Add NO interpretive claims not directly supported by tool output
+
+**Prohibited:** Line numbers, file contents, or finding details not shown in this turn's tool output.
 
 ### Step 7: Cleanup
 

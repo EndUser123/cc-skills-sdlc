@@ -10,6 +10,32 @@ hooks:
     - command: "python .claude/hooks/preflight_require_tdd.py"
   pre_response:
     - command: "python .claude/hooks/stop_if_tdd_unverified.py"
+
+# Evidence-bound verification (anti-confabulation)
+verification:
+  commands:
+    - description: "Confirm evidence.json exists for this run"
+      tool: "Bash"
+      args:
+        command: "ls -la .claude-state/tdd/$RUN_ID/evidence.json 2>/dev/null || echo 'MISSING'"
+    - description: "Confirm validated.json exists (validation passed)"
+      tool: "Bash"
+      args:
+        command: "ls -la .claude-state/tdd/$RUN_ID/validated.json 2>/dev/null || echo 'NOT VALIDATED'"
+    - description: "Show test files modified"
+      tool: "Bash"
+      args:
+        command: "python -c \"import json; e=json.load(open('.claude-state/tdd/$RUN_ID/evidence.json')); print('test_files:', e.get('test_files_modified',[])); print('impl_files:', e.get('impl_files_modified',[]))\" 2>/dev/null || echo 'CANNOT READ'"
+    - description: "Verify RED receipt exists and GREEN receipt exists"
+      tool: "Bash"
+      args:
+        command: "ls .claude-state/tdd/$RUN_ID/red_receipt.json .claude-state/tdd/$RUN_ID/green_receipt.json 2>/dev/null || echo 'RECEIPTS MISSING'"
+  summary_mode: evidence_only
+  expected_artifacts:
+    - ".claude-state/tdd/{RUN_ID}/evidence.json"
+    - ".claude-state/tdd/{RUN_ID}/validated.json"
+    - ".claude-state/tdd/{RUN_ID}/red_receipt.json"
+    - ".claude-state/tdd/{RUN_ID}/green_receipt.json"
 ---
 
 # /tdd Protocol (NTP v3.2)
@@ -154,7 +180,31 @@ On FAILURE:
 
 ---
 
-## Hard Rules
+### Step 6: Evidence-Bound Verification (MANDATORY)
+
+You MUST complete this step before stopping. No exceptions.
+
+Do NOT write a freeform summary. Instead:
+
+1. Run each command from the `verification.commands` frontmatter
+2. Write results to artifact: `P:/.claude/.artifacts/{terminal_id}/tdd/verification.json`
+3. Paste each tool's output verbatim
+4. For each command: PASS or FAIL with one sentence
+
+**Prohibited in summaries:**
+- Line numbers not shown in this turn's tool output
+- File contents not read in this turn
+- Claims about test results not from this turn's run_phase.py output
+- "All tests pass" without showing actual pytest output from this turn
+
+**Format:**
+```
+## Verification Results
+
+### [command description]
+[verbatim tool output]
+Status: PASS/FAIL — [one sentence]
+```
 
 1. **Never run tests directly.** Always use `run_phase.py` for RED/GREEN/REFACTOR.
 2. **Never edit receipts or logs.** You MUST NOT modify `*_receipt.json`, `*.stdout.log`, `*.stderr.log`, `session.json`, or `validated.json`.

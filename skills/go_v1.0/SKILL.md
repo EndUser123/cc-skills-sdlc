@@ -1,595 +1,624 @@
 ---
 name: go
-version: 2.0.0
-description: Local-only Ralph loop with canonical JSON contracts, per-terminal isolation, task-scoped runs, atomic gates, and /go -> /code orchestration.
+version: 3.1.0
+description: Thin SDLC orchestrator that selects one task, routes to planning/design_v1.1/code/refactor, and records canonical per-terminal orchestration state.
 category: execution
 enforcement: blocking
 triggers:
   - '/go'
 aliases:
-  - '/go-local'
-  - '/local-pr-ready'
+  - '/go-v3'
+  - '/go-router'
+  - '/execute-next-task'
 workflow_steps:
+  - initialize_orchestrator_state
   - worktree_enforcement
-  - task_selection
-  - dispatch_code
-  - verify_result
-  - simplify_changes
-  - review_passes
-  - pr_artifacts
-  - plan_progress_update
+  - select_task
+  - classify_route
+  - dispatch_skill
+  - capture_outcome
+  - emit_next_action
 suggest: []
 ---
 
-# /go — Select, Code, Verify, Ship
+# /go — SDLC Orchestrator v3.1
 
-**MANDATORY SEQUENCE:** Worktree Check → Task Selection → /code Dispatch → Verify Result → Simplify → Review Passes → PR Artifacts → Plan Progress Update
+**ROLE:** `/go` is a **thin orchestrator**, not a replacement for `/planning`, `/design_v1.1`, `/code`, or `/refactor`.
 
-**State Pattern:** `.claude/.artifacts/{TERMINAL_ID}/go/`
-**Run Model:** exactly one selected task per `RUN_ID`
-**Canonical Contracts:** `active-plan.json`, `active-task_{RUN_ID}.json`, `task-result_{RUN_ID}.json`
+**MANDATORY SEQUENCE:** Initialize → Worktree Check → Select Task → Route Task → Dispatch Existing Skill → Capture Outcome → Emit Next Action
 
----
+**CANONICAL STATE PATTERN:** `.claude/.artifacts/{TERMINAL_ID}/go/`
 
-## Ralph Loop
+**NON-NEGOTIABLE RULE:** `/go` owns orchestration state only.
+It MUST NOT duplicate or replace the internal workflow logic of:
+- `/planning`
+- `/design_v1.1`
+- `/code`
+- `/refactor`
 
-This skill supports autonomous iteration with **terminal isolation**, **task-scoped runs**, and **atomic step gating**.
-
-**Completion tokens:**
-- `<promise>BLOCKED</promise>` — selected task cannot progress or max attempts reached
-- `<promise>PR_READY</promise>` — selected task completed and local PR artifacts were generated
-- `<promise>MORE_TASKS_IN_PLAN</promise>` — current task completed, more eligible tasks remain
-- `<promise>ALL_TASKS_COMPLETE</promise>` — current task completed, no eligible tasks remain
-
-**Loop behavior:**
-- Each terminal has a unique `TERMINAL_ID`.
-- Each task run has a unique `RUN_ID`.
-- One `/go` run selects **exactly one** task.
-- Ralph loops should keep the same `TERMINAL_ID` and create a **new `RUN_ID` per task**.
-- Flags persist in `.claude/.artifacts/{TERMINAL_ID}/go/`.
-- No downstream step may proceed unless the prior step's gate file exists.
-
-**Token order:**
-1. Emit `<promise>BLOCKED</promise>` immediately if the selected task fails irrecoverably.
-2. Emit `<promise>PR_READY</promise>` after local artifacts are created.
-3. Then emit either `<promise>MORE_TASKS_IN_PLAN</promise>` or `<promise>ALL_TASKS_COMPLETE</promise>` after updating `active-plan.json`.
+Those skills remain authoritative for their own execution, gates, evidence, and validation.
 
 ---
 
-## Initialization
+## Core Contract
 
-**Export environment variables:**
+`/go` is responsible for exactly five things:
 
-```bash
-export TERMINAL_ID=$(uuidgen | cut -d'-' -f1)
-export RUN_ID=$(uuidgen)
-export MAX_ATTEMPTS=3
+1. Select exactly one task.
+2. Normalize that task into a canonical task record.
+3. Decide which existing SDLC skill should handle it.
+4. Invoke that skill.
+5. Record the outcome and next state.
 
-ARTIFACT_DIR=".claude/.artifacts/$TERMINAL_ID/go"
-PLAN_FILE="$ARTIFACT_DIR/active-plan.json"
-ACTIVE_TASK_FILE="$ARTIFACT_DIR/active-task_$RUN_ID.json"
-TASK_RESULT_FILE="$ARTIFACT_DIR/task-result_$RUN_ID.json"
-
-mkdir -p "$ARTIFACT_DIR"
-```
-
----
-
-## STEP 0: WORKTREE ENFORCEMENT (MANDATORY)
-
-**Creates flag:** `.worktree-ready_{RUN_ID}`
-
-**Action:**
-
-```bash
-CURRENT_BRANCH=$(git branch --show-current)
-IN_WORKTREE=$(git worktree list --porcelain | grep -q "$(pwd)" && echo "true" || echo "false")
-```
-
-**Gate:**
-- Fail if not in a git worktree.
-- Fail if on `main` or `master`.
-- Fail if `active-plan.json` does not exist in the artifact directory.
-- Fail if `active-plan.json` is invalid JSON.
-
-**On success:**
-
-```bash
-touch "$ARTIFACT_DIR/.worktree-ready_$RUN_ID"
-echo "✓ Worktree check passed"
-```
+`/go` is NOT responsible for:
+- replacing `/code` TDD or evidence ledger
+- replacing `/refactor` discovery/RED/regression logic
+- replacing `/planning` plan synthesis or adversarial review
+- replacing `/design_v1.1` validation or ADR gating
+- remote git push/deploy
+- hidden multi-step autonomous execution across several tasks in one untracked leap
 
 ---
 
-## STEP 1: TASK SELECTION (MANDATORY)
+## Completion Tokens
 
-**Checks flag:** `.worktree-ready_{RUN_ID}`
-**Creates flag:** `.task-selected_{RUN_ID}`
-**Creates file:** `active-task_{RUN_ID}.json`
+`/go` MUST end each run with exactly one orchestration result token:
 
-**Pre-check:**
+- `<promise>GO_DISPATCHED</promise>` — task selected and routed successfully
+- `<promise>TASK_COMPLETE</promise>` — delegated skill completed and task is done
+- `<promise>TASK_BLOCKED</promise>` — delegated skill or route precondition blocked task
+- `<promise>AWAITING_SKILL_OUTPUT</promise>` — dispatch occurred, outcome not yet confirmed
+- `<promise>MORE_TASKS_REMAIN</promise>` — current task resolved, queue still has pending work
+- `<promise>NO_TASKS_AVAILABLE</promise>` — no eligible task found
+
+---
+
+## Required Environment
+
+Before doing anything else, ensure:
 
 ```bash
-if [ ! -f "$ARTIFACT_DIR/.worktree-ready_$RUN_ID" ]; then
-  echo "ERROR: STEP 0 must complete first"
-  exit 1
-fi
-
-if [ ! -f "$PLAN_FILE" ]; then
-  echo "ERROR: active-plan.json not found"
-  exit 1
-fi
+export CLAUDE_TERMINAL_ID="${CLAUDE_TERMINAL_ID:-$(uuidgen | cut -d'-' -f1)}"
+export GO_RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
+export GO_ARTIFACT_DIR="${CLAUDE_CODE_ARTIFACTS_DIR:-.claude/.artifacts}/${CLAUDE_TERMINAL_ID}/go"
+mkdir -p "$GO_ARTIFACT_DIR"
 ```
 
-**Action:**
-Read `active-plan.json` and select **exactly one eligible task**.
+If `CLAUDE_TERMINAL_ID` already exists for the current terminal/session, reuse it.
+Do NOT generate a new terminal ID mid-session.
 
-**Eligible task rules:**
-- `status == "pending"`
-- dependencies are satisfied
-- not already reserved by another active run
-- has objective, allowed files, forbidden files, acceptance criteria, and verification commands
+---
 
-**Selection rules:**
-- Select one task only.
-- Never infer the task from git diff.
-- Never invent missing acceptance criteria.
-- If no eligible task exists, emit `<promise>ALL_TASKS_COMPLETE</promise>` and stop.
+## Artifact Files
 
-**Write `active-task_{RUN_ID}.json` with this shape:**
+All files for this `/go` run live under:
+
+```text
+.claude/.artifacts/{TERMINAL_ID}/go/
+```
+
+### Required files for every run
+
+- `run_{GO_RUN_ID}.json`
+- `selected-task_{GO_RUN_ID}.json`
+- `dispatch-decision_{GO_RUN_ID}.json`
+- `dispatch-result_{GO_RUN_ID}.json`
+- `next-action_{GO_RUN_ID}.md`
+
+### Optional files
+
+- `task-source-snapshot_{GO_RUN_ID}.md`
+- `blocked-reason_{GO_RUN_ID}.md`
+- `skill-output-summary_{GO_RUN_ID}.md`
+
+### Required flags
+
+- `.initialized_{GO_RUN_ID}`
+- `.worktree-ready_{GO_RUN_ID}`
+- `.task-selected_{GO_RUN_ID}`
+- `.routed_{GO_RUN_ID}`
+- `.dispatched_{GO_RUN_ID}`
+- `.completed_{GO_RUN_ID}`
+- `.blocked_{GO_RUN_ID}`
+
+Only create flags that are true.
+Never create both `.completed_{GO_RUN_ID}` and `.blocked_{GO_RUN_ID}`.
+
+---
+
+## Step 0: Initialize Orchestrator State
+
+**Creates:** `run_{GO_RUN_ID}.json`, `.initialized_{GO_RUN_ID}`
+
+Create `run_{GO_RUN_ID}.json`:
 
 ```json
 {
-  "run_id": "RUN_ID",
-  "terminal_id": "TERMINAL_ID",
-  "task_id": "TASK-001",
-  "title": "Example task",
-  "objective": "Implement the requested change.",
-  "scope": {
-    "in": ["packages/cc-skills-sdlc/skills/go/**"],
-    "out": ["docs/archive/**"]
-  },
-  "allowed_files": [
-    "packages/cc-skills-sdlc/skills/go/SKILL.md"
-  ],
-  "forbidden_files": [
-    ".git/**",
-    "main",
-    "master"
-  ],
-  "acceptance_criteria": [
-    "The selected task is implemented",
-    "Verification evidence is captured"
-  ],
-  "verification_commands": [
-    "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh"
-  ],
-  "selected_at": "2026-04-20T16:05:00Z",
+  "go_run_id": "{GO_RUN_ID}",
+  "terminal_id": "{CLAUDE_TERMINAL_ID}",
+  "status": "initialized",
+  "created_at": "ISO-8601",
+  "skill_version": "3.1.0",
+  "orchestrator_role": "thin-router",
+  "artifact_dir": ".claude/.artifacts/{TERMINAL_ID}/go"
+}
+```
+
+Then create:
+
+```bash
+touch "$GO_ARTIFACT_DIR/.initialized_${GO_RUN_ID}"
+```
+
+---
+
+## Step 1: Worktree Enforcement
+
+**Precondition:** `.initialized_{GO_RUN_ID}`
+**Creates:** `.worktree-ready_{GO_RUN_ID}` or `.blocked_{GO_RUN_ID}` + `blocked-reason_{GO_RUN_ID}.md`
+
+Run:
+
+```bash
+CURRENT_BRANCH="$(git branch --show-current)"
+IN_WORKTREE="$(git worktree list --porcelain | grep -F "$(pwd)" -q && echo true || echo false)"
+```
+
+### Gate rules
+
+Fail if any are true:
+- current directory is not a git worktree
+- current branch is `main` or `master`
+- worktree state is ambiguous
+
+On success:
+
+```bash
+touch "$GO_ARTIFACT_DIR/.worktree-ready_${GO_RUN_ID}"
+```
+
+If blocked, write `blocked-reason_{GO_RUN_ID}.md`, create `.blocked_{GO_RUN_ID}`, and emit:
+
+```xml
+<promise>TASK_BLOCKED</promise>
+```
+
+Then stop.
+
+---
+
+## Step 2: Select Exactly One Task
+
+**Precondition:** `.worktree-ready_{GO_RUN_ID}`
+**Creates:** `selected-task_{GO_RUN_ID}.json`, `.task-selected_{GO_RUN_ID}`
+
+`/go` must select exactly one executable task.
+
+### Preferred sources, in order
+
+1. Existing structured plan/task artifact if available
+2. `plan.md` or equivalent current plan document
+3. Explicit user instruction in current conversation
+4. Staged diff / current branch intent as fallback context
+
+### Selection rules
+
+The selected task MUST be:
+- singular
+- actionable
+- testable or reviewable
+- scoped tightly enough for one delegated skill
+- free of mixed intent ("implement X and refactor Y and redesign Z")
+
+If no task qualifies, emit `NO_TASKS_AVAILABLE`.
+
+### Canonical selected task schema
+
+Write `selected-task_{GO_RUN_ID}.json`:
+
+```json
+{
+  "task_id": "string",
+  "title": "string",
+  "objective": "single-sentence objective",
+  "task_type": "planning|design|implementation|refactor|unknown",
+  "source": "structured-plan|plan-md|conversation|git-context",
+  "source_ref": "string",
+  "scope_in": ["..."],
+  "scope_out": ["..."],
+  "acceptance_criteria": ["..."],
+  "verification_hint": ["..."],
+  "blocked_by": [],
   "status": "selected"
 }
 ```
 
-**On success:**
+Then create:
 
 ```bash
-touch "$ARTIFACT_DIR/.task-selected_$RUN_ID"
-echo "✓ Task selected"
+touch "$GO_ARTIFACT_DIR/.task-selected_${GO_RUN_ID}"
 ```
 
 ---
 
-## STEP 2: DISPATCH `/code` (MANDATORY)
+## Step 3: Route Classification
 
-**Checks flag:** `.task-selected_{RUN_ID}`
-**Creates flag:** `.coded_{RUN_ID}` on success
-**Creates flag:** `.attempt_{N}_{RUN_ID}` on retryable failure
-**Creates flag:** `.blocked_{RUN_ID}` on terminal failure
-**Creates file:** `task-result_{RUN_ID}.json`
+**Precondition:** `.task-selected_{GO_RUN_ID}`
+**Creates:** `dispatch-decision_{GO_RUN_ID}.json`, `.routed_{GO_RUN_ID}`
 
-**Pre-check:**
+`/go` decides which existing skill is authoritative.
 
-```bash
-if [ ! -f "$ARTIFACT_DIR/.task-selected_$RUN_ID" ]; then
-  echo "ERROR: STEP 1 must complete first"
-  exit 1
-fi
+### Routing table
 
-ATTEMPT_COUNT=$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name ".attempt_*_$RUN_ID" | wc -l | tr -d ' ')
-if [ "$ATTEMPT_COUNT" -ge "$MAX_ATTEMPTS" ]; then
-  echo "ERROR: Max attempts reached"
-  touch "$ARTIFACT_DIR/.blocked_$RUN_ID"
-  echo "<promise>BLOCKED</promise>"
-  exit 1
-fi
-```
+#### Route to `/planning`
+Use `/planning` if the task is primarily:
+- decomposition
+- prioritization
+- sequencing
+- task generation
+- plan repair
+- scope clarification requiring a formal executable plan
 
-**Action:**
-Invoke `/code` exactly once for the selected task described in `active-task_{RUN_ID}.json`.
+#### Route to `/design_v1.1`
+Use `/design_v1.1` if the task has:
+- architecture blockers
+- unresolved contract boundaries
+- cross-component design uncertainty
+- CAP / ADR style design requirements
+- explicit design intent that should trigger strict validation
 
-`/code` must:
-- operate only on the selected task
-- respect `allowed_files`
-- avoid `forbidden_files`
-- perform the requested implementation
-- write `task-result_{RUN_ID}.json`
+#### Route to `/code`
+Use `/code` if the task is primarily:
+- feature implementation
+- bug fix implementation
+- targeted code changes
+- tests plus implementation
+- consumer/producer behavior changes already sufficiently designed
 
-**Required `task-result_{RUN_ID}.json` shape:**
+#### Route to `/refactor`
+Use `/refactor` if the task is primarily:
+- code cleanup without changing intended behavior
+- duplication removal
+- simplification
+- maintainability improvements
+- restructuring with characterization tests first
+
+### Priority of routes when ambiguous
+
+Use this precedence:
+
+1. `design_v1.1` if architecture is unresolved
+2. `planning` if executable scope is still unclear
+3. `refactor` if behavior should stay the same and cleanup dominates
+4. `code` if behavior change / implementation dominates
+
+### Dispatch decision schema
+
+Write `dispatch-decision_{GO_RUN_ID}.json`:
 
 ```json
 {
-  "run_id": "RUN_ID",
-  "task_id": "TASK-001",
-  "status": "completed",
-  "summary": "Implemented the requested task changes.",
-  "changed_files": [
-    "packages/cc-skills-sdlc/skills/go/SKILL.md"
+  "go_run_id": "{GO_RUN_ID}",
+  "task_id": "string",
+  "route": "planning|design_v1.1|code|refactor",
+  "reasoning_short": [
+    "brief reason 1",
+    "brief reason 2"
   ],
-  "commands_executed": [
-    "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh"
-  ],
-  "verification_evidence": [
-    "bash syntax check passed"
-  ],
-  "blockers": [],
-  "notes": [
-    "No forbidden files changed"
-  ],
-  "completed_at": "2026-04-20T16:10:00Z"
+  "blocking_preconditions": [],
+  "dispatch_status": "routed"
 }
 ```
 
-**Failure handling:**
-- If `/code` does not produce valid `task-result_{RUN_ID}.json`, create `.attempt_{N}_{RUN_ID}` and stop.
-- If max attempts are exhausted, create `.blocked_{RUN_ID}` and emit `<promise>BLOCKED</promise>`.
-
-**On success:**
+Then create:
 
 ```bash
-touch "$ARTIFACT_DIR/.coded_$RUN_ID"
-echo "✓ /code completed"
+touch "$GO_ARTIFACT_DIR/.routed_${GO_RUN_ID}"
 ```
 
 ---
 
-## STEP 3: VERIFY RESULT (MANDATORY)
+## Step 4: Dispatch Existing Skill
 
-**Checks flag:** `.coded_{RUN_ID}`
-**Creates flag:** `.verified_{RUN_ID}` on success
-**Creates flag:** `.attempt_{N}_{RUN_ID}` on failure
-**Creates flag:** `.blocked_{RUN_ID}` on terminal failure
-**Creates file:** `verification-results_{RUN_ID}.txt`
+**Precondition:** `.routed_{GO_RUN_ID}`
+**Creates:** `dispatch-result_{GO_RUN_ID}.json`, `.dispatched_{GO_RUN_ID}`
 
-**Pre-check:**
+`/go` now delegates to the selected existing skill.
 
-```bash
-if [ ! -f "$ARTIFACT_DIR/.coded_$RUN_ID" ]; then
-  echo "ERROR: STEP 2 must complete first"
-  exit 1
-fi
-```
+### Dispatch contract
 
-**Action:**
-Verify that `task-result_{RUN_ID}.json` is valid and that the implementation satisfies `active-task_{RUN_ID}.json`.
+The delegated skill receives:
+- the selected task title
+- the objective
+- scope_in
+- scope_out
+- acceptance criteria
+- any route-specific blocker notes
 
-**Verification must confirm:**
-- `task_id` matches
-- `run_id` matches
-- all changed files are within `allowed_files`
-- no `forbidden_files` were changed
-- acceptance criteria are actually satisfied
-- verification commands were executed or independently reproduced
-- evidence is concrete, not prose-only
+### Invocation policy
 
-Capture output and findings in `verification-results_{RUN_ID}.txt`.
+`/go` MUST invoke exactly one of:
+- `/planning`
+- `/design_v1.1`
+- `/code`
+- `/refactor`
 
-**Failure handling:**
-- On verification failure, create `.attempt_{N}_{RUN_ID}`.
-- If max attempts are exhausted, create `.blocked_{RUN_ID}` and emit `<promise>BLOCKED</promise>`.
+`/go` MUST NOT invoke more than one primary SDLC skill in the same untracked step.
 
-**On success:**
+If a delegated skill itself performs a documented nested handoff, that is allowed because it belongs to that skill's internal architecture.
 
-```bash
-touch "$ARTIFACT_DIR/.verified_$RUN_ID"
-echo "✓ Verification passed"
-```
+### Dispatch result schema
 
----
-
-## STEP 4: SIMPLIFY (CODE-AWARE QUALITY GATE)
-
-**Checks flag:** `.verified_{RUN_ID}`
-**Creates flag:** `.simplified_{RUN_ID}`
-**Creates file:** `simplify-status_{RUN_ID}.md`
-
-**Pre-check:**
-
-```bash
-if [ ! -f "$ARTIFACT_DIR/.verified_$RUN_ID" ]; then
-  echo "ERROR: STEP 3 must complete first"
-  exit 1
-fi
-```
-
-**Action:**
-Determine whether the selected task changed code or only docs/artifacts using `task-result_{RUN_ID}.json` and/or actual git diff.
-
-**Case A: Code changes**
-- Run `/simplify`
-- If HIGH or CRITICAL findings remain unresolved, stop and do not proceed
-
-**Case B: Docs-only or artifact-only changes**
-- Write `SKIPPED: docs-only or artifact-only change` to `simplify-status_{RUN_ID}.md`
-
-**On success:**
-
-```bash
-touch "$ARTIFACT_DIR/.simplified_$RUN_ID"
-echo "✓ Simplify passed"
-```
-
----
-
-## STEP 5: REVIEW PASSES (MANDATORY)
-
-**Checks flag:** `.simplified_{RUN_ID}`
-**Creates flag:** `.reviews-passed_{RUN_ID}`
-**Creates files:**
-- `review-pass-correctness_{RUN_ID}.md`
-- `review-pass-scope_{RUN_ID}.md`
-- `review-pass-tests_{RUN_ID}.md`
-- `review-pass-simplicity_{RUN_ID}.md`
-- `review-pass-regressions_{RUN_ID}.md`
-- `review-pass-maintainability_{RUN_ID}.md`
-- `review-pass-pr-ready_{RUN_ID}.md`
-
-**Pre-check:**
-
-```bash
-if [ ! -f "$ARTIFACT_DIR/.simplified_$RUN_ID" ]; then
-  echo "ERROR: STEP 4 must complete first"
-  exit 1
-fi
-```
-
-**Action:**
-Run all 7 review passes for the selected task.
-
-Each review file must contain:
-- pass name
-- checklist
-- findings
-- status: `PASS` or `REVIEW_REQUIRED`
-
-**Failure handling:**
-- If any pass is `REVIEW_REQUIRED`, stop and do not create `.reviews-passed_{RUN_ID}`.
-
-**On success:**
-
-```bash
-touch "$ARTIFACT_DIR/.reviews-passed_$RUN_ID"
-echo "✓ Review passes completed"
-```
-
----
-
-## STEP 6: PR ARTIFACTS (LOCAL ONLY)
-
-**Checks flag:** `.reviews-passed_{RUN_ID}`
-**Creates flag:** `.pr-ready_{RUN_ID}`
-**Creates files:**
-- `commit-message_{RUN_ID}.txt`
-- `pr-title_{RUN_ID}.txt`
-- `pr-body_{RUN_ID}.md`
-- `pr-ready_{RUN_ID}.md`
-
-**Pre-check:**
-
-```bash
-if [ ! -f "$ARTIFACT_DIR/.reviews-passed_$RUN_ID" ]; then
-  echo "ERROR: STEP 5 must complete first"
-  exit 1
-fi
-```
-
-**Action:**
-Generate:
-- a conventional commit message
-- a one-line PR title
-- a PR body summarizing task, implementation, verification, simplify, and review outcomes
-- a `pr-ready_{RUN_ID}.md` file containing local next steps and `<promise>PR_READY</promise>`
-
-**Gate:** all 4 files must exist before `.pr-ready_{RUN_ID}` is created.
-
-**On success:**
-
-```bash
-touch "$ARTIFACT_DIR/.pr-ready_$RUN_ID"
-echo "✓ PR artifacts created locally"
-echo "<promise>PR_READY</promise>"
-```
-
----
-
-## STEP 7: PLAN PROGRESS UPDATE
-
-**Checks flag:** `.pr-ready_{RUN_ID}` or `.blocked_{RUN_ID}`
-**Reads file:** `active-plan.json`
-**Writes file:** updated `active-plan.json`
-
-**Action:**
-Update the selected task in `active-plan.json`.
-
-If successful:
-- set task `status` to `done`
-- record `run_id`
-- record `terminal_id`
-- record `completed_at`
-
-If blocked:
-- set task `status` to `blocked`
-- record blocker details
-- record `run_id`
-- record `terminal_id`
-- record `updated_at`
-
-**Loop decision:**
-- If eligible pending tasks remain, emit `<promise>MORE_TASKS_IN_PLAN</promise>`
-- Otherwise emit `<promise>ALL_TASKS_COMPLETE</promise>`
-
----
-
-## Canonical JSON Contracts
-
-### `active-plan.json`
+Write `dispatch-result_{GO_RUN_ID}.json`:
 
 ```json
 {
-  "plan_id": "plan-001",
-  "created_at": "2026-04-20T16:00:00Z",
-  "updated_at": "2026-04-20T16:00:00Z",
-  "tasks": [
-    {
-      "task_id": "TASK-001",
-      "title": "Example task",
-      "status": "pending",
-      "priority": 1,
-      "depends_on": [],
-      "objective": "Implement the requested change.",
-      "scope": {
-        "in": ["packages/cc-skills-sdlc/skills/go/**"],
-        "out": ["docs/archive/**"]
-      },
-      "allowed_files": [
-        "packages/cc-skills-sdlc/skills/go/SKILL.md",
-        "packages/cc-skills-sdlc/skills/go/go-safe.sh",
-        "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
-      ],
-      "forbidden_files": [
-        ".git/**",
-        "main",
-        "master"
-      ],
-      "acceptance_criteria": [
-        "Selected task can be executed by /code",
-        "Verification evidence is captured",
-        "PR artifacts are generated locally"
-      ],
-      "verification_commands": [
-        "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh",
-        "bash -n packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
-      ]
-    }
-  ]
+  "go_run_id": "{GO_RUN_ID}",
+  "task_id": "string",
+  "route": "planning|design_v1.1|code|refactor",
+  "dispatch_status": "dispatched",
+  "delegated_skill": "/code",
+  "delegated_at": "ISO-8601",
+  "expected_outcome_type": "plan|adr|implementation|refactor-result",
+  "orchestrator_wait_state": "awaiting-skill-outcome"
 }
 ```
 
-### `active-task_{RUN_ID}.json`
+Then create:
 
-```json
-{
-  "run_id": "RUN_ID",
-  "terminal_id": "TERMINAL_ID",
-  "task_id": "TASK-001",
-  "title": "Example task",
-  "objective": "Implement the requested change.",
-  "scope": {
-    "in": ["packages/cc-skills-sdlc/skills/go/**"],
-    "out": ["docs/archive/**"]
-  },
-  "allowed_files": [
-    "packages/cc-skills-sdlc/skills/go/SKILL.md",
-    "packages/cc-skills-sdlc/skills/go/go-safe.sh",
-    "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
-  ],
-  "forbidden_files": [
-    ".git/**",
-    "main",
-    "master"
-  ],
-  "acceptance_criteria": [
-    "Selected task can be executed by /code",
-    "Verification evidence is captured",
-    "PR artifacts are generated locally"
-  ],
-  "verification_commands": [
-    "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh",
-    "bash -n packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
-  ],
-  "selected_at": "2026-04-20T16:05:00Z",
-  "status": "selected"
-}
+```bash
+touch "$GO_ARTIFACT_DIR/.dispatched_${GO_RUN_ID}"
 ```
 
-### `task-result_{RUN_ID}.json`
+Immediately emit:
+
+```xml
+<promise>GO_DISPATCHED</promise>
+```
+
+---
+
+## Step 5: Capture Outcome
+
+**Precondition:** `.dispatched_{GO_RUN_ID}`
+**Creates:** updated `dispatch-result_{GO_RUN_ID}.json`, optionally `skill-output-summary_{GO_RUN_ID}.md`, plus either `.completed_{GO_RUN_ID}` or `.blocked_{GO_RUN_ID}`
+
+After delegated execution, `/go` records normalized outcome only.
+
+### Valid normalized outcomes
+
+#### Completed
+Use when the delegated skill clearly completed the selected task or produced the required next artifact.
+
+Set:
+
+```json
+"final_status": "completed"
+```
+
+Create:
+
+```bash
+touch "$GO_ARTIFACT_DIR/.completed_${GO_RUN_ID}"
+```
+
+#### Blocked
+Use when the delegated skill reports or clearly implies:
+- missing design decision
+- failed verification gate
+- unresolved plan ambiguity
+- worktree/precondition issue
+- skill-level refusal due to its own governance rules
+
+Set:
+
+```json
+"final_status": "blocked"
+```
+
+Create:
+
+```bash
+touch "$GO_ARTIFACT_DIR/.blocked_${GO_RUN_ID}"
+```
+
+### Outcome recording requirements
+
+Append or update fields in `dispatch-result_{GO_RUN_ID}.json`:
 
 ```json
 {
-  "run_id": "RUN_ID",
-  "task_id": "TASK-001",
-  "status": "completed",
-  "summary": "Implemented the requested task changes.",
-  "changed_files": [
-    "packages/cc-skills-sdlc/skills/go/SKILL.md",
-    "packages/cc-skills-sdlc/skills/go/go-safe.sh"
-  ],
-  "commands_executed": [
-    "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh"
-  ],
-  "verification_evidence": [
-    "bash syntax check passed for go-safe.sh"
-  ],
-  "blockers": [],
-  "notes": [
-    "No forbidden files changed"
-  ],
-  "completed_at": "2026-04-20T16:10:00Z"
+  "final_status": "completed|blocked",
+  "completion_summary": "brief summary",
+  "produced_artifacts": ["..."],
+  "next_recommended_skill": "planning|design_v1.1|code|refactor|null",
+  "next_recommended_action": "string"
 }
 ```
 
 ---
 
-## State Directory Structure
+## Step 6: Emit Next Action
 
+**Precondition:** `.completed_{GO_RUN_ID}` or `.blocked_{GO_RUN_ID}`
+**Creates:** `next-action_{GO_RUN_ID}.md`
+
+Write a short operator-facing file:
+
+### If completed
+`next-action_{GO_RUN_ID}.md` must include:
+- task completed
+- artifact paths produced
+- whether more tasks remain
+- recommended next task or next command
+
+Emit one of:
+
+```xml
+<promise>TASK_COMPLETE</promise>
 ```
+
+or
+
+```xml
+<promise>MORE_TASKS_REMAIN</promise>
+```
+
+### If blocked
+`next-action_{GO_RUN_ID}.md` must include:
+- what blocked the task
+- which skill blocked it
+- the minimal next action to unblock
+
+Emit:
+
+```xml
+<promise>TASK_BLOCKED</promise>
+```
+
+---
+
+## State Directory Example
+
+```text
 .claude/.artifacts/
 └── {TERMINAL_ID}/
     └── go/
-        ├── active-plan.json
-        ├── .worktree-ready_{RUN_ID}
-        ├── .task-selected_{RUN_ID}
-        ├── .coded_{RUN_ID}
-        ├── .verified_{RUN_ID}
-        ├── .simplified_{RUN_ID}
-        ├── .reviews-passed_{RUN_ID}
-        ├── .pr-ready_{RUN_ID}
-        ├── .blocked_{RUN_ID}
-        ├── .attempt_{N}_{RUN_ID}
-        ├── active-task_{RUN_ID}.json
-        ├── task-result_{RUN_ID}.json
-        ├── verification-results_{RUN_ID}.txt
-        ├── simplify-status_{RUN_ID}.md
-        ├── review-pass-correctness_{RUN_ID}.md
-        ├── review-pass-scope_{RUN_ID}.md
-        ├── review-pass-tests_{RUN_ID}.md
-        ├── review-pass-simplicity_{RUN_ID}.md
-        ├── review-pass-regressions_{RUN_ID}.md
-        ├── review-pass-maintainability_{RUN_ID}.md
-        ├── review-pass-pr-ready_{RUN_ID}.md
-        ├── commit-message_{RUN_ID}.txt
-        ├── pr-title_{RUN_ID}.txt
-        ├── pr-body_{RUN_ID}.md
-        └── pr-ready_{RUN_ID}.md
+        ├── .initialized_{GO_RUN_ID}
+        ├── .worktree-ready_{GO_RUN_ID}
+        ├── .task-selected_{GO_RUN_ID}
+        ├── .routed_{GO_RUN_ID}
+        ├── .dispatched_{GO_RUN_ID}
+        ├── .completed_{GO_RUN_ID}
+        ├── run_{GO_RUN_ID}.json
+        ├── selected-task_{GO_RUN_ID}.json
+        ├── dispatch-decision_{GO_RUN_ID}.json
+        ├── dispatch-result_{GO_RUN_ID}.json
+        ├── skill-output-summary_{GO_RUN_ID}.md
+        └── next-action_{GO_RUN_ID}.md
+```
+
+Blocked run example:
+
+```text
+.claude/.artifacts/
+└── {TERMINAL_ID}/
+    └── go/
+        ├── .initialized_{GO_RUN_ID}
+        ├── .worktree-ready_{GO_RUN_ID}
+        ├── .task-selected_{GO_RUN_ID}
+        ├── .routed_{GO_RUN_ID}
+        ├── .dispatched_{GO_RUN_ID}
+        ├── .blocked_{GO_RUN_ID}
+        ├── run_{GO_RUN_ID}.json
+        ├── selected-task_{GO_RUN_ID}.json
+        ├── dispatch-decision_{GO_RUN_ID}.json
+        ├── dispatch-result_{GO_RUN_ID}.json
+        ├── blocked-reason_{GO_RUN_ID}.md
+        └── next-action_{GO_RUN_ID}.md
 ```
 
 ---
 
-## Prohibited Actions
+## Hard Rules
 
-- Editing on `main` or `master`
-- Proceeding without required gate files
-- Selecting more than one task per run
-- Inferring task intent from git diff alone
-- Accepting prose-only `/code` output without `task-result_{RUN_ID}.json`
-- Claiming acceptance criteria are met without evidence
-- Pushing remotely from `/go`
-- Proceeding past max attempts
+### `/go` MUST
+- use per-terminal artifact isolation
+- select exactly one task
+- route to exactly one primary SDLC skill
+- preserve existing SDLC ownership boundaries
+- write normalized orchestration records
+- stop when blocked
+- stop after recording one task outcome
+
+### `/go` MUST NOT
+- replace `/code` implementation workflow
+- replace `/refactor` TDD/refactor workflow
+- replace `/planning` synthesis/review workflow
+- replace `/design_v1.1` strict validation workflow
+- silently execute multiple primary tasks in one run
+- push remotely
+- claim completion without recording outcome artifacts
+
+---
+
+## Routing Heuristics
+
+Use these short rules when choosing route:
+
+- "Need a plan" → `/planning`
+- "Need architecture clarity" → `/design_v1.1`
+- "Need behavior change or implementation" → `/code`
+- "Need cleanup without behavior change" → `/refactor`
+
+If uncertain between `/code` and `/refactor`, ask:
+
+**Is intended behavior changing?**
+- yes → `/code`
+- no → `/refactor`
+
+If uncertain between `/planning` and `/design_v1.1`, ask:
+
+**Is the blocker primarily architecture/contract related?**
+- yes → `/design_v1.1`
+- no → `/planning`
+
+---
+
+## Minimal Examples
+
+### Example A: feature task
+Selected task = "Add retry handling to Context7 resolver"
+Route = `/code`
+
+### Example B: unclear boundary
+Selected task = "Split planner output contract from design handoff packet"
+Route = `/design_v1.1`
+
+### Example C: duplicate cleanup
+Selected task = "Deduplicate repeated path normalization helpers without behavior change"
+Route = `/refactor`
+
+### Example D: plan formation
+Selected task = "Break bundle findings into sequenced executable tasks"
+Route = `/planning`
+
+---
+
+## Upgrade Notes from older `/go`
+
+Compared with older artifact-safe `/go`, version 3.1 changes the role of `/go`:
+
+- old `/go`: directly owned verify/simplify/review/pr loop
+- new `/go`: owns only orchestration, routing, and normalized task state
+
+What stays:
+- `.claude/.artifacts/{TERMINAL_ID}/go/`
+- per-run flags
+- per-terminal isolation
+- blocking gates
+- auditable state trail
+
+What moves out:
+- verification authority → delegated skill
+- simplification authority → delegated skill
+- review authority → delegated skill
+- implementation/refactor logic → delegated skill
+
+---
+
+## Default Operator Behavior
+
+When user says:
+- "go"
+- "do the next task"
+- "continue"
+- "pick the next item"
+- "execute the next planned change"
+
+`/go` should:
+1. select one task
+2. route it
+3. dispatch the proper SDLC skill
+4. capture outcome
+5. emit the correct promise token
