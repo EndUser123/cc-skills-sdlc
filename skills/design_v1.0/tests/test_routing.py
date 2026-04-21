@@ -21,6 +21,7 @@ from routing import (  # noqa: E402
     HIGH_COMPLEXITY_INDICATORS,
     TEMPLATE_METADATA,
     VALID_TEMPLATES,
+    VERIFICATION_DOMAINS,
     ConfigResult,
     # Types
     TemplateResult,
@@ -28,6 +29,8 @@ from routing import (  # noqa: E402
     detect_complexity,
     detect_domain_keywords,
     detect_intent_type,
+    detect_verification_domain,
+    verification_requirements,
     extract_template_override,
     # Functions
     select_template,
@@ -580,3 +583,112 @@ class TestIntegrationSelectTemplateWithConfig:
 
                 # Verify template is in valid templates set
                 assert template in VALID_TEMPLATES, f"Template '{template}' not in VALID_TEMPLATES"
+
+
+class TestDetectVerificationDomain:
+    """Tests for detect_verification_domain function."""
+
+    def test_browser_automation_detected(self):
+        """Selenium/webdriver/browser queries map to browser_automation."""
+        assert detect_verification_domain("selenium webdriver scrape pages") == "browser_automation"
+        assert detect_verification_domain("playwright headless chromium") == "browser_automation"
+        assert detect_verification_domain("firefox profile xpath click navigate") == "browser_automation"
+
+    def test_performance_detected(self):
+        """Bottleneck/latency/rate limit queries map to performance."""
+        assert detect_verification_domain("bottleneck latency rate limit sleep") == "performance"
+        assert detect_verification_domain("slow throughput timeout concurrency") == "performance"
+        assert detect_verification_domain("retry cooldown fallback chain") == "performance"
+
+    def test_api_integration_detected(self):
+        """API/endpoint/REST queries map to api_integration."""
+        assert detect_verification_domain("rest api endpoint http client") == "api_integration"
+        assert detect_verification_domain("graphql webhook oauth authentication") == "api_integration"
+        assert detect_verification_domain("sdk client library pagination") == "api_integration"
+
+    def test_general_fallback(self):
+        """Generic queries with no domain keywords map to general."""
+        assert detect_verification_domain("refactor module structure") == "general"
+        assert detect_verification_domain("rename variables") == "general"
+        assert detect_verification_domain("") == "general"
+
+    def test_source_snippet_enriches_detection(self):
+        """Source code snippet can trigger domain detection even if query alone doesn't."""
+        assert detect_verification_domain(
+            "optimize this", "from selenium import webdriver"
+        ) == "browser_automation"
+        assert detect_verification_domain(
+            "fix this", "requests.get(endpoint, timeout=30)"
+        ) == "api_integration"
+
+    def test_highest_keyword_count_wins(self):
+        """Domain with most keyword hits wins when multiple domains match."""
+        # "rate limit" appears in both performance and api_integration
+        # But adding more performance-specific keywords should tip the balance
+        result = detect_verification_domain("rate limit sleep timeout latency bottleneck")
+        assert result == "performance"
+
+    def test_case_insensitive(self):
+        """Keyword matching is case-insensitive."""
+        assert detect_verification_domain("Selenium WebDriver") == "browser_automation"
+        assert detect_verification_domain("BOTTLENECK LATENCY") == "performance"
+        assert detect_verification_domain("REST API Endpoint") == "api_integration"
+
+
+class TestVerificationRequirements:
+    """Tests for verification_requirements function."""
+
+    def test_returns_list_for_all_domains(self):
+        """Each domain returns a non-empty list of requirements."""
+        for domain in VERIFICATION_DOMAINS:
+            reqs = verification_requirements(domain)
+            assert isinstance(reqs, list), f"{domain} requirements should be a list"
+            assert len(reqs) > 0, f"{domain} requirements should not be empty"
+
+    def test_browser_automation_requirements(self):
+        """browser_automation has framework verification requirements."""
+        reqs = verification_requirements("browser_automation")
+        assert any("framework" in r.lower() for r in reqs)
+        assert any("api" in r.lower() for r in reqs)
+
+    def test_performance_requirements(self):
+        """performance has timing and fallback chain requirements."""
+        reqs = verification_requirements("performance")
+        assert any("timing" in r.lower() or "constant" in r.lower() for r in reqs)
+        assert any("fallback" in r.lower() for r in reqs)
+
+    def test_api_integration_requirements(self):
+        """api_integration has endpoint verification requirements."""
+        reqs = verification_requirements("api_integration")
+        assert any("endpoint" in r.lower() for r in reqs)
+        assert any("error" in r.lower() for r in reqs)
+
+    def test_general_requirements(self):
+        """general has source file reading requirements."""
+        reqs = verification_requirements("general")
+        assert any("source" in r.lower() for r in reqs)
+
+    def test_unknown_domain_falls_back_to_general(self):
+        """Unknown domain falls back to general requirements."""
+        general_reqs = verification_requirements("general")
+        unknown_reqs = verification_requirements("nonexistent_domain")
+        assert unknown_reqs == general_reqs
+
+
+class TestVerificationDomainsConstant:
+    """Tests for VERIFICATION_DOMAINS constant."""
+
+    def test_is_tuple(self):
+        """VERIFICATION_DOMAINS is an immutable tuple."""
+        assert isinstance(VERIFICATION_DOMAINS, tuple)
+
+    def test_contains_expected_domains(self):
+        """Contains the four expected verification domains."""
+        assert "browser_automation" in VERIFICATION_DOMAINS
+        assert "performance" in VERIFICATION_DOMAINS
+        assert "api_integration" in VERIFICATION_DOMAINS
+        assert "general" in VERIFICATION_DOMAINS
+
+    def test_has_four_domains(self):
+        """Exactly four verification domains defined."""
+        assert len(VERIFICATION_DOMAINS) == 4

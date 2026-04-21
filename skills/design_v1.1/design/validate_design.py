@@ -83,6 +83,46 @@ def _validate_logic(payload: DesignPayload) -> list[str]:
         if not b.consumer:
             errors.append(f"Boundary '{b.boundary_id}' missing consumer")
 
+    # --- Claim verification (all domains) ---
+    if not payload.claim_verification:
+        errors.append(
+            "claim_verification must contain at least one entry — "
+            "each pattern recommendation must cite evidence"
+        )
+    else:
+        for i, claim in enumerate(payload.claim_verification):
+            if not claim.claim:
+                errors.append(f"claim_verification[{i}] missing claim")
+            if not claim.evidence:
+                errors.append(
+                    f"claim_verification[{i}] '{claim.claim[:40]}' missing evidence — "
+                    "state the file, function, or documentation that supports this claim"
+                )
+            if not claim.verified and claim.counterexample:
+                errors.append(
+                    f"claim_verification[{i}] '{claim.claim[:40]}' has counterexample "
+                    "but is not marked verified — either verify the claim or revise it"
+                )
+
+    # --- Bottleneck evidence (performance domain only) ---
+    if payload.domain == "performance":
+        if payload.bottleneck_evidence is None:
+            errors.append(
+                "bottleneck_evidence is required for performance-domain ADRs — "
+                "state what was measured, the primary path, and timing constants"
+            )
+        else:
+            bn = payload.bottleneck_evidence
+            if not bn.measurement_basis:
+                errors.append("bottleneck_evidence.measurement_basis is required")
+            if not bn.primary_path:
+                errors.append("bottleneck_evidence.primary_path is required")
+            if not bn.fallback_positions:
+                errors.append(
+                    "bottleneck_evidence.fallback_positions is required — "
+                    "map each method to its position in the fallback chain"
+                )
+
     return errors
 
 

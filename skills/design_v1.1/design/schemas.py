@@ -79,6 +79,44 @@ class ContractAuthorityPacket:
 
 
 @dataclass
+class ClaimVerification:
+    """A single verified claim in the ADR with evidence trail."""
+    claim: str
+    evidence: str
+    verified: bool = False
+    source_file: str = ""
+    counterexample: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "claim": self.claim,
+            "evidence": self.evidence,
+            "verified": self.verified,
+            "source_file": self.source_file,
+            "counterexample": self.counterexample,
+        }
+
+
+@dataclass
+class BottleneckEvidence:
+    """Evidence for where time/resources are actually spent — required for performance-domain ADRs."""
+    measurement_basis: str  # What was measured (e.g., "sleep_interval constants in transcript.py")
+    primary_path: str       # The main code path (e.g., "yt-dlp WEB client")
+    fallback_positions: dict[str, int]  # method_name → position in chain (1-indexed)
+    timing_constants: dict[str, Any]    # e.g., {"sleep_interval": 15, "cooldown": 300}
+    estimated_reach_pct: float = 0.0    # % of requests reaching the targeted component
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "measurement_basis": self.measurement_basis,
+            "primary_path": self.primary_path,
+            "fallback_positions": self.fallback_positions,
+            "timing_constants": self.timing_constants,
+            "estimated_reach_pct": self.estimated_reach_pct,
+        }
+
+
+@dataclass
 class CriticFinding:
     severity: Severity
     category: str
@@ -111,9 +149,12 @@ class DesignPayload:
     critic_findings: list[CriticFinding]
     adr_markdown: str
     planning_handoff: dict[str, Any] | None = None
+    claim_verification: list[ClaimVerification] = field(default_factory=list)
+    bottleneck_evidence: BottleneckEvidence | None = None
+    domain: str = "general"
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "run_id": self.run_id,
             "mode": self.mode,
             "scope": self.scope,
@@ -125,7 +166,12 @@ class DesignPayload:
             "critic_findings": [f.to_dict() for f in self.critic_findings],
             "adr_markdown": self.adr_markdown,
             "planning_handoff": self.planning_handoff,
+            "claim_verification": [c.to_dict() for c in self.claim_verification],
+            "domain": self.domain,
         }
+        if self.bottleneck_evidence is not None:
+            result["bottleneck_evidence"] = self.bottleneck_evidence.to_dict()
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DesignPayload:
@@ -153,6 +199,28 @@ class DesignPayload:
             )
             for f in data.get("critic_findings", [])
         ]
+        claims = [
+            ClaimVerification(
+                claim=c.get("claim", ""),
+                evidence=c.get("evidence", ""),
+                verified=c.get("verified", False),
+                source_file=c.get("source_file", ""),
+                counterexample=c.get("counterexample", ""),
+            )
+            for c in data.get("claim_verification", [])
+        ]
+        bn_data = data.get("bottleneck_evidence")
+        bottleneck = (
+            BottleneckEvidence(
+                measurement_basis=bn_data.get("measurement_basis", ""),
+                primary_path=bn_data.get("primary_path", ""),
+                fallback_positions=bn_data.get("fallback_positions", {}),
+                timing_constants=bn_data.get("timing_constants", {}),
+                estimated_reach_pct=bn_data.get("estimated_reach_pct", 0.0),
+            )
+            if bn_data
+            else None
+        )
         return cls(
             run_id=data["run_id"],
             mode=data["mode"],
@@ -165,6 +233,9 @@ class DesignPayload:
             critic_findings=findings,
             adr_markdown=data["adr_markdown"],
             planning_handoff=data.get("planning_handoff"),
+            claim_verification=claims,
+            bottleneck_evidence=bottleneck,
+            domain=data.get("domain", "general"),
         )
 
 

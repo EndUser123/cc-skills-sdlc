@@ -28,6 +28,10 @@ __all__ = [
     "detect_domain_keywords",
     "detect_complexity",
     "detect_intent_type",
+    # Verification domain detection
+    "detect_verification_domain",
+    "verification_requirements",
+    "VERIFICATION_DOMAINS",
     # Type definitions
     "TemplateResult",
     "ConfigResult",
@@ -161,6 +165,155 @@ SUBSYSTEM_KEYWORDS: list[str] = [
     "ingestion",
     "validation",
 ]
+
+# =============================================================================
+# Verification Domain Detection
+# =============================================================================
+
+VERIFICATION_DOMAINS = ("browser_automation", "performance", "api_integration", "general")
+
+_VERIFICATION_KEYWORDS: dict[str, list[str]] = {
+    "browser_automation": [
+        "selenium",
+        "playwright",
+        "puppeteer",
+        "webdriver",
+        "browser",
+        "page load",
+        "dom",
+        "headless",
+        "chromium",
+        "firefox profile",
+        "puppeteer-core",
+        "xpath",
+        "css selector",
+        "page.wait",
+        "click",
+        "navigate",
+        "scrape",
+        "crawl",
+    ],
+    "performance": [
+        "bottleneck",
+        "latency",
+        "throughput",
+        "slow",
+        "speed",
+        "timeout",
+        "rate limit",
+        "throttle",
+        "concurrency",
+        "parallelism",
+        "sleep",
+        "cooldown",
+        "batch size",
+        "memory usage",
+        "cpu",
+        "optimization",
+        "fallback chain",
+        "retry",
+    ],
+    "api_integration": [
+        "api",
+        "endpoint",
+        "rest",
+        "graphql",
+        "http client",
+        "request",
+        "response",
+        "status code",
+        "webhook",
+        "oauth",
+        "authentication",
+        "rate limit",
+        "pagination",
+        "sdk",
+        "client library",
+    ],
+}
+
+# Pre-built lookup: keyword -> verification domain
+_VERIFICATION_KEYWORD_TO_DOMAIN: dict[str, str] = {}
+for _vdomain in VERIFICATION_DOMAINS:
+    if _vdomain == "general":
+        continue
+    for _kw in _VERIFICATION_KEYWORDS.get(_vdomain, []):
+        _VERIFICATION_KEYWORD_TO_DOMAIN[_kw.lower()] = _vdomain
+
+# Per-domain verification checklists
+_VERIFICATION_REQUIREMENTS: dict[str, list[str]] = {
+    "browser_automation": [
+        "Identify which framework the codebase uses (check imports: selenium, playwright, puppeteer)",
+        "Verify every API call in recommendations exists in the target framework",
+        "If recommending framework migration, flag as migration not refactor",
+        "Check whether browser operations are sequential or parallel",
+        "Identify the fallback chain position of browser-based components",
+    ],
+    "performance": [
+        "Identify timing constants (sleep intervals, cooldowns, rate limits)",
+        "Determine fallback chain position of the targeted component",
+        "Estimate percentage of requests reaching the targeted component",
+        "Measure actual bottleneck before recommending optimization",
+        "Rank patterns by estimated impact on measured bottleneck, not effort",
+    ],
+    "api_integration": [
+        "Read actual API client code to verify endpoint names and methods",
+        "Verify error handling covers the API's documented failure modes",
+        "Check authentication mechanism matches API requirements",
+        "Identify rate limiting behavior and retry logic",
+    ],
+    "general": [
+        "Read actual source files for each pattern recommendation",
+        "Verify each API prescribed exists in the target framework",
+        "Check fallback chain position of targeted components",
+        "Record each verified claim with evidence trail",
+    ],
+}
+
+
+def detect_verification_domain(query: str, source_snippet: str = "") -> str:
+    """Detect the verification domain from query and optional source code snippet.
+
+    Verification domains impose domain-specific claim verification requirements
+    on ADRs. For example, browser_automation requires checking that recommended
+    APIs exist in the target framework; performance requires timing evidence.
+
+    Given: query string and optional source code context
+    When: query or source contains verification-domain keywords
+    Then: return the matched verification domain (highest keyword count wins)
+
+    Falls back to "general" when no domain-specific keywords are found.
+    """
+    text = f"{query} {source_snippet}".lower()
+
+    domain_hits: dict[str, int] = {}
+    for keyword, domain in _VERIFICATION_KEYWORD_TO_DOMAIN.items():
+        if keyword in text:
+            domain_hits[domain] = domain_hits.get(domain, 0) + 1
+
+    if domain_hits:
+        best_domain = max(domain_hits, key=lambda d: domain_hits[d])
+        logger.debug(f"Verification domain detected: {best_domain} (hits={domain_hits})")
+        return best_domain
+
+    logger.debug("No verification domain detected, defaulting to 'general'")
+    return "general"
+
+
+def verification_requirements(domain: str) -> list[str]:
+    """Return the verification checklist for a given domain.
+
+    Given: domain string (browser_automation, performance, api_integration, general)
+    When: domain is valid
+    Then: return list of verification step descriptions
+
+    Falls back to general requirements for unknown domains.
+    """
+    requirements = _VERIFICATION_REQUIREMENTS.get(domain)
+    if requirements is not None:
+        return requirements
+    logger.debug(f"Unknown verification domain '{domain}', falling back to general")
+    return _VERIFICATION_REQUIREMENTS["general"]
 
 VALID_TEMPLATES: set[str] = {
     "fast",

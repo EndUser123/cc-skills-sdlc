@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/run.schema.json",
+  "title": "GoRunEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "go_run_id",
+    "terminal_id",
+    "status",
+    "created_at",
+    "skill_version",
+    "orchestrator_role",
+    "artifact_dir"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "go.run.v1"
+    },
+    "go_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "terminal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "initialized",
+        "worktree-ready",
+        "task-selected",
+        "routed",
+        "dispatched",
+        "completed",
+        "blocked"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "skill_version": {
+      "type": "string",
+      "const": "3.1.0"
+    },
+    "orchestrator_role": {
+      "type": "string",
+      "const": "thin-router"
+    },
+    "artifact_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_task_file": {
+      "type": "string"
+    },
+    "dispatch_decision_file": {
+      "type": "string"
+    },
+    "dispatch_result_file": {
+      "type": "string"
+    },
+    "next_action_file": {
+      "type": "string"
+    },
+    "active_route": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "planning",
+        "design_v1.1",
+        "code",
+        "refactor",
+        null
+      ]
+    },
+    "final_promise": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "GO_DISPATCHED",
+        "TASK_COMPLETE",
+        "TASK_BLOCKED",
+        "AWAITING_SKILL_OUTPUT",
+        "MORE_TASKS_REMAIN",
+        "NO_TASKS_AVAILABLE",
+        null
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

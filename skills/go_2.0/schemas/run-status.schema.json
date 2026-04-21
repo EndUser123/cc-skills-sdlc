@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/run-status.schema.json",
+  "title": "GoRunStatus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "go_run_id",
+    "terminal_id",
+    "status",
+    "created_at",
+    "skill_version",
+    "current_step"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "go.run-status.v1"
+    },
+    "go_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "terminal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "initialized",
+        "worktree-ready",
+        "task-selected",
+        "task-defined",
+        "verified",
+        "simplified",
+        "reviews-passed",
+        "pr-ready",
+        "completed",
+        "blocked"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "skill_version": {
+      "type": "string",
+      "const": "2.0.0"
+    },
+    "current_step": {
+      "type": "string",
+      "enum": [
+        "worktree_enforcement",
+        "task_selection",
+        "task_contract",
+        "verify_end_to_end",
+        "simplify_code",
+        "seven_pass_review",
+        "local_pr_artifacts",
+        "loop_check"
+      ]
+    },
+    "active_route": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "planning",
+        "design_v1.1",
+        "code",
+        "refactor",
+        "tdd",
+        null
+      ]
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 3
+    },
+    "blocking_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "final_promise": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "GO_DISPATCHED",
+        "TASK_COMPLETE",
+        "TASK_BLOCKED",
+        "AWAITING_SKILL_OUTPUT",
+        "MORE_TASKS_IN_PLAN",
+        "ALL_TASKS_COMPLETE",
+        "PR_READY",
+        "BLOCKED",
+        null
+      ]
+    },
+    "selected_task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "verification_result_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "block_state_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dispatch_results": {
+      "type": "array",
+      "items": {
+        "$ref": "code-result.schema.json"
+      },
+      "default": []
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "prompt"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "pre-mortem",
+              "brainstorm",
+              "external-review",
+              "risk-review",
+              "architecture-spike",
+              "stakeholder-sync",
+              "tdd-debug"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "resolved": {
+            "type": "boolean",
+            "default": false
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "default": []
+    },
+    "artifact_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

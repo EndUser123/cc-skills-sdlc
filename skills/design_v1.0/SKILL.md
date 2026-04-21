@@ -1,9 +1,9 @@
 ---
 name: design
 description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Supports: fast, deep, cli, python, data-pipeline, precedent. Configuration: .archconfig.json (project) → ~/.archconfig.json (user) → ARCH_DEFAULT_DOMAIN (env var). Override with template=<name> parameter. Enhanced with Graph-of-Thought (GoT) for architecture alternatives analysis (v2.5), Hook Registration Consistency Checking (v5.1)."
-version: "5.3"
+version: "5.4"
 status: stable
-enforcement: advisory
+enforcement: strict
 depends_on:
   - sdlc: ">=0.1.0"
 category: architecture
@@ -16,10 +16,14 @@ suggest:
   - /planning
 follow_up_offer:
   - /ai-gemini
+hooks:
+  pre_response:
+    - command: "python skills/design_v1.0/hooks/stop_if_unverified.py"
 workflow_steps:
   - preflight_checks
   - explore_context
   - classify_intent
+  - claim_verification
   - contract_sensitivity_classification
   - select_template
   - load_template
@@ -448,6 +452,73 @@ This is the ADF pre-flight gate — absorbed from the deprecated `/adf` skill. I
 
 **If structural extraction detected:** Continue to Stage 1 with the scope confirmed.
 
+### Step 0.4: Claim Verification Gate
+
+**Before drafting any ADR, run verification domain detection to determine what evidence is required. This step is enforced by a pre-response hook — you MUST call `verify_claims.py` or the hook will block your output.**
+
+1. Generate a RUN ID for this session (e.g., `design-<timestamp>`).
+2. Set environment variable `DESIGN_RUN_ID` to that RUN ID.
+3. Run verification domain detection:
+
+```
+python skills/design_v1.0/hooks/verify_claims.py "<RUN_ID>" "<verification_domain>" <claims_count>
+```
+
+Call `detect_verification_domain(query, source_snippet)` and `verification_requirements(domain)` from `routing.py` to get a domain-specific verification checklist.
+
+```
+vdomain = detect_verification_domain(user_query, ast_or_import_summary)
+checklist = verification_requirements(vdomain)
+```
+
+**Verification domains and their mandatory checks:**
+
+| Domain | Triggered By | Mandatory Verification |
+|--------|-------------|----------------------|
+| `browser_automation` | selenium, playwright, webdriver, browser, dom, scrape | Verify every API call exists in target framework. Check imports to identify which framework. Flag framework migration vs refactor. |
+| `performance` | bottleneck, latency, timeout, rate limit, sleep, cooldown | Identify timing constants. Map fallback chain positions. Estimate % of requests reaching targeted component. |
+| `api_integration` | api, endpoint, rest, graphql, oauth, sdk | Read actual API client code. Verify endpoint names/methods. Check error handling covers documented failure modes. |
+| `general` | (default) | Read source files for each recommendation. Verify APIs exist. Check fallback chain position. |
+
+**Mandatory steps for ALL domains:**
+
+1. **Read the actual source files** that the ADR proposes to change. Do not reason from function names alone.
+2. **Verify each API** you plan to prescribe exists in the target framework. Example: if code uses Selenium, do not prescribe `context.new_page()` (Playwright API).
+3. **Check fallback chain position** — is the targeted component the primary path or a fallback? What percentage of requests actually reach it?
+4. **Identify timing constants** — sleep intervals, cooldowns, rate limits. These define the real bottleneck, not theoretical speed.
+5. **Record each verified claim** with evidence in the ADR (file path, line number, or documentation URL).
+
+**If claim verification reveals a recommendation is invalid** (e.g., API doesn't exist in target framework, component is rarely reached), discard that recommendation before drafting. Do not include unverified claims in the ADR.
+
+### Temporal Claim Gate
+
+Any design conclusion that contains temporal language — "before X", "after X", "still dirty when Y starts", "never called", "always runs", "when Z starts" — is making a **temporal claim** about execution order. Such claims MUST be verified before inclusion in the ADR.
+
+**Trigger words:** before, after, still, never, always, "when X starts", "before next"
+
+When triggered, fill a trace block:
+
+```
+Claim: [what temporal assertion is being made]
+Boundary:
+  - Suspect line/function:
+  - Enclosing try/finally/defer/with:
+  - First downstream caller assuming the post-state:
+State snapshots:
+  - At suspicion point:
+  - At cleanup/reset:
+  - At next caller entry:
+Normal path: A → ... → cleanup? → return → caller → B
+Alternative path: [what execution order makes the opposite story true?]
+Verdict: proven | disproven | crash-path-only | unclear
+```
+
+**Key rules:**
+- Do NOT accept a structural pattern ("no cleanup() call at line X") as evidence of a temporal claim ("cleanup never runs before Y").
+- Read to the natural boundary (end of function, end of try/finally, end of call chain) before concluding.
+- If cleanup exists in a `finally` or `with` block, the normal path may be clean — the bug may only exist on crash/interruption paths.
+- If the verdict is "crash-path-only", label it explicitly and assess probability before recommending a fix.
+
 ---
 
 ## Stage 0.5: Clarity Gate
@@ -853,6 +924,21 @@ The critic must check and block on concrete closure failures only:
    - required fields left as `TBD`, `unknown`, `not yet specified`, or equivalent
    - validator owner or proof owner missing on contract-sensitive boundaries
    - boundary listed as in-scope but not actually closed
+
+6. Unverified claims and evidence gaps
+   - ADR recommends APIs that do not exist in the target framework (e.g., Playwright APIs prescribed for Selenium codebase)
+   - ADR prescribes a migration as if it were a refactor (framework change without migration flag)
+   - performance claims lack timing evidence (no sleep intervals, cooldowns, rate limits, or fallback chain positions identified)
+   - ADR optimizes a component without stating its fallback chain position or estimated % of requests reaching it
+   - API integration claims cite endpoint names or methods not verified against actual client code
+   - ADR includes a pattern recommendation without citing the source file, line number, or documentation that supports it
+   - bottleneck_evidence is missing for performance-domain queries (detected via `detect_verification_domain` in Stage 0.2)
+
+7. Temporal reasoning errors
+   - ADR makes a temporal claim (before/after/still/never/always) based on static code structure without tracing control flow to the next boundary
+   - ADR claims "cleanup never runs" or "state is still dirty" without checking finally/with/defer blocks that execute after the suspect line
+   - ADR treats a crash-path-only bug as a normal-path bug (cleanup exists in finally → normal path is clean → bug only on interruption)
+   - ADR concludes "missing cleanup" without reading past the suspect line to the end of the function or try/finally block
 
 ### Critic Output Rule
 

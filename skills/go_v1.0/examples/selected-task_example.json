@@ -1,0 +1,42 @@
+{
+  "schema_version": "go.selected-task.v1",
+  "go_run_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "terminal_id": "console_a1b2c3d4",
+  "task_id": "TASK-17",
+  "title": "Deduplicate validate_go_contracts.py helper functions",
+  "objective": "Extract duplicate validation helper functions in validate_go_contracts.py into a shared utils module.",
+  "task_type": "refactor",
+  "source": "structured-plan",
+  "source_ref": "active-plan.json#TASK-17",
+  "scope_in": [
+    "P:/.claude/skills/go/scripts/validate_go_contracts.py"
+  ],
+  "scope_out": [
+    "P:/.claude/skills/go/__pycache__/**",
+    "**/*.pyc"
+  ],
+  "acceptance_criteria": [
+    "No duplicate helper functions remain in validate_go_contracts.py",
+    "Shared utilities live in a separate file under scripts/__lib__/",
+    "Validator still passes all schema validation tests",
+    "No new files added outside scripts/__lib__/"
+  ],
+  "verification_hint": [
+    "Run: python -m pytest P:/.claude/skills/go/scripts/ --tb=short",
+    "Check: no duplicate function definitions via ast.parse",
+    "Confirm: shared utils imported by validate_go_contracts.py"
+  ],
+  "forbidden_files": [
+    "P:/.claude/skills/go/SKILL.md",
+    "P:/.claude/skills/go/schemas/**",
+    "main",
+    "master"
+  ],
+  "candidate_routes": [
+    "refactor"
+  ],
+  "blocked_by": [],
+  "status": "selected",
+  "selected_at": "2026-04-20T10:00:45Z",
+  "notes": "Behavior-preserving cleanup only. No functional changes to validation logic."
+}

@@ -6,9 +6,11 @@ description: >
 enforcement: strict
 workflow_steps:
   - Generate RUN ID and set DESIGN_RUN_ID env var
-  - Run generate_context.py to get AST workspace summary and SOP
+  - Run generate_context.py to get enriched AST workspace summary, domain detection, and SOP
+  - Read actual source files for each pattern recommendation
+  - Verify each claim against the codebase before drafting JSON
   - Draft design_draft_<RUNID>.json matching DesignPayload schema
-  - Run validate_design.py to verify schema and logic
+  - Run validate_design.py to verify schema, logic, and claim evidence
   - On SUCCESS: ADR auto-saved, .verified_<RUNID> flag written
   - On FAIL: fix JSON and retry (max 3 attempts)
 hooks:
@@ -16,7 +18,7 @@ hooks:
     - command: "python .claude/skills/design/hooks/stop_if_unverified.py"
 ---
 
-# /design_v1.1 Protocol – NTP v1.1
+# /design_v1.1 Protocol -- NTP v1.1
 
 You are operating under a strict **Native Tool-Gated Architecture Protocol**.
 
@@ -49,15 +51,42 @@ python .claude/skills/design/generate_context.py "[mode]" "[scope]" "<user_query
 ```
 
 Read its output **fully**. It contains:
-- an AST-based summary of the workspace (skipping venv/stdlib),
+- an enriched AST summary of the workspace (imports, constants, function names),
+- a **domain detection** result (`browser_automation`, `performance`, `api_integration`, or `general`),
 - a template routing decision,
-- and your **Standard Operating Procedure (SOP)**.
+- and your **Standard Operating Procedure (SOP)** with domain-specific verification steps.
 
 You MUST follow its SOP exactly.
 
+## Claim Verification (Mandatory Before Drafting)
+
+After generating context and BEFORE drafting the JSON, you MUST:
+
+1. **Read the actual source files** that the ADR proposes to change. Do not reason from function names alone.
+2. **Verify each API** you plan to prescribe exists in the target framework. Example: if the code uses Selenium, do not prescribe `context.new_page()` (that is a Playwright API).
+3. **Check fallback chain position** -- is the targeted component the primary path or a fallback? What percentage of requests actually reach it?
+4. **Identify timing constants** -- sleep intervals, cooldowns, rate limits. These define the real bottleneck, not the component's theoretical speed.
+5. **Record each verified claim** in the `claim_verification` field of the JSON draft.
+
+### Domain-Specific Requirements
+
+For **browser_automation** domain:
+- You MUST verify that every API call in your recommendation exists in the target framework (Selenium vs Playwright vs Puppeteer).
+- State which framework the codebase actually uses (check imports).
+- If you recommend switching frameworks, explicitly flag this as a migration, not a refactor.
+
+For **performance** domain:
+- You MUST fill the `bottleneck_evidence` field with: measurement basis, primary path, fallback positions, and timing constants.
+- Do NOT rank patterns by effort alone -- rank by estimated impact on the measured bottleneck.
+- State what percentage of requests reach the component you are optimizing.
+
+For **api_integration** domain:
+- You MUST read the actual API client code to verify endpoint names and methods.
+- Verify error handling covers the API's documented failure modes.
+
 ## Drafting and Validation (Tool-Gated Loop)
 
-Once you have the SOP:
+Once you have completed claim verification:
 
 1. Draft a **single JSON file** named:
 
@@ -68,6 +97,8 @@ Once you have the SOP:
    The JSON MUST strictly match `DesignPayload` in `schemas.py`.
    - Populate the `cap` object carefully.
    - Populate `critic_findings` with at least one finding, even if `severity = "low"`.
+   - Populate `claim_verification` with at least one entry per pattern recommendation.
+   - For `performance` domain: populate `bottleneck_evidence`.
    - Populate `adr_markdown` with a complete ADR.
 
 2. Validate using the tool:
@@ -95,13 +126,15 @@ When validation has passed:
   - the ADR title and key decision,
   - the status of the Contract Authority Packet (CAP),
   - whether any critic findings remain,
+  - the domain detected and number of claims verified,
   - and where the ADR was saved on disk.
 
 Example:
 
-> Validation succeeded for RUN ID XYZ.  
-> ADR saved to `docs/architecture/ADR-SYSTEM-1732050800.md`.  
-> CAP is closed for all identified boundaries.  
+> Validation succeeded for RUN ID XYZ.
+> ADR saved to `docs/architecture/ADR-SYSTEM-1732050800.md`.
+> Domain: browser_automation. Claims verified: 3/3.
+> CAP is closed for all identified boundaries.
 > No high or critical critic findings remain.
 
 If validation has not passed, you MUST NOT answer the user with an ADR.

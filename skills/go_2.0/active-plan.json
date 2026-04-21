@@ -1,0 +1,134 @@
+{
+  "plan_id": "go-gen2-smoke-test-001",
+  "created_at": "2026-04-20T16:52:00Z",
+  "updated_at": "2026-04-20T16:52:00Z",
+  "tasks": [
+    {
+      "task_id": "TASK-001",
+      "title": "Replace SKILL.md with Gen 2 JSON-contract version",
+      "status": "pending",
+      "priority": 1,
+      "depends_on": [],
+      "objective": "Replace the current go skill definition with the Gen 2 JSON-contract redesign.",
+      "scope": {
+        "in": [
+          "packages/cc-skills-sdlc/skills/go/SKILL.md"
+        ],
+        "out": [
+          "packages/cc-skills-sdlc/skills/go/GO-QUICK-REFERENCE.md",
+          "packages/cc-skills-sdlc/skills/go/IMPLEMENTATION-GUIDE.md"
+        ]
+      },
+      "allowed_files": [
+        "packages/cc-skills-sdlc/skills/go/SKILL.md"
+      ],
+      "forbidden_files": [
+        ".git/**",
+        "main",
+        "master",
+        "packages/cc-skills-sdlc/skills/go/go-safe.sh",
+        "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
+      ],
+      "acceptance_criteria": [
+        "SKILL.md uses active-plan.json as the scheduler source of truth",
+        "SKILL.md defines active-task_{RUN_ID}.json and task-result_{RUN_ID}.json as canonical contracts",
+        "SKILL.md defines /go -> /code orchestration",
+        "SKILL.md removes dependence on task-contract markdown and plan.md loop semantics"
+      ],
+      "verification_commands": [
+        "test -f packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "grep -q 'active-plan.json' packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "grep -q 'active-task_\\{RUN_ID\\}.json' packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "grep -q 'task-result_\\{RUN_ID\\}.json' packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "grep -q '/code' packages/cc-skills-sdlc/skills/go/SKILL.md"
+      ]
+    },
+    {
+      "task_id": "TASK-002",
+      "title": "Replace go-safe.sh with Gen 2 JSON-contract wrapper",
+      "status": "pending",
+      "priority": 2,
+      "depends_on": [
+        "TASK-001"
+      ],
+      "objective": "Replace go-safe.sh so it validates active-plan.json, previews the next eligible task, and runs /go using the Gen 2 contract model.",
+      "scope": {
+        "in": [
+          "packages/cc-skills-sdlc/skills/go/go-safe.sh"
+        ],
+        "out": [
+          "packages/cc-skills-sdlc/skills/go/GO-QUICK-REFERENCE.md",
+          "packages/cc-skills-sdlc/skills/go/IMPLEMENTATION-GUIDE.md"
+        ]
+      },
+      "allowed_files": [
+        "packages/cc-skills-sdlc/skills/go/go-safe.sh"
+      ],
+      "forbidden_files": [
+        ".git/**",
+        "main",
+        "master",
+        "packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
+      ],
+      "acceptance_criteria": [
+        "go-safe.sh fails if active-plan.json is missing",
+        "go-safe.sh validates that active-plan.json is parseable JSON",
+        "go-safe.sh previews the next eligible task before invoking /go",
+        "go-safe.sh writes .env_{RUN_ID}",
+        "go-safe.sh prints active-task_{RUN_ID}.json and task-result_{RUN_ID}.json if they exist"
+      ],
+      "verification_commands": [
+        "bash -n packages/cc-skills-sdlc/skills/go/go-safe.sh",
+        "grep -q 'active-plan.json' packages/cc-skills-sdlc/skills/go/go-safe.sh",
+        "grep -q 'active-task_' packages/cc-skills-sdlc/skills/go/go-safe.sh",
+        "grep -q 'task-result_' packages/cc-skills-sdlc/skills/go/go-safe.sh",
+        "grep -q 'python -' packages/cc-skills-sdlc/skills/go/go-safe.sh"
+      ]
+    },
+    {
+      "task_id": "TASK-003",
+      "title": "Replace ralph-go-loop.sh with per-task RUN_ID loop",
+      "status": "pending",
+      "priority": 3,
+      "depends_on": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "objective": "Replace ralph-go-loop.sh so it keeps TERMINAL_ID stable, generates a new RUN_ID per cycle, and uses active-plan.json plus artifact files as loop truth.",
+      "scope": {
+        "in": [
+          "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
+        ],
+        "out": [
+          "packages/cc-skills-sdlc/skills/go/GO-QUICK-REFERENCE.md",
+          "packages/cc-skills-sdlc/skills/go/IMPLEMENTATION-GUIDE.md"
+        ]
+      },
+      "allowed_files": [
+        "packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
+      ],
+      "forbidden_files": [
+        ".git/**",
+        "main",
+        "master",
+        "packages/cc-skills-sdlc/skills/go/SKILL.md",
+        "packages/cc-skills-sdlc/skills/go/go-safe.sh"
+      ],
+      "acceptance_criteria": [
+        "ralph-go-loop.sh keeps one TERMINAL_ID for the session",
+        "ralph-go-loop.sh generates a new RUN_ID for each cycle",
+        "ralph-go-loop.sh reads active-plan.json before and after each cycle",
+        "ralph-go-loop.sh exits BLOCKED when .blocked_{RUN_ID} exists",
+        "ralph-go-loop.sh exits ALL_TASKS_COMPLETE when no eligible tasks remain"
+      ],
+      "verification_commands": [
+        "bash -n packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh",
+        "grep -q 'RUN_ID=.*uuidgen' packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh",
+        "grep -q 'active-plan.json' packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh",
+        "grep -q '.blocked_' packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh",
+        "grep -q 'ALL_TASKS_COMPLETE' packages/cc-skills-sdlc/skills/go/ralph-go-loop.sh"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/verification-result.schema.json",
+  "title": "GoVerificationResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "terminal_id",
+    "task_id",
+    "status",
+    "generated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "go.verification-result.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "terminal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "passed", "failed", "blocked", "waived"]
+    },
+    "pr_ready": {
+      "type": "boolean",
+      "default": false
+    },
+    "verification_commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exit_code", "passed"],
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "artifact_path": {
+            "type": "string"
+          },
+          "elapsed_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "default": []
+    },
+    "simplify": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped"]
+        },
+        "findings_summary": {
+          "type": "string"
+        },
+        "artifact_path": {
+          "type": "string"
+        }
+      }
+    },
+    "review_passes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "correctness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "tests": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "simplicity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "regressions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "maintainability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        },
+        "pr_ready": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed", "failed", "skipped"]
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "tdd": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "validated": {
+          "type": "boolean",
+          "default": false
+        },
+        "validated_artifact": {
+          "type": "string"
+        },
+        "phase_state": {
+          "type": "string",
+          "enum": ["red", "green", "refactor", "none"]
+        }
+      }
+    },
+    "integration_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped", "none"]
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verification_log": {
+          "type": "string"
+        },
+        "simplify_log": {
+          "type": "string"
+        },
+        "review_log": {
+          "type": "string"
+        },
+        "tdd_receipt": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

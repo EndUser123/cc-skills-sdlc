@@ -73,6 +73,15 @@ Use the full tool-gated loop end-to-end.
 ## Consequences
 None — this is a test fixture.
 """,
+        "claim_verification": [
+            {
+                "claim": "Test claim for integration fixture",
+                "evidence": "test_full_ntp_loop.py: verified in test helper",
+                "verified": True,
+                "source_file": "",
+                "counterexample": "",
+            }
+        ],
     }
 
 

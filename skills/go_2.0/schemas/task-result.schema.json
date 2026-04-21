@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/task-result.schema.json",
+  "title": "GoTaskResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "task_id",
+    "status",
+    "completed_at"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pr_ready", "blocked", "in_progress"]
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification_summary_file": {
+      "type": "string"
+    },
+    "simplify_summary_file": {
+      "type": "string"
+    },
+    "review_summary_file": {
+      "type": "string"
+    },
+    "commit_message_file": {
+      "type": "string"
+    },
+    "pr_title_file": {
+      "type": "string"
+    },
+    "pr_body_file": {
+      "type": "string"
+    },
+    "pr_ready_file": {
+      "type": "string"
+    }
+  }
+}

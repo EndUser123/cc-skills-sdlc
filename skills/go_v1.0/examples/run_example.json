@@ -1,0 +1,17 @@
+{
+  "schema_version": "go.run.v1",
+  "go_run_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "terminal_id": "console_a1b2c3d4",
+  "status": "dispatched",
+  "created_at": "2026-04-20T10:00:00Z",
+  "updated_at": "2026-04-20T10:01:30Z",
+  "skill_version": "3.1.0",
+  "orchestrator_role": "thin-router",
+  "artifact_dir": ".claude/.artifacts/console_a1b2c3d4/go",
+  "selected_task_file": "selected-task_a1b2c3d4-e5f6-7890-abcd-ef1234567890.json",
+  "dispatch_decision_file": "dispatch-decision_a1b2c3d4-e5f6-7890-abcd-ef1234567890.json",
+  "dispatch_result_file": "dispatch-result_a1b2c3d4-e5f6-7890-abcd-ef1234567890.json",
+  "active_route": "refactor",
+  "final_promise": "GO_DISPATCHED",
+  "notes": "Task selected and dispatched to /refactor for deduplication cleanup."
+}

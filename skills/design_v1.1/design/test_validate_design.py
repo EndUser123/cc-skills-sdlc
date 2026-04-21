@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from schemas import (
+    ClaimVerification,
     ContractAuthorityPacket,
     ContractBoundary,
     CriticFinding,
@@ -33,6 +34,11 @@ def _minimal_payload(run_id: str = "test-run-001") -> DesignPayload:
         category="test",
         description="Smoke-test finding",
     )
+    claim = ClaimVerification(
+        claim="Test claim for fixture",
+        evidence="test_validate_design.py: verified in test helper",
+        verified=True,
+    )
     return DesignPayload(
         run_id=run_id,
         mode="system",
@@ -44,6 +50,7 @@ def _minimal_payload(run_id: str = "test-run-001") -> DesignPayload:
         cap=cap,
         critic_findings=[finding],
         adr_markdown="# ADR-Test\n\n## Status\nAccepted\n\n## Context\nTest ADR for smoke-test validation.\n\n## Decision\nUse minimal valid ADR format for testing.\n\n## Consequences\nNone — this is a test fixture.",
+        claim_verification=[claim],
     )
 
 
@@ -96,6 +103,31 @@ def test_validate_logic_rejects_missing_critic_findings():
     payload.critic_findings = []
     errors = _validate_logic(payload)
     assert any("critic_findings" in e for e in errors)
+
+
+def test_validate_logic_rejects_missing_claim_verification():
+    payload = _minimal_payload()
+    payload.claim_verification = []
+    errors = _validate_logic(payload)
+    assert any("claim_verification" in e for e in errors)
+
+
+def test_validate_logic_rejects_claim_without_evidence():
+    payload = _minimal_payload()
+    payload.claim_verification = [ClaimVerification(
+        claim="Some claim",
+        evidence="",
+    )]
+    errors = _validate_logic(payload)
+    assert any("missing evidence" in e for e in errors)
+
+
+def test_validate_logic_rejects_performance_domain_without_bottleneck():
+    payload = _minimal_payload()
+    payload.domain = "performance"
+    payload.bottleneck_evidence = None
+    errors = _validate_logic(payload)
+    assert any("bottleneck_evidence" in e for e in errors)
 
 
 def test_validate_logic_rejects_boundary_missing_producer():
