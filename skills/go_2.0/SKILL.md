@@ -1,7 +1,7 @@
 ---
 name: go_2.0
 version: 2.0.0
-description: Thin orchestrator — selects one task from `.claude/tasks/tasks.json`, runs it through verify → simplify → 7-pass review → local PR artifacts. Use when: tasks are queued in `.claude/tasks/tasks.json`, user says "do the next task", "run /go", "pick the next item", or "execute the planned changes". Do not use for architecture, design, or refactoring — route those to `/planning`, `/design_1.0`, or `/refactor` instead.
+description: Execute the next queued task from tasks.json and drive it to PR-ready completion. Use this when the user wants to work through their backlog, pick the next item, continue where they left off, or run the next planned task. Handles task selection, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
 category: execution
 enforcement: strict
 triggers:
