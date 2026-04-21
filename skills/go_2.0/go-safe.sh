@@ -50,11 +50,11 @@ case "$ANSWER" in
     ;;
 esac
 
-if command -v /go_2.0 >/dev/null 2>&1; then
-  /go_2.0
-elif command -v go_2.0 >/dev/null 2>&1; then
-  go_2.0
+if command -v /go >/dev/null 2>&1; then
+  /go
+elif command -v go >/dev/null 2>&1; then
+  go
 else
-  echo "ERROR: /go_2.0 command not found"
+  echo "ERROR: /go command not found"
   exit 1
 fi

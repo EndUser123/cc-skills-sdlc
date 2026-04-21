@@ -24,10 +24,10 @@ Treat `verification-result.json` as the canonical readiness object — it aggreg
 
 | Condition | Route | Why |
 |-----------|-------|-----|
-| code changes detected | `/tdd` first | Enforces RED/GREEN/REFACTOR before simplify/review |
-| `/tdd` complete + behavior stable | `/refactor` if simplify flags debt | Cleanup without behavior change |
-| code changes + high ambiguity | `/tdd` → `/design_v1.1` | Architecture clarity needed before full TDD |
-| planning gap or scope unclear | `/planning` | Decomposition needed before any implementation |
+| code changes detected | `/code` | Execute behavior change, TDD if applicable |
+| cleanup without behavior change | `/refactor` | Simplification, deduplication, restructuring |
+| architecture unresolved or contract ambiguous | `/design_1.0` | Resolve design before `/code` |
+| scope unclear or decomposition needed | `/planning` | Task breakdown before implementation |
 | config/infra only | direct verify → reviews | No TDD needed; skip to quality gates |
 
 ## /go auto-invoke chain for code tasks

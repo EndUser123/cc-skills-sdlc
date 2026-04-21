@@ -167,7 +167,7 @@ Required fields:
 
 A task is eligible when:
 
-- `status == "pending"`
+- `status == "ready"` (or `queued` or `approved`)
 - all `depends_on` tasks are already `done`
 - it is not reserved by another active run
 - it has all required contract fields

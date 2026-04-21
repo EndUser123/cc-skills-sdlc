@@ -62,33 +62,32 @@ count_attempts() {
 }
 
 task_outcome() {
-  # run-status.json is authoritative when it exists
-  local status_file="$GO_STATE_DIR/run-status_$RUN_ID.json"
-  if [ -f "$status_file" ]; then
-    local fp
-    fp=$(python -c "import json,sys; d=json.load(open('$status_file')); print(d.get('final_promise',''))" 2>/dev/null || echo "")
-    case "$fp" in
-      PR_READY)   echo "PR_READY";  return 0 ;;
-      BLOCKED)    echo "BLOCKED";   return 0 ;;
-    esac
-    # Also check run-status.status for completion
-    local rs
-    rs=$(python -c "import json,sys; d=json.load(open('$status_file')); print(d.get('status',''))" 2>/dev/null || echo "")
-    case "$rs" in
-      pr-ready|completed) echo "PR_READY"; return 0 ;;
-      blocked)          echo "BLOCKED";  return 0 ;;
-    esac
+  # Artifact flags are authoritative; check them first
+  if has_flag ".pr-ready_$RUN_ID"; then
+    echo "PR_READY"
+    return 0
   fi
 
-  # Atomic flags are authoritative when run-status is absent or incomplete
-  if has_flag ".pr-ready_$RUN_ID"; then
-    echo "PR_READY"; return 0
-  fi
   if has_flag ".blocked_$RUN_ID"; then
-    echo "BLOCKED"; return 0
+    echo "BLOCKED"
+    return 0
   fi
+
   if [ "$(count_attempts)" -ge "$MAX_ATTEMPTS" ]; then
-    echo "BLOCKED"; return 0
+    echo "BLOCKED"
+    return 0
+  fi
+
+  # Fallback: parse log only if no authoritative flag exists
+  if [ -f "$GO_STATE_DIR/go-output_$RUN_ID.log" ]; then
+    if grep -q '<promise>PR_READY</promise>' "$GO_STATE_DIR/go-output_$RUN_ID.log"; then
+      echo "PR_READY"
+      return 0
+    fi
+    if grep -q '<promise>BLOCKED</promise>' "$GO_STATE_DIR/go-output_$RUN_ID.log"; then
+      echo "BLOCKED"
+      return 0
+    fi
   fi
 
   echo "UNKNOWN"
@@ -151,15 +150,27 @@ main() {
   while [ "$cycle" -le "$MAX_CYCLES" ]; do
     log "cycle=$cycle/$MAX_CYCLES"
 
+    # Worktree sanity check before each cycle
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+      log "ERROR: not in git repo — cannot continue"
+      exit 1
+    }
+    git worktree list --porcelain | grep -F "worktree $(pwd)" >/dev/null 2>&1 || {
+      log "ERROR: not in registered git worktree — cannot continue"
+      exit 1
+    }
+
     # Artifact flags are authoritative — resume from last known state
     if has_flag ".pr-ready_$RUN_ID"; then
       log "artifact already indicates PR_READY"
+      echo "<promise>PR_READY</promise>"
       show_success_artifacts
       exit 0
     fi
 
     if has_flag ".blocked_$RUN_ID"; then
       log "artifact already indicates BLOCKED"
+      echo "<promise>BLOCKED</promise>"
       exit 1
     fi
 
@@ -175,6 +186,7 @@ main() {
 
     case "$OUTCOME" in
       PR_READY)
+        echo "<promise>PR_READY</promise>"
         MORE="$(remaining_tasks_after_current)"
         show_success_artifacts
         if [ "$MORE" = "yes" ]; then
@@ -185,6 +197,7 @@ main() {
         exit 0
         ;;
       BLOCKED)
+        echo "<promise>BLOCKED</promise>"
         log "run blocked"
         exit 1
         ;;

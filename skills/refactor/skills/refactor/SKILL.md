@@ -1,21 +1,26 @@
 ---
 name: refactor
 description: Multi-file refactoring with orchestration - discovers synergies and assigns tasks to agents.
-version: 2.0.0
+version: 3.0.0
 status: stable
 category: refactoring
 enforcement: advisory
 workflow_steps:
   - DISCOVER
   - DEDUPLICATE
+  - CLASSIFY_DEBT
   - PRIORITIZE
   - CONSTITUTIONAL_FILTER
   - PLAN
   - RED_PHASE
+  - CHECKPOINT_RED
   - ADVERSARIAL_REVIEW
   - REFACTOR
+  - LSP_VALIDATE
+  - CHECKPOINT_GREEN
   - REGRESSION
   - CODE_SIMPLIFICATION
+  - DELETION_METRIC
 triggers:
   - /refactor
 aliases:
@@ -35,9 +40,11 @@ Multi-file refactoring with orchestration -- discovers synergies across files, p
 - **No enterprise patterns**: Service extraction, factory patterns, complex abstractions auto-filtered
 - **Constitutional filter required**: All recommendations pass SoloDevConstitutionalFilter
 - **TDD mandatory**: Characterization tests before any changes
-- **7-step workflow**: Discovery -> Prioritization -> Constitutional Filter -> RED Phase -> Output -> Refactor -> Regression
-- **Parallel agents**: 3+ agents for bugs/logic, DRY/simplicity, conventions
+- **15-step workflow**: Discovery -> Deduplicate -> Classify Debt -> Prioritize -> Constitutional Filter -> Plan -> RED Phase -> Checkpoint -> Adversarial Review -> Refactor -> LSP Validate -> Checkpoint -> Regression -> Simplification -> Deletion Metric
+- **Parallel agents**: 8 agents with structured 8-dimension analysis rubric
 - **Priority levels**: P0 (bugs/race), P1 (error handling), P2 (DRY), P3 (conventions)
+- **Debt types**: design debt, code debt, test debt, documentation debt
+- **Rollback safety**: Git tag checkpoints after RED and GREEN phases
 
 For code quality standards, naming conventions, regex best practices, and pre-edit safety checks, see `references/code-quality-standards.md`.
 
@@ -45,7 +52,7 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 
 **CRITICAL: When user invokes `/refactor continue`, execute ALL priority levels (P0->P1->P2->P3) without stopping.**
 
-1. **DISCOVER** -- Before launching agents, use CDS/`Grep`/CKS/CHS to locate hotspots; targeted `Read`s on those files. Then launch 8 staggered Task agents (30s apart to avoid context flooding):
+1. **DISCOVER** -- Before launching agents, use CDS/`Grep`/CKS/CHS to locate hotspots; targeted `Read`s on those files. Then launch 8 staggered Task agents (30s apart to avoid context flooding). Each agent scores findings on the **8-dimension analysis rubric** (see below):
    - Agent 1: `adversarial-compliance` -- Bugs/Logic (race conditions, error handling, TOCTOU)
    - Agent 2: `adversarial-performance` -- DRY/Simplicity (duplication, extraction, concurrency)
    - Agent 3: `adversarial-performance` (tuned `--focus performance`) -- Leaks/bottlenecks/N+1/algorithmic improvements
@@ -54,6 +61,17 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
    - Agent 6: `/ai-pi-zai-glm51` -- Architecture lens: cross-module coupling, abstraction gaps, boundary violations, shared state patterns. Each finding MUST be verified by reading the actual file before writing.
    - Agent 7: `/ai-pi-mm-m27` -- Testing lens: coverage gaps, missing test scenarios, edge cases not covered, brittle tests. Each finding MUST be verified by reading the actual file before writing.
    - Agent 8: `/ai-gemini` -- Deep insight lens: semantic bugs, idiom violations, improvement opportunities that static analysis misses. Each finding MUST be verified by reading the actual file before writing.
+   - **8-dimension analysis rubric** (from NTCoding/lightweight-design-analysis): Each agent scores findings across 8 dimensions, weighting by its specialty:
+     | Dimension | What it measures | Weighted high by |
+     |-----------|-----------------|-----------------|
+     | Naming | Clarity and consistency of identifiers | Agent 4 (quality) |
+     | Object Calisthenics | SRP, no getters/setters, small objects | Agent 2 (DRY) |
+     | Coupling/Cohesion | Module boundaries, dependency direction | Agent 6 (architecture) |
+     | Immutability | Mutable state, side effects | Agent 1 (bugs) |
+     | Domain Integrity | Business logic leaks, anemic models | Agent 6 (architecture) |
+     | Type System | Type hints, generics, unions | Agent 4 (quality) |
+     | Simplicity | CC, nesting, parameter count | Agent 5 (standards) |
+     | Performance | Algorithmic complexity, resource usage | Agent 3 (performance) |
    - **modernize synergy** (default ON): Context7 lookups for deprecated patterns — runs automatically unless `--synergy-type` is explicitly set to a non-modernize value
    - **For Python async**: Run `` `ruff` + `/p` `` to detect existing async bugs before refactoring
    - **Agent output format**: Each agent MUST use the `Write` tool (not `Bash`) to write findings JSON. The orchestrator MUST substitute the actual path before launching agents:
@@ -65,23 +83,42 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
    - **Verification in DISCOVER**: Each agent verifies every finding by reading the actual file at the reported line before including it. Confidence is raised to 95+ for verified findings. Confidence is left as-is (or lowered) for unverified findings. The agent must distinguish: confirmed code exists at (file, line) = VERIFIED; code structure matches description = VERIFIED; description-only inference = UNVERIFIED.
    - **Graceful degradation**: If any agent fails or times out, skip it and continue with remaining agents. All findings are merged in step 2 regardless of source.
    - **Findings reuse**: If `{artifacts_dir}/{target}/refactor/findings-*.json` files exist from a prior `--dry-run`, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified.
-2. **DEDUPLICATE** -- Run `scripts/deduplicate.py` to merge findings by file+line, assign canonical IDs (e.g., `COMP-001/DRY-003` for cross-agent duplicates), and annotate evidence tiers. Output goes to `{artifacts_dir}/{target}/refactor/deduplicated.json`.
+2. **DEDUPLICATE** -- Run `scripts/deduplicate.py` to merge findings by file+line, assign canonical IDs (e.g., `COMP-001/DRY-003` for cross-agent duplicates), and annotate evidence tiers. Also detect **cross-file semantic similarity**: functions in different files with similar structure (parameter patterns, call graphs, naming) flagged as potential DRY candidates even when not text-identical. Output goes to `{artifacts_dir}/{target}/refactor/deduplicated.json`.
 2.5. **EVIDENCE TIER** (optional checkpoint) -- Only run if findings lack `[VERIFIED]` annotations from DISCOVER agents, or if a prior run's findings are being reused. Targeted reads for unverified findings. Labels:
    - `[VERIFIED]` — Tier 1: confirmed via targeted read or test execution
    - `[UNVERIFIED]` — Tier 3: static analysis only, claim could not be confirmed
    - `[CONTESTED]` — Tier 4: user or agent flagged as overstated/stale
    - `[INFERRED]` — Tier 3: plausible mechanism but unconfirmed root cause
-3. **PRIORITIZE** -- P0: Bugs/Race -> P1: Error Handling -> P2: DRY -> P3: Conventions
-4. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
-   - **If `--dry-run`**: Continue to steps 4.5-4.6, then STOP
-   - **If "continue" or no `--dry-run`**: Execute steps 5-9 for ALL priority levels
-   4.5. **CREATE PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
-   4.6. **ADVERSARIAL REVIEW** -- Call `adversarial_review_plan(plan)` from `scripts/plan_review.py`. Also runnable as CLI for testing: `python scripts/plan_review.py <plan.json>`.
-5. **RED PHASE** -- Create characterization tests, verify they FAIL (see `references/tdd-implementation.md`)
-6. **ADVERSARIAL REVIEW** -- Stress-test characterization tests via `adversarial-review` (8 perspectives)
-7. **REFACTOR** -- Apply changes (GREEN phase). Must use AST-based refactoring (see `references/ast-refactoring.md`)
-8. **REGRESSION** -- Run full test suite, verify no new failures
-9. **CODE SIMPLIFICATION** -- Polish via `pr-review-toolkit:code-simplifier`
+3. **CLASSIFY_DEBT** -- Label each finding with a debt type for targeted remediation:
+   - `design_debt`: Architecture issues — coupling, missing abstractions, boundary violations
+   - `code_debt`: Implementation issues — duplication, complexity, dead code, naming
+   - `test_debt`: Missing or brittle tests, uncovered edge cases
+   - `documentation_debt`: Stale docs, missing docstrings, misleading comments
+   - Use the **code smell classification tree** to map findings to refactoring techniques:
+     | Smell Category | Smells | Recommended Technique |
+     |---------------|--------|----------------------|
+     | **Bloaters** | Long method, large class, primitive obsession, long parameter list | Extract method/class, introduce parameter object, replace primitive with object |
+     | **OO Abusers** | Switch statements, temporary fields, refused bequest | Replace conditional with polymorphism, move field/method, extract class |
+     | **Change Preventers** | Divergent change, shotgun surgery, parallel inheritance | Extract class, inline class, move method/field |
+     | **Couplers** | Feature envy, inappropriate intimacy, message chains | Move method, extract class, hide delegate |
+     | **Dispensables** | Dead code, speculative generality, lazy class | Delete, inline, collapse hierarchy |
+4. **PRIORITIZE** -- P0: Bugs/Race -> P1: Error Handling -> P2: DRY -> P3: Conventions
+5. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
+   - **If `--dry-run`**: Continue to step 6, then STOP
+   - **If "continue" or no `--dry-run`**: Execute steps 7-15 for ALL priority levels
+6. **PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
+   - **Tiny commits breakdown**: Each finding must be broken into smallest-safe-change commits. Each commit must leave the codebase in a working state (tests pass). Plan must specify commit boundaries: `[commit N] description`.
+   - **Out of Scope section**: Every plan MUST include an explicit "Out of Scope" section listing: changes considered but rejected (with reason), files touched but not refactored (with rationale), findings deprioritized to future passes. This prevents scope creep during execution.
+   - **Adversarial review**: Call `adversarial_review_plan(plan)` from `scripts/plan_review.py`. Also runnable as CLI for testing: `python scripts/plan_review.py <plan.json>`.
+7. **RED PHASE** -- Create characterization tests, verify they FAIL (see `references/tdd-implementation.md`)
+8. **CHECKPOINT_RED** -- Git tag `refactor/red-{target}-{timestamp}` after RED phase. This creates a rollback point before any production code changes. If GREEN phase fails catastrophically, reset to this tag.
+9. **ADVERSARIAL REVIEW** -- Stress-test characterization tests via `adversarial-review` (8 perspectives)
+10. **REFACTOR** -- Apply changes (GREEN phase). Must use AST-based refactoring (see `references/ast-refactoring.md`)
+11. **LSP_VALIDATE** -- After each file edit in REFACTOR phase, run LSP diagnostics (`textDocument/publishDiagnostics`) to catch type errors, undefined references, and import issues immediately. If diagnostics reveal errors: pause, fix, re-validate before proceeding to next file. This prevents cascading type errors across files.
+12. **CHECKPOINT_GREEN** -- Git tag `refactor/green-{target}-{timestamp}` after GREEN phase passes tests. This marks the "known working" state. If regression phase reveals issues, reset here rather than re-running the full refactor.
+13. **REGRESSION** -- Run full test suite, verify no new failures
+14. **CODE SIMPLIFICATION** -- Polish via `pr-review-toolkit:code-simplifier`
+15. **DELETION_METRIC** -- Calculate and report: `lines_removed - lines_added`. A positive deletion metric indicates successful simplification. Track per-priority-level: P0 through P3 should each show net deletion or explain why addition was necessary (e.g., missing error handling). If net lines added > 0 across all priorities, flag for review — the refactor may be adding complexity rather than reducing it.
 
 **Stopping Conditions:**
 - STOP only if: user says "stop", question requires user input, or all findings processed
@@ -216,7 +253,7 @@ Not all findings require characterization tests. Skip RED phase when:
 | **P3: Dead code removal** | **NO** | If no callers exist (verified by Grep), removing it is safe without tests. |
 | **P3: Naming/convention** | **NO** | Renaming doesn't change behavior. |
 
-**Principle**: TDD protects against behavior change. If the fix changes broken behavior to correct behavior (crash → works), tests add ceremony without protection. If the fix changes working behavior to different working behavior (SQL strategy), tests prevent regression.
+**Principle**: TDD protects against behavior change. If the fix changes broken behavior to correct behavior (crash -> works), tests add ceremony without protection. If the fix changes working behavior to different working behavior (SQL strategy), tests prevent regression.
 
 ## See Also
 

@@ -5,7 +5,6 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
     "run_id",
     "terminal_id",
     "task_id",
@@ -13,10 +12,6 @@
     "generated_at"
   ],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "const": "go.verification-result.v1"
-    },
     "run_id": {
       "type": "string",
       "minLength": 1
