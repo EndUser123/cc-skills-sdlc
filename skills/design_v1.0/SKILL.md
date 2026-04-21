@@ -1,7 +1,7 @@
 ---
 name: design
 description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Supports: fast, deep, cli, python, data-pipeline, precedent. Configuration: .archconfig.json (project) → ~/.archconfig.json (user) → ARCH_DEFAULT_DOMAIN (env var). Override with template=<name> parameter. Enhanced with Graph-of-Thought (GoT) for architecture alternatives analysis (v2.5), Hook Registration Consistency Checking (v5.1)."
-version: "5.4"
+version: "5.5"
 status: stable
 enforcement: strict
 depends_on:
@@ -33,6 +33,7 @@ workflow_steps:
   - emit_contract_authority_packet
   - adr_closure_consistency_check
   - adr_critic_review
+  - payload_validation
   - generate_architecture_review
 
 governance:
@@ -454,7 +455,7 @@ This is the ADF pre-flight gate — absorbed from the deprecated `/adf` skill. I
 
 ### Step 0.4: Claim Verification Gate
 
-**Before drafting any ADR, run verification domain detection to determine what evidence is required. This step is enforced by a pre-response hook — you MUST call `verify_claims.py` or the hook will block your output.**
+**Before drafting any ADR, run verification domain detection to determine what evidence is required. This step is enforced by a pre-response hook — you MUST call `verify_claims.py` to establish the verification record, and later pass `validate_design.py` (Stage 1.9b) to write the `.verified_<RUNID>` flag that the hook checks.**
 
 1. Generate a RUN ID for this session (e.g., `design-<timestamp>`).
 2. Set environment variable `DESIGN_RUN_ID` to that RUN ID.
@@ -985,6 +986,55 @@ Output: P:/.claude/state/adr_critic.json"""
 **Model selection**: Haiku for the fallback — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
 
 **Blocking behavior**: If `adr_critic` returns `status: "blocked"`, `/design` must repair the ADR's HIGH severity defects before saving or presenting it.
+
+---
+
+## Stage 1.9b: Payload Validation Gate
+
+After the ADR passes critic review (Stage 1.9), you MUST validate the design artifact as a structured JSON payload before proceeding. This is a tool-gated enforcement step — the pre-response hook (`stop_if_unverified.py`) will block your output if validation has not passed.
+
+### Draft the Payload
+
+Construct a JSON file matching the `DesignPayload` schema from `schemas.py`:
+
+```
+design_draft_<RUN_ID>.json
+```
+
+Required fields (all validated by `validate_design.py`):
+
+| Field | Requirement |
+|-------|-------------|
+| `run_id` | Matches the DESIGN_RUN_ID for this session |
+| `mode` | One of: `system`, `rca`, `component` |
+| `scope` | One of: `backend`, `frontend`, `data`, `all` |
+| `ast_summary` | Enriched AST summary of relevant codebase |
+| `sop` | Standard operating procedure followed |
+| `template_name` | Template selected in Stage 2 |
+| `cap` | Contract Authority Packet from Stage 1.7 |
+| `critic_findings` | At least one finding (even if severity=low) |
+| `adr_markdown` | Complete ADR (minimum 50 characters) |
+| `claim_verification` | At least one entry with claim + evidence |
+| `bottleneck_evidence` | Required for performance domain |
+
+### Run Validation
+
+```bash
+python skills/design_v1.0/validate_design.py "design_draft_<RUN_ID>.json" "<mode>" "<RUN_ID>"
+```
+
+**On SUCCESS:**
+- ADR auto-saved to `docs/architecture/ADR-<MODE>-<timestamp>.md`
+- `.verified_<RUN_ID>` flag written (consumed by stop_if_unverified.py hook)
+- Proceed to Stage 1.10
+
+**On FAIL:**
+- Read the error messages from stderr
+- Fix the JSON payload
+- Re-run validation (max 3 attempts per RUN ID)
+- If all 3 attempts fail, stop and ask the user for help
+
+**You MUST NOT present the ADR to the user until validation passes.** The pre-response hook enforces this mechanically.
 
 ---
 

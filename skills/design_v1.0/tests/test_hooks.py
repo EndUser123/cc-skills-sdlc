@@ -93,16 +93,15 @@ class TestVerifyClaims:
         run_id = f"hook-json-{time.time_ns()}"
         try:
             _run_verify(run_id, "performance", 7)
-            # Find the actual flag path from the verify_claims.py output location
-            # It uses _state_dir() which resolves relative to the script
-            from verify_claims import _state_dir
-            state_dir = Path(__file__).resolve().parent.parent.parent.parent / ".claude" / "arch_decisions"
+            # Resolve using the same logic as verify_claims.py._state_dir()
+            # skill_root = hooks/.. = design_v1.0, then up 3 levels to repo root
+            state_dir = Path(__file__).resolve().parent.parent.parent.parent.parent / ".claude" / "arch_decisions"
             flag = state_dir / f".verified_{run_id}"
-            if flag.exists():
-                data = json.loads(flag.read_text())
-                assert data["run_id"] == run_id
-                assert data["verification_domain"] == "performance"
-                assert data["claims_verified"] == 7
+            assert flag.exists(), f"Flag file not found at {flag}"
+            data = json.loads(flag.read_text())
+            assert data["run_id"] == run_id
+            assert data["verification_domain"] == "performance"
+            assert data["claims_verified"] == 7
         finally:
             p = _flag_path(run_id)
             if p.exists():
@@ -129,8 +128,8 @@ class TestStopIfUnverified:
                 p.unlink()
 
     def test_allows_without_design_run_id(self):
-        decision_json, _ = _run_stop(run_id=None)
-        decision = json.loads(decision_json)
+        _, stdout, _ = _run_stop(run_id=None)
+        decision = json.loads(stdout)
         assert decision["decision"] == "allow"
 
     def test_allows_with_empty_stdin(self):
@@ -177,13 +176,13 @@ class TestHookIntegration:
             assert exit_code == 0
 
             # Step 2: Stop hook should allow
-            decision_json, _ = _run_stop(run_id)
-            decision = json.loads(decision_json)
+            _, stdout, _ = _run_stop(run_id)
+            decision = json.loads(stdout)
             assert decision["decision"] == "allow"
 
             # Step 3: Second stop should block (flag was consumed)
-            decision_json_2, _ = _run_stop(run_id)
-            decision_2 = json.loads(decision_json_2)
+            _, stdout_2, _ = _run_stop(run_id)
+            decision_2 = json.loads(stdout_2)
             assert decision_2["decision"] == "block"
         finally:
             p = _flag_path(run_id)

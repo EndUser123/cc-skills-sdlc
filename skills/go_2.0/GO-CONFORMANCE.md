@@ -38,8 +38,8 @@ ROUTING.md has 15 routing rows covering all required branches. Still prose-based
 ### GO-CONF-007 — FIXED
 After `/tdd` invocation, SKILL.md now reads `tdd-receipt_{RUN_ID}.json` and blocks if `validated=false` or receipt missing. Blocks with `reason_code: tdd_validation_failed`.
 
-### GO-CONF-008 — OPEN
-`workflow_steps` in SKILL.md frontmatter lists 8 steps. STEP 1B (test_discovery) and STEP 1C (tdd_decision) are prose-only additions not reflected in `workflow_steps`. Tooling reading `workflow_steps` will miss 2 steps.
+### GO-CONF-008 — FIXED
+`workflow_steps` now lists all 10 steps including `test_discovery` and `tdd_decision`.
 
 ### GO-CONF-009 — FIXED
 Flag filename `.pr-ready_$RUN_ID` (hyphen) is consistent across SKILL.md artifact layout, `ralph-go-loop.sh`, and `go-safe.sh`.
@@ -48,8 +48,8 @@ Flag filename `.pr-ready_$RUN_ID` (hyphen) is consistent across SKILL.md artifac
 
 ## Medium
 
-### GO-CONF-010 — OPEN
-`verification-result.schema.json` requires `task_id` but no SKILL.md step writes `verification-result_{RUN_ID}.json` — the schema exists but is not populated by any step.
+### GO-CONF-010 — FIXED
+STEP 3 now writes `verification-result_{RUN_ID}.json` after successful verification, populating all required fields including `task_id`, `status`, `verification_commands`, `simplify`, and `generated_at`.
 
 ### GO-CONF-011 — FIXED
 Pre-mortem and stakeholder sync now write structured recommendation objects to `run-status.recommendations[]` with `type`, `prompt`, `evidence`, `resolved`, `resolved_at`.
@@ -82,11 +82,9 @@ SKILL.md title updated to `/go_2.0 — Verify, Simplify, Ship`.
 | GO-CONF-004 | critical | schema | `$ref` resolution for `dispatch_results[]` |
 | GO-CONF-005 | high | naming | Status hyphens vs reason code underscores |
 | GO-CONF-006 | high | routing | Routing table not machine-enforced |
-| GO-CONF-008 | high | artifact-path | `workflow_steps` missing 2 steps |
-| GO-CONF-010 | medium | schema | `verification-result` never populated |
 | GO-CONF-012 | medium | recommendation | Type string inconsistency (hyphen/enum vs underscore/reason) |
 
-**Fixed this session (9 of 16):** 001, 002, 003, 007, 009, 011, 013, 014, 015, 016.
+**Fixed this session (12 of 16):** 001, 002, 003, 007, 008, 009, 010, 011, 013, 014, 015, 016.
 
 ---
 

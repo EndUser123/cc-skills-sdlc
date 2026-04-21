@@ -13,6 +13,8 @@ workflow_steps:
   - worktree_enforcement
   - task_selection
   - task_contract
+  - test_discovery
+  - tdd_decision
   - verify_end_to_end
   - simplify_code
   - seven_pass_review
@@ -691,6 +693,44 @@ fi
 
 touch "$GO_STATE_DIR/.verified_$RUN_ID"
 echo "✓ Verification passed"
+
+# Write verification-result (GO-CONF-010)
+python - <<'PY'
+import json, os, pathlib, datetime
+
+state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
+run_id = os.environ["RUN_ID"]
+terminal_id = os.environ["TERMINAL_ID"]
+
+active = json.loads((state_dir / f"active-task_{run_id}.json").read_text(encoding="utf-8"))
+task_id = active.get("task", {}).get("id", "UNKNOWN")
+summary = json.loads((state_dir / f"verification-summary_{run_id}.json").read_text(encoding="utf-8"))
+simplify_path = state_dir / f"simplify-summary_{run_id}.json"
+simplify_data = json.loads(simplify_path.read_text()) if simplify_path.exists() else {"status": "skipped"}
+
+vr = {
+    "schema_version": "go.verification-result.v1",
+    "run_id": run_id,
+    "terminal_id": terminal_id,
+    "task_id": task_id,
+    "status": "passed" if summary.get("verified") else "failed",
+    "pr_ready": True,
+    "verification_commands": summary.get("commands", []),
+    "simplify": {
+        "status": simplify_data.get("status", "skipped"),
+        "findings_summary": simplify_data.get("reason", ""),
+        "artifact_path": str(state_dir / f"simplify-summary_{run_id}.json")
+    },
+    "generated_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "artifact_paths": {
+        "verification_log": str(state_dir / f"verification-results_{run_id}.txt"),
+        "simplify_log": str(state_dir / f"simplify-status_{run_id}.md"),
+        "tdd_receipt": str(state_dir / f"tdd-receipt_{run_id}.json") if (state_dir / f"tdd-receipt_{run_id}.json").exists() else None
+    }
+}
+path = state_dir / f"verification-result_{run_id}.json"
+path.write_text(json.dumps(vr, indent=2) + "\n", encoding="utf-8")
+PY
 
 # Update run-status
 python - <<'PY'
