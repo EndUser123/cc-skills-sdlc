@@ -1,7 +1,6 @@
 """Code pattern scanner for detecting TODO, FIXME, HACK, XXX, NOTE markers.
 
-This module scans Python files for code markers and extracts metadata
-including risk assessment using the gap_task_opportunities risk scoring system.
+Extracts marker type, location, description, risk score, and severity.
 """
 
 import logging
