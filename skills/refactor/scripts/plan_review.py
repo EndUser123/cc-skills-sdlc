@@ -200,7 +200,7 @@ def _generate_recommendations(plan: dict[str, Any], findings: list[str]) -> list
     if regex_findings:
         recommendations.append(
             "Use AST-based refactoring (LibCST) instead of regex for function signature changes. "
-            "See P:/packages/refactor/AST_HELPERS_GUIDE.md for API documentation."
+            "See P:/packages/cc-skills-sdlc/skills/refactor/references/ast-refactoring.md for API documentation."
         )
 
     # Check for batch operation recommendations
@@ -208,7 +208,7 @@ def _generate_recommendations(plan: dict[str, Any], findings: list[str]) -> list
     if batch_findings:
         recommendations.append(
             "Split batch operations into smaller increments with validation between each step. "
-            "Use the validation template: P:/.claude/consolidation_template.py"
+            "Use the validation template: P:/packages/cc-skills-sdlc/skills/refactor/references/plan-and-review-libraries.md"
         )
 
     # Check for large refactoring

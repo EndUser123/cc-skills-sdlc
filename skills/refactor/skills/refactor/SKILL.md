@@ -245,7 +245,7 @@ When synergy-type=modernize (deprecated API updates), invoke `/context7` before 
 
 ## Evidence Collection
 
-All TDD phases use `src.core.evidence_collector`. See `references/evidence-and-validation.md` for full details including sequential enforcement, dead code detection, and quality gate patterns.
+All TDD phases use `src.core.evidence_collector` (planned — not yet implemented). Evidence stored in `P:/.claude/.artifacts/{terminal_id}/refactor/` (subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`).
 
 Evidence stored in `P:/.claude/.artifacts/{terminal_id}/refactor/` (subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`).
 
@@ -277,7 +277,7 @@ Not all findings require characterization tests. Skip RED phase when:
 
 ## See Also
 
-- `/aid` - Single-file refactoring analysis (see `references/aid-integration.md`)
+- `/aid` - Single-file refactoring analysis
 - `/p` - Python 2025 standards compliance
 - `/complexity` - Code complexity analysis
 - `/tdd` - TDD workflow with evidence collection
@@ -287,13 +287,6 @@ Not all findings require characterization tests. Skip RED phase when:
 
 | File | Contents |
 |------|----------|
-| `references/code-quality-standards.md` | DRY, naming, function design, regex, pre-edit safety |
-| `references/tdd-implementation.md` | TDD enforcement flow, exemption detection, phase code |
-| `references/constitutional-compliance.md` | Prohibited patterns, filter step, filter code |
-| `references/ast-refactoring.md` | LibCST transformations, when to use AST |
-| `references/evidence-and-validation.md` | Evidence collection, sequential enforcement, dead code, quality gate |
-| `references/plan-and-review-libraries.md` | Plan creation, adversarial review, check catalog |
-| `references/agent-enhancements.md` | Complexity triage, import hygiene |
-| `references/subagent-routing.md` | Result envelope, routing rules, targeted reads |
-| `references/aid-integration.md` | AID workflow, ROI analysis, when to use |
 | `references/refactoring-mechanics.md` | Named transformation recipes: step-by-step mechanical procedures for each code smell category |
+
+**Planned references** (not yet created): code-quality-standards, tdd-implementation, constitutional-compliance, ast-refactoring, evidence-and-validation, plan-and-review-libraries, agent-enhancements, subagent-routing, aid-integration.

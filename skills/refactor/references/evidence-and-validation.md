@@ -2,27 +2,28 @@
 
 ## Evidence Collection
 
-**MANDATORY:** All TDD phases use `src.core.evidence_collector` for verification.
+**MANDATORY:** All TDD phases must verify test results before and after changes.
 
 ### Quick Reference
 
 ```python
-from src.core.evidence_collector import collect_test_evidence, verify_tdd_green, get_evidence_collector
-
-baseline = collect_test_evidence("pytest tests/test_module.py -v")           # 1. Baseline
+# Baseline: run tests before changes
+import subprocess
+result_before = subprocess.run(["pytest", "tests/test_module.py", "-v"], capture_output=True)
 # ... apply refactoring ...
-after = collect_test_evidence("pytest tests/test_module.py -v")              # 2. Verify
-assert verify_tdd_green(after).is_verified, "Refactoring broke tests"
-regression = collect_test_evidence("pytest tests/ -v")                        # 3. Regression
+# Verify: run tests after changes
+result_after = subprocess.run(["pytest", "tests/test_module.py", "-v"], capture_output=True)
+# Regression: run full suite
+regression = subprocess.run(["pytest", "tests/", "-v"], capture_output=True)
 ```
 
 ### Evidence Storage
 
-All artifacts stored in `P:\.evidence/` — subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`.
+All artifacts stored in `P:/packages/cc-skills-sdlc/skills/refactor/` — subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`.
 
 **New directories** (Priority 1 enhancements):
-- `.evidence/refactor/rollbacks/` — Rollback plans with git state
-- `.evidence/refactor/behavior/` — Behavior characterizations
+- `refactor/rollbacks/` — Rollback plans with git state
+- `refactor/behavior/` — Behavior characterizations
 
 | Phase | Evidence Required | Verification |
 |-------|------------------|--------------|
@@ -44,10 +45,9 @@ All artifacts stored in `P:\.evidence/` — subdirectories: `commands/`, `tests/
 
 **Integration pattern:**
 ```python
-from scripts.state_manager import StateManager
-
-state_mgr = StateManager()
-state_file = str(state_mgr.state_file)
+# Track phase transitions using git state
+import subprocess
+git_status = subprocess.run(["git", "status", "--short"], capture_output=True, text=True)
 # Track phase: 'discovery', 'prioritization', 'constitutional_filter', 'red', 'refactor'
 ```
 

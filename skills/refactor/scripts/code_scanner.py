@@ -5,6 +5,7 @@ Extracts marker type, location, description, risk score, and severity.
 
 import logging
 import re
+from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
