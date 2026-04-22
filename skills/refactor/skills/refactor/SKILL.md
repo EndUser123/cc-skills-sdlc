@@ -75,9 +75,10 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
    - **modernize synergy** (default ON): Context7 lookups for deprecated patterns — runs automatically unless `--synergy-type` is explicitly set to a non-modernize value
    - **For Python async**: Run `` `ruff` + `/p` `` to detect existing async bugs before refactoring
    - **Agent output format**: Each agent MUST use the `Write` tool (not `Bash`) to write findings JSON. The orchestrator MUST substitute the actual path before launching agents:
-     - Artifacts dir: `P:/.claude/.artifacts/{terminal_id}/refactor/` (NOT `.refactor/` subdirectory of target)
+     - Artifacts dir: `P:/.claude/.artifacts/{terminal_id}/refactor/`
      - Output path: `{artifacts_dir}/{target}/refactor/findings-{agent-name}.json`
-     - Example: `P:/.claude/.artifacts/console_1c309c3a-1fef-477f-b394-d22cc53057e4/yt-is/refactor/findings-adversarial-compliance.json`
+     - Example: `P:/.claude/.artifacts/console_081c35fc-2c20-42d8-90ee-fc271a305b8c/yt-is/refactor/findings-adversarial-compliance.json`
+     - **terminal_id resolution** (in priority order): `CLAUDE_TERMINAL_ID` env var → `WT_SESSION` env var (Windows Terminal, stable across compactions) → `ConEmuServerPID` env var (Windows fallback) → `console_unknown`
      - Shell quoting in Bash commands causes 3-4 wasted turns per agent. Write tool avoids this entirely.
    - **Minimum finding quality**: Every finding MUST have a non-empty `description`, `file`, `line`, and `confidence` score. Findings with empty descriptions or confidence=0 indicate the agent failed to analyze the code — do not include them in deduplication.
    - **Verification in DISCOVER**: Each agent verifies every finding by reading the actual file at the reported line before including it. Confidence is raised to 95+ for verified findings. Confidence is left as-is (or lowered) for unverified findings. The agent must distinguish: confirmed code exists at (file, line) = VERIFIED; code structure matches description = VERIFIED; description-only inference = UNVERIFIED.
@@ -245,8 +246,6 @@ When synergy-type=modernize (deprecated API updates), invoke `/context7` before 
 
 ## Evidence Collection
 
-All TDD phases use `src.core.evidence_collector` (planned — not yet implemented). Evidence stored in `P:/.claude/.artifacts/{terminal_id}/refactor/` (subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`).
-
 Evidence stored in `P:/.claude/.artifacts/{terminal_id}/refactor/` (subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`).
 
 ## TDD Checkpoint
@@ -288,5 +287,13 @@ Not all findings require characterization tests. Skip RED phase when:
 | File | Contents |
 |------|----------|
 | `references/refactoring-mechanics.md` | Named transformation recipes: step-by-step mechanical procedures for each code smell category |
-
-**Planned references** (not yet created): code-quality-standards, tdd-implementation, constitutional-compliance, ast-refactoring, evidence-and-validation, plan-and-review-libraries, agent-enhancements, subagent-routing, aid-integration.
+| `references/code-quality-standards.md` | Standards guiding refactoring decisions — what to simplify, consolidate, or standardize |
+| `references/tdd-implementation.md` | TDD enforcement flow, exemption detection, and phase implementation |
+| `references/constitutional-compliance.md` | Solo-dev constitutional constraints filter for all refactoring recommendations |
+| `references/ast-refactoring.md` | AST-based refactoring using LibCST transformations (required for all Python refactoring) |
+| `references/evidence-and-validation.md` | Evidence collection, storage, sequential enforcement, and quality gates |
+| `references/plan-and-review-libraries.md` | Plan creation (`refactor_plan.py`) and adversarial review (`plan_review.py`) libraries |
+| `references/agent-enhancements.md` | Complexity triage (Agent 2) and import hygiene (Agent 3) enhancement specs |
+| `references/subagent-routing.md` | Subagent result envelope and output routing rules |
+| `references/aid-integration.md` | AI Distiller (AID) integration for enhanced refactoring analysis |
+| `references/changelog.md` | Reference file changelog |
