@@ -26,7 +26,7 @@ def scan_code_patterns(session_files: list[str]) -> list[dict]:
     Scan Python files for TODO, FIXME, HACK, XXX, NOTE markers.
 
     For each marker found, extracts type, location, description, and calculates
-    risk score using the gap_task_opportunities risk scoring system.
+    risk score using hardcoded marker-type mappings.
 
     Args:
         session_files: List of file paths to scan
