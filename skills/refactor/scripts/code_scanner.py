@@ -78,7 +78,7 @@ def scan_code_patterns(session_files: list[str]) -> list[dict]:
                     state_impact = _detect_state_impact(description)
 
                     # Get marker-specific metadata (including rollback complexity)
-                    marker_metadata = _get_marker_metadata(marker_type, description, risk_result, state_impact)
+                    marker_metadata = _get_marker_metadata(marker_type, description, state_impact)
 
                     finding = {
                         'type': marker_type,
@@ -104,16 +104,13 @@ def scan_code_patterns(session_files: list[str]) -> list[dict]:
     return findings
 
 
-def _get_marker_metadata(marker_type: str, description: str, risk_result, state_impact: str) -> dict:
+def _get_marker_metadata(marker_type: str, description: str, state_impact: str) -> dict:
     """
     Get marker-specific metadata including risk score, rollback complexity, and severity.
-
-    This function maps marker types to the expected values based on test requirements.
 
     Args:
         marker_type: Type of marker (TODO/FIXME/HACK/XXX/NOTE)
         description: Description text from the marker
-        risk_result: Risk score result from calculate_risk_score
         state_impact: Detected state impact level
 
     Returns:
