@@ -94,7 +94,7 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
    - `code_debt`: Implementation issues — duplication, complexity, dead code, naming
    - `test_debt`: Missing or brittle tests, uncovered edge cases
    - `documentation_debt`: Stale docs, missing docstrings, misleading comments
-   - Use the **code smell classification tree** to map findings to refactoring techniques:
+   - Use the **code smell classification tree** to map findings to refactoring techniques (see `references/refactoring-mechanics.md` for step-by-step procedures):
      | Smell Category | Smells | Recommended Technique |
      |---------------|--------|----------------------|
      | **Bloaters** | Long method, large class, primitive obsession, long parameter list | Extract method/class, introduce parameter object, replace primitive with object |
@@ -118,10 +118,30 @@ For code quality standards, naming conventions, regex best practices, and pre-ed
 12. **CHECKPOINT_GREEN** -- Git tag `refactor/green-{target}-{timestamp}` after GREEN phase passes tests. This marks the "known working" state. If regression phase reveals issues, reset here rather than re-running the full refactor.
 13. **REGRESSION** -- Run full test suite, verify no new failures
 14. **CODE SIMPLIFICATION** -- Polish via `pr-review-toolkit:code-simplifier`
-15. **DELETION_METRIC** -- Calculate and report: `lines_removed - lines_added`. A positive deletion metric indicates successful simplification. Track per-priority-level: P0 through P3 should each show net deletion or explain why addition was necessary (e.g., missing error handling). If net lines added > 0 across all priorities, flag for review — the refactor may be adding complexity rather than reducing it.
+15. **DELETION_METRIC + QUALITY SCORE** -- Calculate and report:
+   - **Deletion metric**: `lines_removed - lines_added`. Positive = successful simplification. Track per-priority-level: P0 through P3 should each show net deletion or explain why addition was necessary (e.g., missing error handling). If net lines added > 0 across all priorities, flag for review.
+   - **Quality score**: Rate the target code 0-10 across the 8 dimensions from DISCOVER, before and after refactoring. Report delta per dimension:
+     ```
+     | Dimension        | Before | After | Delta |
+     |------------------|--------|-------|-------|
+     | Naming           | 5      | 8     | +3    |
+     | Object Calisthenics | 4   | 7     | +3    |
+     | Coupling/Cohesion| 6      | 9     | +3    |
+     ```
+   - A dimension that doesn't improve means the refactoring didn't address it — flag for the user.
+
+**Completion Criteria:**
+Each priority level has explicit "done" conditions. Do not advance to the next level until current level meets its criteria:
+
+| Level | Done When |
+|-------|-----------|
+| **P0 (Bugs/Race)** | No crashes, no race conditions, all error paths produce a result (not silent failure) |
+| **P1 (Error Handling)** | No bare `except`, all exceptions have actionable messages, no swallowed errors |
+| **P2 (DRY)** | No code duplication >6 identical lines across files, no CC>10 functions, all extracted helpers verified identical to originals |
+| **P3 (Conventions)** | Passes `ruff check`, type hints on all public APIs, no `# type: ignore` without justification |
 
 **Stopping Conditions:**
-- STOP only if: user says "stop", question requires user input, or all findings processed
+- STOP only if: user says "stop", question requires user input, or all findings processed AND all completion criteria met
 - DO NOT STOP after completing one priority level. Continue: P0 -> P1 -> P2 -> P3
 
 **Agent Enhancement Specs**: See `references/agent-enhancements.md` for complexity triage and import hygiene details.
@@ -276,3 +296,4 @@ Not all findings require characterization tests. Skip RED phase when:
 | `references/agent-enhancements.md` | Complexity triage, import hygiene |
 | `references/subagent-routing.md` | Result envelope, routing rules, targeted reads |
 | `references/aid-integration.md` | AID workflow, ROI analysis, when to use |
+| `references/refactoring-mechanics.md` | Named transformation recipes: step-by-step mechanical procedures for each code smell category |
