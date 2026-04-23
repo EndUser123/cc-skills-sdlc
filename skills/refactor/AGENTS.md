@@ -49,7 +49,7 @@ Multi-file refactoring with orchestration - discovers synergies and assigns task
 # Sanitize name (remove @, ?, *, etc.)
 $name = "refactor" -replace '[@?*:<>|+]', ''
 
-New-Item -ItemType Junction -Path "P:\.claude\skills\$name" -Target "P:\packages\refactor\skills\refactor"
+New-Item -ItemType Junction -Path "P:\.claude\skills\$name" -Target "P:\packages\cc-skills-sdlc\skills\refactor"
 ```
 
 ## Key Constraints

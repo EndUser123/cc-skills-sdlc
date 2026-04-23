@@ -147,6 +147,16 @@ Heuristic: Law of Demeter violation. A method should only talk to its immediate 
 
 Heuristic: A class that exists only to hold two fields and has no behavior. Use a NamedTuple or dataclass inline instead.
 
+## Debt Types
+
+| Type | Description | Examples |
+|------|-------------|----------|
+| `design_debt` | Architecture issues | Coupling, missing abstractions, boundary violations |
+| `code_debt` | Implementation issues | Duplication, complexity, dead code, naming |
+| `test_debt` | Test quality issues | Missing tests, brittle tests, uncovered edge cases |
+| `documentation_debt` | Documentation issues | Stale docs, missing docstrings, misleading comments |
+| `migration_debt` | Structural issues | Old import paths, stale re-exports, callers not yet migrated to new module paths |
+
 ## Safety Rules
 
 1. **One transformation per commit** — never combine two refactorings

@@ -69,7 +69,7 @@ result = {
     "run_id": run_id,
     "task_id": task_id,
     "status": "pr_ready",
-    "completed_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 }
 
 (state_dir / f"commit-message_{run_id}.txt").write_text(commit_msg, encoding="utf-8")

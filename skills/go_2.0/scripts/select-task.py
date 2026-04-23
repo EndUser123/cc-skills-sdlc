@@ -28,7 +28,7 @@ if not selected:
 payload = {
     "run_id": run_id,
     "terminal_id": terminal_id,
-    "selected_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "selected_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     "task": selected,
 }
 out = state_dir / f"active-task_{run_id}.json"

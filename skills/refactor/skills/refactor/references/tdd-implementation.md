@@ -59,7 +59,13 @@ import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from src.core.evidence_collector import collect_test_evidence, verify_tdd_red, verify_tdd_green
+from scripts.evidence_collector import (
+    collect_test_evidence,
+    verify_tdd_red,
+    verify_tdd_green,
+    verify_regression,
+    get_evidence_collector,
+)
 
 def create_rollback_plan(finding: dict) -> dict:
     """Generate rollback plan before refactoring."""

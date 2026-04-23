@@ -24,7 +24,7 @@ Transform large-scale refactoring from a risky manual process into a safe, autom
 ```bash
 # Create junction (Windows - no admin required)
 # Run from the skills parent directory
-mklink /J "P:\.claude\skills\refactor" "P:\.claude\skills\refactor"
+mklink /J "P:\.claude\skills\refactor" "P:\packages\cc-skills-sdlc\skills\refactor"
 
 # Or create symlink (macOS/Linux)
 ln -s "$(pwd)" ~/.claude/skills/refactor
@@ -48,11 +48,11 @@ The skill is accessed via `/refactor` in Claude Code.
 # IMPORTANT: Sanitize the junction name to remove problematic characters
 $junctionName = "refactor" -replace '[@?*:<>|+]', ''
 
-New-Item -ItemType Junction -Path "P:\.claude\skills\$junctionName" -Target "P:\packages\refactor\skills\refactor"
+New-Item -ItemType Junction -Path "P:\.claude\skills\$junctionName" -Target "P:\packages\cc-skills-sdlc\skills\refactor"
 ```
 
 **Key points:**
-- ✅ Edit in `P:/packages/refactor/`, changes work immediately
+- ✅ Edit in `P:/packages/cc-skills-sdlc/skills/refactor/`, changes work immediately
 - ✅ No reinstallation required - skills auto-discover from `P:/.claude/skills/`
 - ✅ Perfect for active development
 
@@ -64,7 +64,7 @@ New-Item -ItemType Junction -Path "P:\.claude\skills\$junctionName" -Target "P:\
 ```powershell
 # Symlink individual hook files to P:/.claude/hooks/
 cd P:/.claude/hooks
-cmd /c "mklink HookName.py P:/packages/refactor/scripts/hooks/HookName.py"
+cmd /c "mklink HookName.py P:/packages/cc-skills-sdlc/skills/refactor/scripts/hooks/HookName.py"
 ```
 
 #### 3. PLUGINS (End User Deployment)
@@ -74,7 +74,7 @@ cmd /c "mklink HookName.py P:/packages/refactor/scripts/hooks/HookName.py"
 **Setup:**
 ```bash
 # End users install via /plugin command
-/plugin P:/packages/refactor
+/plugin P:/packages/cc-skills-sdlc/skills/refactor
 ```
 
 ## 🏗️ Architecture

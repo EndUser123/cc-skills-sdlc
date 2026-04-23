@@ -59,9 +59,19 @@ def deduplicate_findings(
     canonical_id_counter = {"COMP": 1, "DRY": 1, "CONC": 1, "QUAL": 1, "PY": 1}
 
     for location, findings_at_location in by_location.items():
-        # Primary ID prefix from first agent's type or source agent
-        first = findings_at_location[0]
-        type_ = first.get("type", "unknown")
+        # Severity order: P0 > P1 > P2 > P3 (lowest number wins)
+        severity_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+        worst_severity = min(
+            severity_order.get(f.get("severity", "P3"), 3)
+            for f in findings_at_location
+        )
+
+        # Primary ID prefix from worst-severity finding
+        worst_finding = min(
+            findings_at_location,
+            key=lambda f: severity_order.get(f.get("severity", "P3"), 3)
+        )
+        type_ = worst_finding.get("type", "unknown")
         if type_ in ["bug", "race", "error-handling", "toctou"]:
             prefix = "COMP"
         elif type_ in ["duplication", "extraction"]:
@@ -88,13 +98,13 @@ def deduplicate_findings(
         # Canonical entry
         entry = {
             "id": canonical_id,
-            "file": first.get("file", ""),
-            "line": first.get("line", 0),
+            "file": worst_finding.get("file", ""),
+            "line": worst_finding.get("line", 0),
             "type": type_,
-            "severity": first.get("severity", "P2"),
+            "severity": worst_finding.get("severity", "P2"),
             "description": description,
             "confidence": max_confidence,
-            "evidence": first.get("evidence", ""),
+            "evidence": worst_finding.get("evidence", ""),
             "evidence_tier": _tier_for_confidence(max_confidence),
             "duplicate_count": len(findings_at_location),
             "source_agents": list(set(fo.get("_source_agent", "unknown") for fo in findings_at_location)),
@@ -137,22 +147,37 @@ def deduplicate_and_save(
     Args:
         artifacts_dir: Base .artifacts directory (e.g. P:/.claude/.artifacts/)
         target_name: Target identifier (e.g. "yt-is")
-        terminal_id: Terminal ID for multi-terminal isolation. If None, reads
-            CLAUDE_TERMINAL_ID env var. If env var is also empty, uses "default".
+        terminal_id: Terminal ID for multi-terminal isolation. If None, resolves
+            via canonical_terminal_id() (WT_SESSION → CLAUDE_TERMINAL_ID → ConEmu → hash).
 
     Returns:
         Path to deduplicated findings JSON
     """
     if terminal_id is None:
-        terminal_id = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+        # Try canonical_terminal_id from core.terminal_id (search-research package)
+        try:
+            import core.terminal_id as tid
+            terminal_id = tid.canonical_terminal_id()
+        except ImportError:
+            pass
         if not terminal_id:
-            try:
-                hostname = socket.gethostname()
-                cwd = str(Path.cwd())
-                pid = os.getpid()
-                terminal_id = hashlib.sha256(f"{hostname}/{cwd}/{pid}".encode()).hexdigest()[:12]
-            except Exception:
-                terminal_id = "default"
+            # Local fallback matching canonical_terminal_id priority:
+            # WT_SESSION (Windows Terminal) → ConEmuServerPID → hash fallback
+            terminal_id = (
+                os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+                or os.environ.get("WT_SESSION", "").strip()
+                or os.environ.get("ConEmuServerPID", "").strip()
+            )
+            if terminal_id:
+                terminal_id = f"console_{terminal_id}"
+            else:
+                try:
+                    hostname = socket.gethostname()
+                    cwd = str(Path.cwd())
+                    pid = os.getpid()
+                    terminal_id = hashlib.sha256(f"{hostname}/{cwd}/{pid}".encode()).hexdigest()[:12]
+                except Exception:
+                    terminal_id = "console_unknown"
     refactor_dir = artifacts_dir / terminal_id / target_name / "refactor"
     findings_files = list(refactor_dir.glob("findings-*.json"))
     output_path = refactor_dir / "deduplicated.json"

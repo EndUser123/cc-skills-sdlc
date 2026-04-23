@@ -1,0 +1,82 @@
+[
+  {
+    "query": "the hooks directory at .claude/hooks/ is getting unwieldy, there's a bunch of duplicated validation logic across StopHook files and some of the PreToolUse hooks have near-identical pattern matching. Can you clean this up?",
+    "should_trigger": true
+  },
+  {
+    "query": "/refactor src/features/llm_providers/ --dry-run",
+    "should_trigger": true
+  },
+  {
+    "query": "I've got 3 files in packages/search-research/skills/chs/ that all do similar string matching with slightly different regex patterns. The duplication is getting confusing. Simplify this.",
+    "should_trigger": true
+  },
+  {
+    "query": "refactor the constitutional_patterns.py file in .claude/skills/ - it's 400 lines of nested ifs that could be much cleaner",
+    "should_trigger": true
+  },
+  {
+    "query": "We have old Python code using requests.Session() and datetime.utcnow() scattered across P:/packages/cc-skills-sdlc/. Modernize it to httpx and timezone-aware datetimes.",
+    "should_trigger": true
+  },
+  {
+    "query": "the skill routing layer has gotten complex - too many conditionals doing the same checks in different places. find the duplication and consolidate it into shared helpers",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to improve the overall code quality of the .claude/hooks/ directory. Run a thorough analysis and fix the worst offenders.",
+    "should_trigger": true
+  },
+  {
+    "query": "clean up the hooks/__lib/ directory, there's shared state management code that's copy-pasted across commitment_tracker.py, file_lock.py, and evidence_store.py",
+    "should_trigger": true
+  },
+  {
+    "query": "/refactor packages/cc-skills-sdlc/skills/refactor/ --focus complexity",
+    "should_trigger": true
+  },
+  {
+    "query": "the Stop_router.py and the various gate hooks all independently parse JSON from stdin and do their own error handling. This pattern is repeated 8+ times. Simplify and extract the common boilerplate.",
+    "should_trigger": true
+  },
+  {
+    "query": "can you review the hooks in .claude/hooks/ for security issues? Check for injection vulnerabilities and auth gaps",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new PreToolUse hook that validates YAML frontmatter in skill files before they're loaded",
+    "should_trigger": false
+  },
+  {
+    "query": "run a performance profile on the search-research CLI, it's been slow on large queries lately",
+    "should_trigger": false
+  },
+  {
+    "query": "I need to add a new --workspace-alias feature to the /chs skill. It should let users define shortcuts for workspace groups.",
+    "should_trigger": false
+  },
+  {
+    "query": "write characterization tests for the deduplicate.py script in the refactor skill's scripts/ directory",
+    "should_trigger": false
+  },
+  {
+    "query": "there's a bug in Stop_self_reflection_gate.py where it blocks valid responses about completed work. Fix it.",
+    "should_trigger": false
+  },
+  {
+    "query": "what architecture pattern should I use for the new multi-agent coordination layer? Singleton vs message passing?",
+    "should_trigger": false
+  },
+  {
+    "query": "run ruff check on the whole .claude/ directory and fix any lint errors",
+    "should_trigger": false
+  },
+  {
+    "query": "explain how the 8-agent discovery system works in the refactor skill",
+    "should_trigger": false
+  },
+  {
+    "query": "rename all the hook files in .claude/hooks/ to follow a consistent naming convention - snake_case with event type prefix",
+    "should_trigger": false
+  }
+]

@@ -48,7 +48,7 @@ with results_path.open("w", encoding="utf-8") as f:
 summary = {
     "run_id": run_id,
     "verified": all_ok,
-    "verified_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "verified_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     "commands": command_results
 }
 summary_path.write_text(json.dumps(summary, indent=2) + "\n")

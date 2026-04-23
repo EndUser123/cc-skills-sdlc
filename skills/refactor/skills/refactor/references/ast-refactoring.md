@@ -11,15 +11,18 @@
 
 **Available Helpers**:
 ```python
-from packages.refactor.ast_refactor_helpers import (
+from scripts.ast_refactor_helpers import (
     safe_transform_file,
     LibCSTTransformer,
     RenameAttribute,
     RemoveUnusedImport,
+    extract_method_callsafe,
+    diff_sources,
 )
+import libcst as cst
 ```
 
-**Example: Extract Method**:
+**Example: Extract Method** (using LibCST directly):
 ```python
 class ExtractMethodTransformer(LibCSTTransformer):
     def __init__(self, target_function: str, new_method: str):
@@ -29,17 +32,19 @@ class ExtractMethodTransformer(LibCSTTransformer):
 
     def leave_FunctionDef(self, original_node, updated_node):
         if updated_node.name.value == self.target_function:
-            self._increment_modifications()
+            self._increment()
             # Extract logic to new method
             return create_extracted_method(updated_node)
         return updated_node
 
-success, error, count = safe_transform_file(
+result = safe_transform_file(
     "src/module.py",
     ExtractMethodTransformer,
     target_function="old_function",
     new_method="extracted_method"
 )
+# result.changed == True means transformation was applied
+# result.new_source contains the transformed code
 ```
 
-**Reference**: `P:/packages/refactor/AST_HELPERS_GUIDE.md` for complete API documentation.
+**Reference**: LibCST documentation — https://libcst.readthedocs.io/
