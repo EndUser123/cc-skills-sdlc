@@ -44,9 +44,8 @@ hooks:
           timeout: 10
   Stop:
     - hooks:
-        - type: agent
-          agent: refactor_verifier
-          prompt_file: "P:/packages/cc-skills-sdlc/skills/refactor/hooks/Stop_refactor_verifier.py"
+        - type: command
+          command: "python \"$CLAUDE_PROJECT_DIR/.claude/skills/refactor/hooks/Stop_refactor_verifier.py\""
 ---
 
 # /refactor - Multi-File Refactoring Orchestrator
