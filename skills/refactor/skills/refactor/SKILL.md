@@ -148,10 +148,19 @@ feature flags for behavioral changes, static lint enforcement, and rollback play
    - `migration_debt`: Structural issues -- old import paths, stale re-exports, callers not
      migrated to new module paths (see `references/migration-safety.md`)
    - Use the **code smell classification tree** to map findings to refactoring techniques (see `references/refactoring-mechanics.md` for the full classification table and step-by-step procedures)
+   ```bash
+   python "P:/.claude/skills/refactor/hooks/ledger_append.py" CLASSIFY_DEBT
+   ```
 4. **PRIORITIZE** -- P0: Bugs/Race -> P1: Error Handling -> P2: DRY -> P3: Conventions
+   ```bash
+   python "P:/.claude/skills/refactor/hooks/ledger_append.py" PRIORITIZE
+   ```
 5. **CONSTITUTIONAL FILTER** -- Apply SoloDevConstitutionalFilter (see `references/constitutional-compliance.md`)
    - **If `--dry-run`**: Continue to step 6, then STOP
    - **If "continue" or no `--dry-run`**: Execute steps 7-15 for ALL priority levels
+   ```bash
+   python "P:/.claude/skills/refactor/hooks/ledger_append.py" CONSTITUTIONAL_FILTER
+   ```
 6. **PLAN** -- Call `create_refactor_plan(findings, target_path, session_id)` from `scripts/refactor_plan.py`. Also runnable as CLI for testing: `python scripts/refactor_plan.py <deduplicated.json> <target> <session> [--output-dir <dir>]`.
    - **Migration Strategy** (required for structural changes): If `migration_debt` findings exist, the plan MUST include a "Migration Strategy" section with:
      - Shim location (OLD path → NEW path mapping)
@@ -170,6 +179,9 @@ feature flags for behavioral changes, static lint enforcement, and rollback play
 12. **CHECKPOINT_GREEN** -- Git tag `refactor/green-{target}-{timestamp}` after GREEN phase passes tests. This marks the "known working" state. If regression phase reveals issues, reset here rather than re-running the full refactor.
 13. **REGRESSION** -- Run full test suite, verify no new failures
 14. **CODE SIMPLIFICATION** -- Polish via `pr-review-toolkit:code-simplifier`
+    ```bash
+    python "P:/.claude/skills/refactor/hooks/ledger_append.py" CODE_SIMPLIFICATION
+    ```
 15. **DELETION_METRIC + QUALITY SCORE** -- Calculate and report:
    - **Deletion metric**: `lines_removed - lines_added`. Positive = successful simplification. Track per-priority-level: P0 through P3 should each show net deletion or explain why addition was necessary (e.g., missing error handling). If net lines added > 0 across all priorities, flag for review.
    - **Quality score**: Rate the target code 0-10 across the 8 dimensions from DISCOVER, before and after refactoring. Report delta per dimension:
