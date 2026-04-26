@@ -66,33 +66,6 @@ All runtime artifacts write to:
 
 Skills MUST NOT write state to their own directory or to the package root.
 
-## Scripts / Forked Tools
-
-### skill-creator (subscription-first fork)
-
-Fork of the `skill-creator` plugin with subscription-only API substitution.
-
-**Location:** `scripts/skill_creator/`
-
-**Why forked:** The original uses `anthropic.Anthropic()` for description improvement (separate API cost). This fork substitutes `claude -p` calls, routing through the Claude Code subscription.
-
-**Key files:**
-- `improve_description.py` — `claude_p()` substitution instead of `client.messages.create()`
-- `sync_check.py` — auto-detects upstream plugin updates via SHA256[:12] hashes
-- `run_loop.py` — full eval+improve loop calling `claude -p` throughout
-- `run_eval.py` — trigger eval via `claude -p` (no API cost)
-
-**Invocation:**
-```bash
-cd P:/packages/cc-skills-sdlc
-python -m scripts.skill_creator.run_loop --eval-set <path> --skill-path <path> --model sonnet
-python -m scripts.skill_creator.run_eval --eval-set <path> --skill-path <path>
-```
-
-**Version tracking:** On each run, `sync_check.py` compares hashes of tracked plugin scripts against `.fork_metadata.json`. If the plugin updates, it warns — run `python scripts/skill_creator/sync_check.py --check` to see what changed, then cherry-pick upstream changes.
-
-**Tracked files (5):** `improve_description.py`, `run_loop.py`, `run_eval.py`, `utils.py`, `generate_report.py`
-
 ## Installation
 
 Skills surfaced via junctions in :

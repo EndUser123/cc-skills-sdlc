@@ -15,7 +15,7 @@ triggers:
 suggest:
   - /planning
 follow_up_offer:
-  - /ai-gemini
+  - /ai-pcli
 hooks:
   pre_response:
     - command: "python skills/design_v1.0/hooks/stop_if_unverified.py"
@@ -222,6 +222,20 @@ For architecture-heavy work, `/design` should treat `trace` and `challenge` as f
 
 Use `trace` whenever `/design` is inheriting unresolved planning blockers or conflicting prior guidance.
 Use `challenge` whenever the architecture introduces a new boundary, state mechanism, gate, packet, or fallback contract.
+
+### Multi-LLM Challenge Pass (when `SDLC_MULTI_LLM=1`)
+
+For contract-sensitive designs, the `challenge` pass can be strengthened by dispatching to `/ai-pcli` for independent adversarial review across multiple models. This catches blind spots that a single model's context bias may miss.
+
+```bash
+python "P:/.claude/skills/ai-pcli/ai_cli.py" "You are an architecture challenger. The following is a proposed architecture design. Find the strongest counter-arguments, contradictory evidence, simpler alternatives, and downstream ownership conflicts. Focus on: 1) What existing mechanism already overlaps with this proposal? 2) What boundary remains unclosed? 3) What fallback behavior is undefined? 4) What is the simplest alternative that achieves the same goal? Output: {challenges: [{challenge, evidence, severity, alternative}], strongest_challenge, recommendation}" --context "<adr_path>" --diff --no-critic --timeout 180
+```
+
+The `--diff` flag surfaces where models disagree on the design's weaknesses — disagreement flags genuine uncertainty, agreement across models flags a confirmed defect.
+
+**When to use multi-LLM challenge**: contract-sensitive boundaries, new state mechanisms, multi-terminal designs, or any architecture where a single model's blind spot could propagate to `/planning`.
+
+**When to skip**: lightweight architecture notes, non-contract-sensitive queries, or designs that don't introduce new boundaries.
 
 Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
 
@@ -969,15 +983,19 @@ Stage 1.9 invokes `adr_critic` with conditional dispatch:
 python -c "import os; print(os.environ.get('SDLC_MULTI_LLM', '0'))"
 ```
 
-**If `SDLC_MULTI_LLM=1`** — dispatch via Gemini for a second-model perspective:
+**If `SDLC_MULTI_LLM=1`** — dispatch via `/ai-pcli` for multi-model consensus review:
 
 ```bash
-python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an ADR closure auditor. Review the ADR provided in the context file against 5 defect classes. Apply the rubric strictly — block only on concrete closure failures, not stylistic preference. The 5 defect classes are: 1) Safety Contradictions (conflicting timeout/stale-data/failure behavior), 2) Router Closure Defects (missing activation/bypass/ambiguous/failure criteria), 3) Packet Consistency Defects (summary drifts from Contract Authority Packet, prose weakens packet), 4) Downstream Alignment Defects (ADR claims contradict current skill contracts), 5) Unresolved Closure Fields (TBD/unknown/missing validators). Output: {review_metadata: {skill, adr_path, defects_found, defects_suppressed, scope}, findings: [{defect_class, severity, location, description, evidence, remediation}], passed_defect_classes, summary}" --context "<adr_path>" --context "P:/.claude/skills/design/references/gemini-adr-critic-prompt.md" --gemini-only --output-format json --no-critic --timeout 120
+python "P:/.claude/skills/ai-pcli/ai_cli.py" "You are an ADR closure auditor. Review the ADR provided in the context file against 7 defect classes. Apply the rubric strictly — block only on concrete closure failures, not stylistic preference. The 7 defect classes are: 1) Safety Contradictions (conflicting timeout/stale-data/failure behavior), 2) Router Closure Defects (missing activation/bypass/ambiguous/failure criteria), 3) Packet Consistency Defects (summary drifts from Contract Authority Packet, prose weakens packet), 4) Downstream Alignment Defects (ADR claims contradict current skill contracts), 5) Unresolved Closure Fields (TBD/unknown/missing validators), 6) Unverified Claims and Evidence Gaps (unverified APIs, missing bottleneck evidence), 7) Temporal Reasoning Errors (before/after/never/always claims without control flow trace). Output: {review_metadata: {skill, adr_path, defects_found, defects_suppressed, scope}, findings: [{defect_class, severity, location, description, evidence, remediation}], passed_defect_classes, summary}" --context "<adr_path>" --context "P:/.claude/skills/design/references/gemini-adr-critic-prompt.md" --quality-weighted --aggregate --output-format json --no-critic --timeout 180
 ```
+
+Models used (via `/ai-pcli` defaults): Gemini (default), GPT-5.4-mini (Codex), MiniMax M2.7 (pi-m27), GLM 5.1 (pi-glm).
+
+The `--quality-weighted --aggregate` flags produce consensus-based defect detection — defects flagged by multiple models carry higher confidence than single-model findings.
 
 Parse the JSON output. If valid, use it as the critic result. Write to `P:/.claude/state/adr_critic.json`.
 
-**If `SDLC_MULTI_LLM` is not `"1"` or Gemini dispatch fails** — fall back to Claude haiku:
+**If `SDLC_MULTI_LLM` is not `"1"` or multi-LLM dispatch fails** — fall back to Claude haiku:
 
 ```python
 Agent(
@@ -991,7 +1009,7 @@ Output: P:/.claude/state/adr_critic.json"""
 )
 ```
 
-**Model selection**: Haiku for the fallback — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
+**Model selection**: Multi-LLM for full dispatch (4 independent perspectives catch defects any single model misses). Haiku for the fallback — the critic applies a fixed rubric to a known structure; Opus reasoning depth is not required and slows parallelization.
 
 **Blocking behavior**: If `adr_critic` returns `status: "blocked"`, `/design` must repair the ADR's HIGH severity defects before saving or presenting it.
 
@@ -1052,7 +1070,17 @@ After validation passes, run a 4-point self-review before quality check: (1) Pla
 
 ## Stage 1.10: Intelligent Quality Check
 
-After ADR passes critic review, `/design` automatically triggers `/qr --strategic-only` to validate the architectural decision:
+After ADR passes critic review, `/design` validates the architectural decision's strategic quality.
+
+**If `SDLC_MULTI_LLM=1`** — multi-model strategic validation via `/ai-pcli`:
+
+```bash
+python "P:/.claude/skills/ai-pcli/ai_cli.py" "Evaluate the architecture decision in the provided context for strategic quality across 4 dimensions: 1) Architecture soundness — are the boundaries and contracts well-defined? 2) Design pattern appropriateness — does the pattern fit the problem domain? 3) Technology fit — is the technology choice justified against alternatives? 4) Engineering balance — is the solution appropriately scoped (not over-engineered or under-specified)? Output: {dimensions: [{name, rating: Sound|Concerning|Critical, evidence, concern}], overall: Sound|Concerning|Critical, summary}" --context "<adr_path>" --quality-weighted --quality-gate --output-format json --no-critic --timeout 180
+```
+
+The `--quality-weighted --quality-gate` flags filter findings to confidence >= 80%, preventing noise from low-confidence disagreements across models.
+
+**If `SDLC_MULTI_LLM` is not `"1"`** — single-model fallback:
 
 ```python
 # After ADR is saved and passes critic
@@ -1070,10 +1098,10 @@ Return /rns-formatted findings if any issues are found."""
 )
 ```
 
-**Routing behavior after /qr:**
-- If `/qr` returns `Sound` → proceed to Stage 2 (Select Template)
-- If `/qr` returns `Concerning` → loop back to architecture revision
-- If `/qr` returns `Critical` → recommend `/planning` re-think
+**Routing behavior after quality check:**
+- If overall `Sound` → proceed to Stage 2 (Select Template)
+- If overall `Concerning` → loop back to architecture revision
+- If overall `Critical` → recommend `/planning` re-think
 
 **Why automatic?** Architecture decisions deserve strategic quality validation before being presented as settled. This catches issues that the critic (focused on closure) might miss.
 

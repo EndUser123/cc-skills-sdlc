@@ -1,14 +1,9 @@
 ---
 name: go_2.0
 version: 2.0.0
-description: Execute the next queued task from tasks.json and drive it to PR-ready completion. Use this when the user wants to work through their backlog, pick the next item, continue where they left off, or run the next planned task. Handles task selection, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
+description: Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Handles intent parsing, task selection, worktree enforcement, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
 category: execution
 enforcement: strict
-triggers:
-  - '/go_2.0'
-aliases:
-  - '/go-local'
-  - '/local-pr-ready'
 workflow_steps:
   - worktree_enforcement
   - task_selection
@@ -23,40 +18,17 @@ suggest:
   - /code
   - refactor
 hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: |
-            git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-              echo "ERROR: not in git repo"; exit 2
-            }
-            BRANCH="$(git branch --show-current)"
-            case "$BRANCH" in main|master)
-              echo "ERROR: /go cannot run on $BRANCH"; exit 2
-            esac
-            git worktree list --porcelain | grep -F "worktree $(pwd)" >/dev/null 2>&1 || {
-              echo "ERROR: not in registered git worktree"; exit 2
-            }
-          description: "Block non-worktree or main-branch Bash calls"
   Stop:
     - hooks:
         - type: command
           command: |
-            STATE_DIR=".claude/.artifacts/${CLAUDE_TERMINAL_ID:-unknown}/go"
-            RUN_ID="${GO_RUN_ID:-unknown}"
-            if [ -f "$STATE_DIR/.verified_$RUN_ID" ] && [ -f "$STATE_DIR/.reviews-passed_$RUN_ID" ]; then
-              exit 0
-            else
-              echo "WARNING: /go completed without all gates passed"
-              exit 1
-            fi
+            python -c "import os,sys,glob; tid=os.environ.get('CLAUDE_TERMINAL_ID','unknown'); sd=f'.claude/.artifacts/{tid}/go'; sys.exit(0) if not glob.glob(f'{sd}/active-task_*.json') else None; rid=os.environ.get('GO_RUN_ID','unknown'); sys.exit(0) if os.path.isfile(f'{sd}/.verified_{rid}') and os.path.isfile(f'{sd}/.reviews-passed_{rid}') else (print('WARNING: /go completed without all gates passed',file=sys.stderr), sys.exit(1))"
           description: "Self-verify all gates passed on Stop"
 ---
 
 # /go_2.0 — Thin Orchestrator
 
-**Role:** `/go_2.0` is a **thin orchestrator**. It selects one task, routes it to the correct SDLC skill, and records the outcome. It does not implement TDD, simplification, or review logic itself — it delegates to `/code`, `/refactor`, `/planning`, or `/design_1.0`.
+**Role:** `/go_2.0` is a **thin orchestrator**. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome. It does not implement TDD, simplification, or review logic itself — it delegates to `/code`, `/refactor`, `/planning`, or `/design_1.0`.
 
 **MANDATORY SEQUENCE:** Worktree Check → Task Selection → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
 
@@ -66,8 +38,8 @@ hooks:
 
 ## What /go_2.0 Must Do
 
-1. Enforce worktree + branch preconditions
-2. Select exactly **one** task from `$GO_TASKS_FILE`
+1. Enforce worktree + branch preconditions (auto-create if on main)
+2. Acquire a task from one of three input sources
 3. Route to the correct SDLC skill based on task type and diff
 4. Run verification commands from the task contract
 5. Run `/simplify` if code changed
@@ -101,44 +73,74 @@ export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 export GO_STATE_DIR=".claude/.artifacts/${TERMINAL_ID}/go"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
+export GO_PROMPT="${GO_PROMPT:-}"
+export HANDOFF_TRANSCRIPT="${HANDOFF_TRANSCRIPT:-}"
+export GO_PLAN_FILE="${GO_PLAN_FILE:-}"
 mkdir -p "$GO_STATE_DIR"
 ```
 
 ---
 
-## Task Source-of-Truth Contract
+## Task Input Sources
 
-`$GO_TASKS_FILE` must be valid JSON:
+| Source | Env Var | Description |
+|--------|---------|-------------|
+| Direct prompt | `GO_PROMPT` | User's task description at invocation |
+| Handoff transcript | `HANDOFF_TRANSCRIPT` | Path to prior session transcript |
+| Plan file | `GO_PLAN_FILE` | Path to `.md` plan file |
+| Task queue | `GO_TASKS_FILE` | JSON file with queued tasks |
+
+Priority: `GO_PROMPT` > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
+
+When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, the first task with `status` in `{ready, queued, approved}` is selected.
+
+---
+
+## Task Contract
+
+**Synthesized task** (from intent parsing):
 
 ```json
 {
-  "version": "1.0",
-  "tasks": [
-    {
-      "id": "TASK-001",
-      "title": "Short title",
-      "objective": "One-sentence objective",
-      "status": "ready",
-      "priority": "P1",
-      "scope_in": ["fileA", "fileB"],
-      "scope_out": ["fileC"],
-      "forbidden_files": ["secrets.env"],
-      "acceptance_criteria": ["Criterion 1", "Criterion 2"],
-      "verification_commands": ["pytest -q", "npm test"],
-      "task_type": "implementation",
-      "requires_approval": false
-    }
-  ]
+  "task_id": "task-04221-1430",
+  "title": "Short title",
+  "objective": "One-sentence objective",
+  "status": "ready",
+  "priority": "P1",
+  "scope_in": [],
+  "scope_out": [],
+  "forbidden_files": [],
+  "acceptance_criteria": ["Criterion 1"],
+  "verification_commands": [],
+  "task_type": "implementation",
+  "routing": { "skill": "/code", "route": "code" }
 }
 ```
 
-**Allowed `status` values:** `ready`, `queued`, `approved`
+**Queued task** (from `$GO_TASKS_FILE`):
+
+```json
+{
+  "id": "TASK-001",
+  "title": "Short title",
+  "objective": "One-sentence objective",
+  "status": "ready",
+  "priority": "P1",
+  "scope_in": ["fileA"],
+  "scope_out": ["fileB"],
+  "forbidden_files": ["secrets.env"],
+  "acceptance_criteria": ["Criterion 1"],
+  "verification_commands": ["pytest -q"],
+  "task_type": "implementation",
+  "requires_approval": false
+}
+```
+
+**Allowed `task_type` values:** `implementation`, `refactor`, `design`, `planning`
 
 ---
 
 ## Routing Table
-
-Read `ROUTING.md` for the full decision table. Summary:
 
 | Condition | Route |
 |-----------|-------|
@@ -152,36 +154,27 @@ Read `ROUTING.md` for the full decision table. Summary:
 
 ## STEP 0: Worktree Enforcement
 
-Fail immediately if not in a registered git worktree or on `main`/`master`.
+**If already in a registered git worktree:** proceed to Step 1.
+
+**If on main or master:** auto-create a worktree.
 
 ```bash
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-  echo "ERROR: not in git repo"
-  touch "$GO_STATE_DIR/.blocked_$RUN_ID"
-  echo "<promise>BLOCKED</promise>"
-  exit 1
-}
-BRANCH="$(git branch --show-current)"
-case "$BRANCH" in main|master)
-  echo "ERROR: /go cannot run on $BRANCH"
-  touch "$GO_STATE_DIR/.blocked_$RUN_ID"
-  echo "<promise>BLOCKED</promise>"
-  exit 1
-esac
-git worktree list --porcelain | grep -F "worktree $(pwd)" >/dev/null 2>&1 || {
-  echo "ERROR: not in registered git worktree"
-  touch "$GO_STATE_DIR/.blocked_$RUN_ID"
-  echo "<promise>BLOCKED</promise>"
-  exit 1
-}
-touch "$GO_STATE_DIR/.worktree-ready_$RUN_ID"
+BRANCH=$(git branch --show-current)
+if [[ "$BRANCH" == "main" || "$BRANCH" == "master" ]]; then
+  TS=$(date +%Y%m%d-%H%M%S)
+  git worktree add -b "ai/ai-task-$TS" ".claude/worktrees/ai-task-$TS" HEAD
+fi
 ```
+
+The PreToolUse hook enforces this at the Bash level — if we reach this step, we're either already in a worktree or on main (which triggers creation).
 
 ---
 
-## STEP 1: Task Selection
+## STEP 1: Task Acquisition
 
-Select the first task with `status` in `{ready, queued, approved}`. Write `active-task_{RUN_ID}.json`.
+**From intent (GO_PROMPT / HANDOFF_TRANSCRIPT / GO_PLAN_FILE):** Parse intent and synthesize a task contract. Write `active-task_{RUN_ID}.json`.
+
+**From queue (GO_TASKS_FILE):** Select the first task with `status` in `{ready, queued, approved}`.
 
 ```bash
 python ".claude/skills/go_2.0/scripts/select-task.py"
@@ -194,26 +187,16 @@ touch "$GO_STATE_DIR/.task-selected_$RUN_ID"
 
 ## STEP 2: Route & Dispatch
 
-Read `active-task_{RUN_ID}.json`. Classify the task type:
+Read `active-task_{RUN_ID}.json`. Route by `task_type`:
 
-- `task_type: implementation` → `/code`
-- `task_type: refactor` → `/refactor`
-- `task_type: design` → `/design_1.0`
-- `task_type: planning` → `/planning`
+- `implementation` → `/code`
+- `refactor` → `/refactor`
+- `design` → `/design_1.0`
+- `planning` → `/planning`
 
-For `task_type: implementation`, check for code changes first:
+For `implementation`, check for existing code changes:
 - `git diff --name-only HEAD` — if empty or docs only, skip TDD
 - If code changes exist, invoke `/tdd` then `/code`
-
-**Direct dispatch example:**
-```bash
-SKILL_ROUTE="/code"
-"$SKILL_ROUTE" --task-file "$GO_STATE_DIR/active-task_$RUN_ID.json" \
-  --output "$GO_STATE_DIR/task-result_$RUN_ID.json" \
-  2>&1 | tee "$GO_STATE_DIR/dispatch-log_$RUN_ID.txt"
-```
-
-After dispatch, write `task-result_{RUN_ID}.json` or the skill's output artifact.
 
 ---
 
