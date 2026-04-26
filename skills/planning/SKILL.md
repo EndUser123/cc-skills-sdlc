@@ -7,7 +7,7 @@ depends_on:
   - sdlc: ">=0.1.0"
 suggest:
   - /design
-  - /go_2.0
+  - /go
 triggers:
   - /planning
   - /planning-v2

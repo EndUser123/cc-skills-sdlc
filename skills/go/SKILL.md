@@ -1,5 +1,5 @@
 ---
-name: go_2.0
+name: go
 version: 2.0.0
 description: Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Handles intent parsing, task selection, worktree enforcement, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
 category: execution
@@ -26,9 +26,9 @@ hooks:
           description: "Self-verify all gates passed on Stop"
 ---
 
-# /go_2.0 — Thin Orchestrator
+# /go — Thin Orchestrator
 
-**Role:** `/go_2.0` is a **thin orchestrator**. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome. It does not implement TDD, simplification, or review logic itself — it delegates to `/code`, `/refactor`, `/planning`, or `/design_1.0`.
+**Role:** `/go` is a **thin orchestrator** that stays on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome. It does not implement TDD, simplification, or review logic itself — it delegates to `/code`, `/refactor`, `/planning`, or `/design_1.0` via subagents that work in isolated worktrees.
 
 **MANDATORY SEQUENCE:** Worktree Check → Task Selection → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
 
@@ -36,7 +36,7 @@ hooks:
 
 ---
 
-## What /go_2.0 Must Do
+## What /go Must Do
 
 1. Enforce worktree + branch preconditions (auto-create if on main)
 2. Acquire a task from one of three input sources
@@ -47,7 +47,7 @@ hooks:
 7. Generate local PR artifacts
 8. Emit the correct completion token
 
-**What /go_2.0 Must NOT Do:**
+**What /go Must NOT Do:**
 - Replace `/code` TDD workflow
 - Replace `/refactor` cleanup logic
 - Replace `/planning` task breakdown
@@ -152,21 +152,27 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
 
 ---
 
-## STEP 0: Worktree Enforcement
+## STEP 0: Worktree Provisioning
 
-**If already in a registered git worktree:** proceed to Step 1.
+`/go` stays on `main`. It creates a worktree for the worker, then dispatches the worker into it.
 
-**If on main or master:** auto-create a worktree.
+**Create a worktree for the task:**
 
 ```bash
-BRANCH=$(git branch --show-current)
-if [[ "$BRANCH" == "main" || "$BRANCH" == "master" ]]; then
-  TS=$(date +%Y%m%d-%H%M%S)
-  git worktree add -b "ai/ai-task-$TS" ".claude/worktrees/ai-task-$TS" HEAD
-fi
+TS=$(date +%Y%m%d-%H%M%S)
+WORKTREE=".claude/worktrees/ai-task-$TS"
+git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 ```
 
-The PreToolUse hook enforces this at the Bash level — if we reach this step, we're either already in a worktree or on main (which triggers creation).
+**Dispatch a worker into the worktree** using one of:
+
+| Method | When to use |
+|--------|-------------|
+| `Agent` tool with `isolation: "worktree"` | Subagent does code changes |
+| `Agent` tool with prompt instructing `EnterWorktree` | Worker needs to choose its own worktree |
+| `claude -p` with `--cd "$WORKTREE"` | External CLI-based LLM |
+
+`/go` remains on `main` throughout — it orchestrates, workers execute.
 
 ---
 
@@ -177,7 +183,7 @@ The PreToolUse hook enforces this at the Bash level — if we reach this step, w
 **From queue (GO_TASKS_FILE):** Select the first task with `status` in `{ready, queued, approved}`.
 
 ```bash
-python ".claude/skills/go_2.0/scripts/select-task.py"
+python ".claude/skills/go/scripts/select-task.py"
 STATUS=$?
 [ "$STATUS" -ne 0 ] && exit 1
 touch "$GO_STATE_DIR/.task-selected_$RUN_ID"
@@ -205,7 +211,7 @@ For `implementation`, check for existing code changes:
 Run every command in `task.verification_commands`. Record results.
 
 ```bash
-python ".claude/skills/go_2.0/scripts/verify-task.py"
+python ".claude/skills/go/scripts/verify-task.py"
 STATUS=$?
 if [ "$STATUS" -ne 0 ]; then
   ATTEMPT_NEXT=$(find "$GO_STATE_DIR" -maxdepth 1 -type f -name ".attempt_*_$RUN_ID" | wc -l | tr -d ' ')
@@ -244,7 +250,7 @@ touch "$GO_STATE_DIR/.simplified_$RUN_ID"
 Run review passes at the depth determined by diff classification.
 
 ```bash
-python ".claude/skills/go_2.0/scripts/review-passes.py"
+python ".claude/skills/go/scripts/review-passes.py"
 STATUS=$?
 [ "$STATUS" -ne 0 ] && exit 1
 touch "$GO_STATE_DIR/.reviews-passed_$RUN_ID"
@@ -257,7 +263,7 @@ touch "$GO_STATE_DIR/.reviews-passed_$RUN_ID"
 Generate commit message, PR title, PR body, PR-ready report.
 
 ```bash
-python ".claude/skills/go_2.0/scripts/pr-artifacts.py"
+python ".claude/skills/go/scripts/pr-artifacts.py"
 touch "$GO_STATE_DIR/.pr-ready_$RUN_ID"
 echo "<promise>PR_READY</promise>"
 ```
@@ -269,14 +275,14 @@ echo "<promise>PR_READY</promise>"
 Check if more eligible tasks remain.
 
 ```bash
-python ".claude/skills/go_2.0/scripts/loop-check.py"
+python ".claude/skills/go/scripts/loop-check.py"
 ```
 
 ---
 
 ## Prohibited Actions
 
-- Running on `main` or `master`
+- Workers making direct changes on `main` or `master`
 - Using `plan.md` as scheduler source
 - Proceeding without required prior flag
 - Ignoring failed verification commands

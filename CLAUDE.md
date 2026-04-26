@@ -22,7 +22,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | docs | /docs - Documentation Automation |
 | docs-validate | Documentation Quality Validation |
 | dpef | DPEF - Deterministic Prompt Execution Framework |
-| go_2.0 | /go_2.0 — Local PR-Ready Ralph Loop v2 |
+| go | /go — Local PR-Ready Ralph Loop |
 | harden | /harden |
 | mermaid-c4 | Mermaid Diagrams |
 | mermaid-davila7 | Mermaid Diagramming |
