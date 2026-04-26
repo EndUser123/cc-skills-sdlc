@@ -469,13 +469,12 @@ This is the ADF pre-flight gate — absorbed from the deprecated `/adf` skill. I
 
 ### Step 0.4: Claim Verification Gate
 
-**Before drafting any ADR, run verification domain detection to determine what evidence is required. This step is enforced by a pre-response hook — you MUST call `verify_claims.py` to establish the verification record, and later pass `validate_design.py` (Stage 1.9b) to write the `.verified_<RUNID>` flag that the hook checks.**
+**Before drafting any ADR, run verification domain detection to determine what evidence is required. This step is enforced by a pre-response hook — call `verify_claims.py` to establish the verification record (writes `verified: true` to session state file), confirmed by `validate_design.py` (Stage 1.9b) in the same state file.**
 
 **Scoping Aid**: When scope is ambiguous, use RICE scoring and MoSCoW classification to prioritize components. See `references/design-enhancements.md` Section 7.
 
 1. Generate a RUN ID for this session (e.g., `design-<timestamp>`).
-2. Set environment variable `DESIGN_RUN_ID` to that RUN ID.
-3. Run verification domain detection:
+2. Run verification domain detection:
 
 ```
 python skills/design_v1.0/hooks/verify_claims.py "<RUN_ID>" "<verification_domain>" <claims_count>
@@ -894,6 +893,32 @@ If any gate fails, `/design` must not present the ADR as settled architecture. I
 - name the failing gate explicitly
 - repair the ADR before recommending downstream execution
 
+## Stage 1.8b: Adversarial Pre-Check (reason_openai)
+
+After Stage 1.8 passes, run `red_team` and `implementation_realist` subagents against the draft ADR before the expensive multi-LLM dispatch. This catches fundamental structural flaws while the design is still fluid.
+
+**Run order:**
+
+1. **`red_team`** — attack the ADR for hidden assumptions, failure modes, elegant-but-wrong reasoning
+   - Agent: `P:/packages/cc-skills-meta/skills/reason_openai/agents/red_team.md`
+   - Input: draft ADR text
+   - Output contract: Main objection, failure modes, hidden assumption, what would change your mind, severity
+
+2. **`implementation_realist`** — pressure-test practicality, migration risk, maintenance burden, rollout complexity
+   - Agent: `P:/packages/cc-skills-meta/skills/reason_openai/agents/implementation_realist.md`
+   - Input: draft ADR text
+   - Output contract: Practical verdict, main implementation risk, operational burden, simplest viable version, recommendation
+
+**Routing rules after adversarial pre-check:**
+
+| Severity | Recommendation | Action |
+|----------|--------------|--------|
+| HIGH in either subagent | Revise | Repair ADR before any multi-LLM dispatch |
+| MEDIUM in both subagents | Note and proceed | Surface issues in ADR, proceed to Stage 1.9 |
+| LOW in both subagents | Ship | ADR is clean — skip Stage 1.9 multi-LLM |
+
+**Rationale:** Multi-LLM consensus is expensive and slow. `red_team` + `implementation_realist` are fast adversarial passes that catch the structural flaws most likely to survive single-model review. Only invoke multi-LLM when genuine model disagreement is likely to add value.
+
 ## Stage 1.9: ADR Critic Review
 
 After Stage 1.8 passes, `/design` should run a narrow critic review before saving or presenting the ADR.
@@ -993,7 +1018,7 @@ Models used (via `/ai-pcli` defaults): Gemini (default), GPT-5.4-mini (Codex), M
 
 The `--quality-weighted --aggregate` flags produce consensus-based defect detection — defects flagged by multiple models carry higher confidence than single-model findings.
 
-Parse the JSON output. If valid, use it as the critic result. Write to `P:/.claude/state/adr_critic.json`.
+Parse the JSON output. If valid, use it as the critic result. Write to `.claude/.artifacts/{WT_SESSION}/design/adr_critic.json`.
 
 **If `SDLC_MULTI_LLM` is not `"1"` or multi-LLM dispatch fails** — fall back to Claude haiku:
 
@@ -1005,7 +1030,7 @@ Agent(
 
 adr_critic is at P:/.claude/agents/adr_critic.md
 Read the agent definition first, then execute the review workflow.
-Output: P:/.claude/state/adr_critic.json"""
+Output: `.claude/.artifacts/{WT_SESSION}/design/adr_critic.json`"""
 )
 ```
 
@@ -1031,7 +1056,7 @@ Required fields (all validated by `validate_design.py`):
 
 | Field | Requirement |
 |-------|-------------|
-| `run_id` | Matches the DESIGN_RUN_ID for this session |
+| `run_id` | The RUN ID for this session |
 | `mode` | One of: `system`, `rca`, `component` |
 | `scope` | One of: `backend`, `frontend`, `data`, `all` |
 | `ast_summary` | Enriched AST summary of relevant codebase |
@@ -1051,7 +1076,7 @@ python skills/design_v1.0/validate_design.py "design_draft_<RUN_ID>.json" "<mode
 
 **On SUCCESS:**
 - ADR auto-saved to `docs/architecture/ADR-<MODE>-<timestamp>.md`
-- `.verified_<RUN_ID>` flag written (consumed by stop_if_unverified.py hook)
+- `verified: true` written to session state file (consumed by stop_if_unverified.py hook)
 - Proceed to Stage 1.10
 
 **On FAIL:**

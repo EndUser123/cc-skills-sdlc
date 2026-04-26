@@ -63,6 +63,7 @@
       "enum": [
         "structured-plan",
         "plan-md",
+        "plan.md",
         "conversation",
         "git-context",
         "manual"
@@ -72,19 +73,31 @@
       "type": "string",
       "minLength": 1
     },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "out": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
     "scope_in": {
       "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": {"type": "string", "minLength": 1}
     },
     "scope_out": {
       "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": {"type": "string", "minLength": 1}
+    },
+    "allowed_files": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
     },
     "acceptance_criteria": {
       "type": "array",
