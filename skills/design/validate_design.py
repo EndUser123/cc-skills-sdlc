@@ -1,9 +1,11 @@
-"""Design artifact validator for design_v1.0.
+"""Design artifact validator for design skill.
 
 Validates design_draft_<RUNID>.json against DesignPayload schema and business logic.
-On SUCCESS: writes .verified_<RUNID> flag to .claude/arch_decisions/.
+On SUCCESS: writes verified=true to .state.json in session artifact directory.
 On FAIL: prints errors for user to fix.
 Max 3 attempts per RUN ID.
+
+Session-scoped state file — no DESIGN_RUN_ID env var needed.
 """
 from __future__ import annotations
 
@@ -19,10 +21,27 @@ ATTEMPT_FILE = ".attempt_{run_id}"
 MAX_ATTEMPTS = 3
 
 
+def _terminal_id() -> str:
+    """Resolve terminal ID, falling back to WT_SESSION or 'default'."""
+    tid = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+    if tid:
+        return tid
+    tid = os.environ.get("WT_SESSION", "").strip()
+    if tid:
+        return tid
+    return "default"
+
+
 def _state_dir() -> Path:
-    """Resolve the arch_decisions directory for verification state files."""
+    """Resolve the design artifact directory for this terminal session."""
     skill_root = Path(__file__).resolve().parent
-    return skill_root.parent.parent / ".claude" / "arch_decisions"
+    tid = _terminal_id()
+    return skill_root / ".claude" / ".artifacts" / tid / "design"
+
+
+def _state_file() -> Path:
+    """Path to the session state file."""
+    return _state_dir() / ".state.json"
 
 
 def _load_payload(path: str) -> tuple[DesignPayload | None, list[str]]:
@@ -149,18 +168,19 @@ def _increment_attempt(run_id: str, count: int) -> None:
 
 
 def _write_flag(run_id: str) -> str:
-    """Write .verified_<run_id> flag file. Returns flag path."""
+    """Write verified state to session state file. Returns state file path."""
     state_dir = _state_dir()
     state_dir.mkdir(parents=True, exist_ok=True)
-    flag_file = state_dir / f".verified_{run_id}"
+    state_file = _state_file()
 
     record = {
         "run_id": run_id,
         "validation_source": "validate_design.py",
+        "verified": True,
         "timestamp": time.time(),
     }
-    flag_file.write_text(json.dumps(record), encoding="utf-8")
-    return str(flag_file)
+    state_file.write_text(json.dumps(record), encoding="utf-8")
+    return str(state_file)
 
 
 def _save_adr(run_id: str, adr_markdown: str, mode: str) -> str:

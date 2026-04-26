@@ -15,12 +15,32 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 VALIDATE_SCRIPT = SKILL_DIR / "validate_design.py"
 
 
+def _terminal_id() -> str:
+    """Resolve terminal ID, falling back to WT_SESSION or 'default'."""
+    import os
+    tid = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+    if tid:
+        return tid
+    tid = os.environ.get("WT_SESSION", "").strip()
+    if tid:
+        return tid
+    return "default"
+
+
 def _state_dir() -> Path:
-    return SKILL_DIR.parent.parent / ".claude" / "arch_decisions"
+    """Resolve the design artifact directory for this terminal session."""
+    skill_root = Path(__file__).resolve().parent.parent
+    tid = _terminal_id()
+    return skill_root / ".claude" / ".artifacts" / tid / "design"
+
+
+def _state_file() -> Path:
+    """Path to the session state file."""
+    return _state_dir() / ".state.json"
 
 
 def _flag_path(run_id: str) -> Path:
-    return _state_dir() / f".verified_{run_id}"
+    return _state_file()
 
 
 def _attempt_path(run_id: str) -> Path:

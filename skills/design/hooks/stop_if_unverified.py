@@ -1,14 +1,15 @@
 """Pre-response hook: block design output unless claim verification completed.
 
-Checks for a .verified_<RUNID> state file written by verify_claims.py.
-If DESIGN_RUN_ID is set but no verification flag exists, blocks the response.
+Reads .state.json from the session artifact directory.
+No DESIGN_RUN_ID env var needed — state is session-scoped.
 
 Allow conditions:
-  - DESIGN_RUN_ID not set (non-design session)
-  - DESIGN_RUN_ID set and .verified_<RUNID> flag exists
+  - No stdin (non-design session)
+  - stdin not JSON (non-design session)
+  - No state file (not a design session)
 
 Block conditions:
-  - DESIGN_RUN_ID set but .verified_<RUNID> flag missing
+  - State file exists but verified flag is not True
 """
 import json
 import os
@@ -16,11 +17,27 @@ import sys
 from pathlib import Path
 
 
+def _terminal_id() -> str:
+    """Resolve terminal ID, falling back to WT_SESSION or 'default'."""
+    tid = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+    if tid:
+        return tid
+    tid = os.environ.get("WT_SESSION", "").strip()
+    if tid:
+        return tid
+    return "default"
+
+
 def _state_dir() -> Path:
-    """Resolve the arch_decisions directory for verification state files."""
-    # Use .claude/arch_decisions/ relative to the design skill root
+    """Resolve the design artifact directory for this terminal session."""
     skill_root = Path(__file__).resolve().parent.parent
-    return skill_root.parent.parent.parent / ".claude" / "arch_decisions"
+    tid = _terminal_id()
+    return skill_root / ".claude" / ".artifacts" / tid / "design"
+
+
+def _state_file() -> Path:
+    """Path to the session state file."""
+    return _state_dir() / ".state.json"
 
 
 def main() -> None:
@@ -40,35 +57,35 @@ def main() -> None:
         print(json.dumps({"decision": "allow"}))
         return
 
-    run_id = os.environ.get("DESIGN_RUN_ID", "").strip()
-    if not run_id:
-        # No DESIGN_RUN_ID — not a design session, allow
+    state_file = _state_file()
+
+    if not state_file.exists():
         print(json.dumps({"decision": "allow"}))
         return
 
-    # Check for verification flag
-    state_dir = _state_dir()
-    flag_file = state_dir / f".verified_{run_id}"
-
-    if not flag_file.exists():
-        print(json.dumps({
-            "decision": "block",
-            "reason": (
-                f"DESIGN VERIFICATION REQUIRED: RUN ID {run_id} has no "
-                f"claim verification record. You must run verify_claims.py "
-                f"with this RUN ID before presenting architecture output. "
-                f"Expected flag: {flag_file}"
-            )
-        }))
+    try:
+        state = json.loads(state_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        print(json.dumps({"decision": "allow"}))
         return
 
-    # Verification passed — clean up the flag and allow
-    try:
-        os.remove(flag_file)
-    except OSError:
-        pass
+    if state.get("verified") is True:
+        # Clean up and allow
+        try:
+            state_file.unlink()
+        except OSError:
+            pass
+        print(json.dumps({"decision": "allow"}))
+        return
 
-    print(json.dumps({"decision": "allow"}))
+    print(json.dumps({
+        "decision": "block",
+        "reason": (
+            "DESIGN VERIFICATION REQUIRED: Session has no verified flag. "
+            "You must run verify_claims.py before presenting architecture output. "
+            f"Expected state: {state_file}"
+        )
+    }))
 
 
 if __name__ == "__main__":

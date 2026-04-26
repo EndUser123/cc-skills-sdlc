@@ -1,36 +1,51 @@
-"""Claim verification state writer for design_v1.0.
+"""Claim verification state writer for design skill.
 
-Called by the LLM after completing Step 0.4 (Claim Verification Gate).
-Writes a .verified_<RUNID> flag file so the stop_if_unverified.py hook
+Writes a .verified flag to the session state file so the stop_if_unverified.py hook
 can confirm verification was performed.
 
-Usage:
-    python verify_claims.py <run_id> <verification_domain> [claims_count]
-
-Arguments:
-    run_id:              The RUN ID for this design session
-    verification_domain: The detected verification domain
-                         (browser_automation|performance|api_integration|general)
-    claims_count:        Optional number of claims verified (default: 0)
+No DESIGN_RUN_ID env var needed — uses session-scoped state file keyed by WT_SESSION.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
+
 VALID_DOMAINS = ("browser_automation", "performance", "api_integration", "general")
 
 
+def _terminal_id() -> str:
+    """Resolve terminal ID, falling back to WT_SESSION or 'default'."""
+    tid = os.environ.get("CLAUDE_TERMINAL_ID", "").strip()
+    if tid:
+        return tid
+    tid = os.environ.get("WT_SESSION", "").strip()
+    if tid:
+        return tid
+    return "default"
+
+
 def _state_dir() -> Path:
-    """Resolve the arch_decisions directory for verification state files."""
+    """Resolve the design artifact directory for this terminal session.
+
+    Uses skill-local .claude/.artifacts/{TERMINAL_ID}/design/ following /go pattern.
+    """
     skill_root = Path(__file__).resolve().parent.parent
-    return skill_root.parent.parent.parent / ".claude" / "arch_decisions"
+    tid = _terminal_id()
+    return skill_root / ".claude" / ".artifacts" / tid / "design"
+
+
+def _state_file() -> Path:
+    """Path to the session state file."""
+    state_dir = _state_dir()
+    return state_dir / ".state.json"
 
 
 def verify(run_id: str, domain: str, claims_count: int = 0) -> str:
-    """Write verification flag file. Returns path to flag file."""
+    """Write verification state. Returns path to state file."""
     if not run_id:
         print("ERROR: run_id is required", file=sys.stderr)
         sys.exit(1)
@@ -42,17 +57,16 @@ def verify(run_id: str, domain: str, claims_count: int = 0) -> str:
     state_dir = _state_dir()
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    flag_file = state_dir / f".verified_{run_id}"
-
+    state_file = _state_file()
     record = {
         "run_id": run_id,
         "verification_domain": domain,
         "claims_verified": claims_count,
+        "verified": True,
         "timestamp": time.time(),
     }
-
-    flag_file.write_text(json.dumps(record), encoding="utf-8")
-    return str(flag_file)
+    state_file.write_text(json.dumps(record), encoding="utf-8")
+    return str(state_file)
 
 
 def main() -> None:
@@ -68,9 +82,9 @@ def main() -> None:
     domain = sys.argv[2]
     claims_count = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
-    flag_path = verify(run_id, domain, claims_count)
+    state_path = verify(run_id, domain, claims_count)
     print(f"VERIFIED: run_id={run_id} domain={domain} claims={claims_count}")
-    print(f"Flag written: {flag_path}")
+    print(f"State written: {state_path}")
 
 
 if __name__ == "__main__":
