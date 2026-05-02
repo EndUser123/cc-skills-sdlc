@@ -234,7 +234,7 @@ class BlindSpotDetector:
         if project_root is None:
             project_root = Path.cwd()
 
-        state_dir = project_root / ".claude" / "state"
+        state_dir = project_root / ".claude" / ".state"
         if not state_dir.exists():
             return dict(coverage), dict(last_checked)
 

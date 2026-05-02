@@ -4,6 +4,7 @@ description: Convert code to Mermaid flowchart for understanding logic flow.
 version: 1.0.0
 status: stable
 category: visualization
+---
 
 # Code Flow Visualizer
 

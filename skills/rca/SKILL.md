@@ -50,33 +50,33 @@ hooks:
     - matcher: "Skill"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/PostToolUse_rca_init.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_init.py"
           timeout: 10
     - matcher: "Bash|Task|TaskCreate|TaskUpdate|Read|Write|Edit|Grep|Skill|WebSearch|WebFetch|mcp__plugin_serena|mcp__plugin_context7|mcp__plugin_claude-mem"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/PostToolUse_rca_phase_tracker.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_phase_tracker.py"
           timeout: 10
     - matcher: "Bash|Task|TaskCreate|TaskUpdate|Read|Write|Edit|Grep|Skill|WebSearch|WebFetch|mcp__plugin_serena|mcp__plugin_context7|mcp__plugin_claude-mem"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/PostToolUse_rca_action_tracker.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_action_tracker.py"
           timeout: 10
     - matcher: "Grep"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/PostToolUse_rca_search_validator.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_search_validator.py"
           timeout: 10
     - matcher: "WebSearch|WebFetch|mcp__web-reader__webReader"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/PostToolUse_rca_research_storage.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_research_storage.py"
           timeout: 10
   SessionEnd:
     - matcher: ".*"
       hooks:
         - type: command
-          command: python "$CLAUDE_PROJECT_DIR/.claude/skills/rca/hooks/SessionEnd_rca_cleanup.py"
+          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/SessionEnd_rca_cleanup.py"
           timeout: 10
 ---
 

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class Profiler:
     """Measure and compare performance metrics."""
 
-    def __init__(self, baseline_path: Path = Path.home() / ".claude" / "state" / "profile_baselines.json"):
+    def __init__(self, baseline_path: Path = Path.home() / ".claude" / ".state" / "profile_baselines.json"):
         self.baseline_path = baseline_path
         self.baselines = self._load_baselines()
 

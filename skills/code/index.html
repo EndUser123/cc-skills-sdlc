@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>/code — Single-Task TDD Implementation Engine</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --card: #f3f4f6;
+      --border: #d1d5db;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --purple: #7c3aed;
+      --cyan: #0891b2;
+      --link: #2563eb;
+      --toc-width: 240px;
+    }
+    [data-theme="dark"] {
+      --bg: #0f1117;
+      --card: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --accent: #60a5fa;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --purple: #c084fc;
+      --cyan: #22d3ee;
+      --link: #60a5fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      display: flex;
+    }
+    .toc {
+      position: fixed;
+      top: 0; left: 0;
+      width: var(--toc-width);
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1rem;
+      z-index: 200;
+      font-size: 0.8rem;
+      transition: transform 0.25s ease;
+    }
+    .toc.collapsed { transform: translateX(calc(-1 * var(--toc-width))); }
+    .toc-toggle-btn {
+      position: fixed;
+      left: calc(var(--toc-width) - 16px);
+      top: 0.75rem;
+      width: 24px; height: 28px;
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 201;
+      transition: left 0.25s ease, opacity 0.15s;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+    }
+    body.toc-hidden .toc-toggle-btn { left: 0; }
+    .toc-toggle-btn:hover { opacity: 0.85; }
+    .toc h3 {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .toc a {
+      display: block;
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      margin-bottom: 0.15rem;
+      transition: background 0.15s;
+      border-left: 2px solid transparent;
+    }
+    .toc a:hover { background: var(--accent); color: #fff; }
+    .toc a.active { background: var(--accent); color: #fff; border-left-color: #fff; }
+    .content {
+      margin-left: var(--toc-width);
+      padding: 2rem 2.5rem 4rem;
+      width: calc(100% - var(--toc-width));
+      max-width: 900px;
+      transition: margin-left 0.25s ease, max-width 0.25s ease, width 0.25s ease;
+    }
+    body.toc-hidden .content { margin-left: 0; width: 100%; max-width: none; }
+    .header {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; color: var(--accent); }
+    h2 { font-size: 1.1rem; margin-bottom: 0; color: var(--muted); font-weight: 400; }
+    h3 { font-size: 0.85rem; color: var(--text); font-weight: 700; margin-bottom: 0.75rem; margin-top: 0; }
+    h4 { font-size: 0.8rem; color: var(--accent); font-weight: 600; margin-bottom: 0.4rem; margin-top: 0; }
+    .highlight { color: var(--green); font-weight: 700; }
+    .toggle-wrap {
+      position: fixed;
+      top: 1rem; right: 1rem;
+      display: flex; gap: 0.5rem;
+      align-items: center;
+      z-index: 300;
+    }
+    .toggle-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+    .toggle {
+      width: 44px; height: 24px;
+      background: var(--border);
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    [data-theme="dark"] .toggle { background: var(--accent); }
+    [data-theme="dark"] .toggle::after { transform: translateX(20px); }
+    .mermaid-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+      line-height: 0;
+    }
+    .mermaid-container svg { max-width: 100%; height: auto; }
+    .diagram-wrapper {
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+      cursor: grab;
+      min-height: 200px;
+    }
+    .diagram-wrapper:active { cursor: grabbing; }
+    .diagram-wrapper svg { cursor: inherit; }
+    .zoom-controls {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      z-index: 5;
+    }
+    .zoom-btn {
+      width: 28px; height: 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .zoom-btn:hover { background: var(--accent); color: #fff; }
+    .zoom-reset {
+      font-size: 0.65rem;
+      font-family: 'Fira Code', monospace;
+      padding: 0 4px;
+    }
+    .legend {
+      display: flex; gap: 1.25rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      font-size: 0.75rem;
+      padding: 0.5rem 0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.35rem; }
+    .legend-dot {
+      width: 0.65rem; height: 0.65rem;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .section-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 2.5rem 0 1.25rem;
+    }
+    .section-header h3 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .section-header .line { flex: 1; height: 1px; background: var(--border); }
+    .stages {
+      display: flex; flex-direction: column; gap: 0.6rem;
+    }
+    .stage {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .stage:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+    .stage-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .stage-header:hover { background: var(--bg); }
+    .stage-num {
+      background: var(--accent);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      width: 1.5rem; height: 1.5rem;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .stage-name { font-weight: 600; font-size: 1rem; }
+    .stage-chevron {
+      color: var(--muted);
+      font-size: 0.7rem;
+      transition: transform 0.25s ease;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .stage.collapsed .stage-chevron { transform: rotate(-90deg); }
+    .stage-body {
+      padding: 0 1.5rem 1.25rem;
+      max-height: 800px;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease, opacity 0.25s ease;
+      opacity: 1;
+    }
+    .stage.collapsed .stage-body { max-height: 0; padding-top: 0; opacity: 0; }
+    .steps {
+      display: flex; flex-direction: column; gap: 0.35rem;
+      margin-bottom: 0.6rem;
+    }
+    .step {
+      display: flex; align-items: flex-start; gap: 0.5rem;
+      font-size: 0.85rem; line-height: 1.5;
+    }
+    .step::before { content: '\203A'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+    .data-flow {
+      font-size: 0.75rem; color: var(--muted);
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      background: var(--bg);
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .data-flow::before { content: '→ '; color: var(--accent); }
+    .sub-note { font-size: 0.75rem; color: var(--purple); margin-top: 0.5rem; font-style: italic; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .card h3 { font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 0.75rem; }
+    .card p { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+    .card code { font-family: 'Fira Code', monospace; background: var(--bg); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; color: var(--text); }
+    .flags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .flag { font-family: 'Fira Code', monospace; font-size: 0.75rem; background: var(--bg); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); }
+    .schema { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.6; color: var(--muted); overflow-x: auto; }
+    .schema .key { color: var(--accent); }
+    .schema .string { color: var(--green); }
+    .schema .bool { color: var(--amber); }
+    .footer {
+      margin-top: 4rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="toggle-wrap">
+    <span class="toggle-label">Dark</span>
+    <div class="toggle" id="themeToggle"></div>
+    <span class="toggle-label">Light</span>
+  </div>
+  <button class="toc-toggle-btn" id="tocToggle">☰</button>
+
+  <nav class="toc collapsed" id="toc">
+    <h3>Contents</h3>
+    <a href="#pipeline" data-section="pipeline">Pipeline</a>
+    <a href="#input-contract" data-section="input-contract">Input Contract</a>
+    <a href="#output-contract" data-section="output-contract">Output Contract</a>
+    <a href="#usage" data-section="usage">Usage</a>
+    <a href="#flags" data-section="flags">Key Flags</a>
+    <a href="#delegation" data-section="delegation">What /go owns</a>
+    <a href="#environment-isolation" data-section="environment-isolation">Environment Isolation</a>
+  </nav>
+
+  <div class="content">
+    <header class="header">
+      <h1>/code</h1>
+      <h2>Single-Task TDD Implementation Engine</h2>
+    </header>
+
+    <div class="section-header">
+      <h3>Pipeline</h3>
+      <div class="line"></div>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--accent)"></div>
+        <span>Workflow Step</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--green)"></div>
+        <span>Terminal State</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--amber)"></div>
+        <span>Decision Gate</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--purple)"></div>
+        <span>Route Out</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--cyan)"></div>
+        <span>Input Source</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--purple)"></div>
+        <span>Delegated (ai-pcli)</span>
+      </div>
+    </div>
+
+    <div class="diagram-wrapper">
+      <div class="mermaid-container">
+        <pre class="mermaid" id="pipelineDiagram">
+flowchart TD
+    classDef inputSource fill:#1a1d27,stroke:#22d3ee,color:#e4e4e7
+    classDef workflowStep fill:#1a1d27,stroke:#60a5fa,color:#e4e4e7
+    classDef decisionGate fill:#1a1d27,stroke:#fbbf24,color:#e4e4e7
+    classDef routeOut fill:#1a1d27,stroke:#c084fc,color:#e4e4e7
+    classDef terminalState fill:#1a1d27,stroke:#4ade80,color:#e4e4e7
+    classDef delegatedStep fill:#1a1d27,stroke:#7c3aed,color:#e4e4e7
+
+    GO(["/go<br/>task-file"]):::inputSource -->|"active-task_{RUN_ID}.json"| B[read_task]
+    USER(["user prompt<br/>direct args"]):::inputSource -->|"standalone"| B
+    B --> C[pre_execution_checklist]
+    C --> F{"all Qs<br/>passed?"}
+    F -->|No| PL["emit replan-request<br/>→ /planning"]
+    F -->|Yes| X{"Q4:<br/>need explore?"}
+    X -->|No| G[TDD RED]
+    X -->|Yes| EX[explore_codebase]
+    EX --> G
+    G -->|delegate| AID[TDD RED<br/>ai-pcli]
+    AID --> H[TDD GREEN]
+    H -->|delegate| AIG[TDD GREEN<br/>ai-pcli]
+    AIG --> I[TDD REFACTOR]
+    I -->|delegate| AII[TDD REFACTOR<br/>ai-pcli]
+    AII --> J[smoke_validation]
+    J --> K([write_task_result]):::terminalState
+    K --> RESULT(["task-result_{RUN_ID}.json"])
+
+    class GO,USER inputSource
+    class B,C,EX,G,H,I,J,K workflowStep
+    class F,X decisionGate
+    class PL routeOut
+    class RESULT terminalState
+    class AID,AIG,AII delegatedStep
+        </pre>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomIn" title="Zoom in">+</button>
+        <button class="zoom-btn" id="zoomOut" title="Zoom out">−</button>
+        <button class="zoom-btn zoom-reset" id="zoomReset" title="Reset">1:1</button>
+      </div>
+    </div>
+
+    <div class="stages">
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">1</span>
+          <span class="stage-name">read_task</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Load task file or argument. Reads <code>active-task_{RUN_ID}.json</code> from /go state directory.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">2</span>
+          <span class="stage-name">pre_execution_checklist</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Answer 5 questions before proceeding. If any fails → emit <code>replan-request.json</code> → route to <code>/planning</code>.</p>
+          <ol>
+            <li>Do I understand what "done" looks like?</li>
+            <li>Do I know where the relevant code lives?</li>
+            <li>Is the scope clear and bounded?</li>
+            <li>Do I need <code>/search</code> or <code>/explore</code> first?</li>
+            <li>Are there existing tests that cover this area?</li>
+          </ol>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">3</span>
+          <span class="stage-name">explore_codebase</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Understand relevant existing code. Only runs if checklist Q4 = Yes.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">4</span>
+          <span class="stage-name">tdd_red</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Spec what the test must verify, then delegate to <code>ai-pcli</code>.</p>
+          <div class="steps">
+            <div class="step"><code>code.spec_test(acceptance_criteria)</code> → write test spec</div>
+            <div class="step"><code>ai-pcli.delegate()</code> → qwen/gemini/codex/opencode write the failing test</div>
+            <div class="step"><code>code.validate_fail()</code> → confirm test fails before proceeding</div>
+          </div>
+          <div class="data-flow">delegate: "write failing test matching this spec"</div>
+          <p class="sub-note">Validation failure → emit replan-request → route to /planning</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">5</span>
+          <span class="stage-name">tdd_green</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Spec the implementation constraints, then delegate to <code>ai-pcli</code>.</p>
+          <div class="steps">
+            <div class="step"><code>code.spec_impl(test_spec)</code> → define what code must do</div>
+            <div class="step"><code>ai-pcli.delegate()</code> → qwen/gemini/codex/opencode implement minimal code</div>
+            <div class="step"><code>code.validate_pass()</code> → confirm test passes</div>
+          </div>
+          <div class="data-flow">delegate: "implement minimal code to pass this test"</div>
+          <p class="sub-note">Validation failure → emit replan-request → route to /planning</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">6</span>
+          <span class="stage-name">tdd_refactor</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Spec the refactor targets, then delegate to <code>ai-pcli</code>.</p>
+          <div class="steps">
+            <div class="step"><code>code.spec_refactor(current_code)</code> → define cleanup targets</div>
+            <div class="step"><code>ai-pcli.delegate()</code> → qwen/gemini/codex/opencode refactor preserving behavior</div>
+            <div class="step"><code>code.validate_pass()</code> → confirm all tests still pass</div>
+          </div>
+          <div class="data-flow">delegate: "refactor preserving behavior"</div>
+          <p class="sub-note">Validation failure → emit replan-request → route to /planning</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">7</span>
+          <span class="stage-name">smoke_validation</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Prove implementation works. Run verification commands from task contract.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-header" onclick="toggleStage(this)">
+          <span class="stage-num">8</span>
+          <span class="stage-name">write_task_result</span>
+          <span class="stage-chevron">▾</span>
+        </div>
+        <div class="stage-body">
+          <p>Emit <code>task-result_{RUN_ID}.json</code> and return completion token.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h3>Input Contract</h3>
+      <div class="line"></div>
+    </div>
+    <div class="schema">
+<pre>{
+  <span class="key">"task_id"</span>: <span class="string">"task-04221-1430"</span>,
+  <span class="key">"title"</span>: <span class="string">"Short title"</span>,
+  <span class="key">"objective"</span>: <span class="string">"One-sentence objective"</span>,
+  <span class="key">"task_type"</span>: <span class="string">"implementation"</span>,
+  <span class="key">"scope_in"</span>: [...],
+  <span class="key">"scope_out"</span>: [...],
+  <span class="key">"forbidden_files"</span>: [...],
+  <span class="key">"acceptance_criteria"</span>: [<span class="string">"Criterion 1"</span>],
+  <span class="key">"verification_commands"</span>: [],
+  <span class="key">"candidate_routes"</span>: {<span class="key">"skill"</span>: <span class="string">"/code"</span>}
+}</pre>
+    </div>
+
+    <div class="section-header">
+      <h3>Output Contract</h3>
+      <div class="line"></div>
+    </div>
+    <div class="schema">
+<pre>{
+  <span class="key">"schema_version"</span>: <span class="string">"go.task-result.v1"</span>,
+  <span class="key">"go_run_id"</span>: <span class="string">"..."</span>,
+  <span class="key">"task_id"</span>: <span class="string">"..."</span>,
+  <span class="key">"route"</span>: <span class="string">"code"</span>,
+  <span class="key">"status"</span>: <span class="string">"completed|blocked|failed"</span>,
+  <span class="key">"tdd_phases"</span>: {
+    <span class="key">"red"</span>: <span class="bool">true</span>,
+    <span class="key">"green"</span>: <span class="bool">true</span>,
+    <span class="key">"refactor"</span>: <span class="bool">true</span>
+  },
+  <span class="key">"smoke_validated"</span>: <span class="bool">true</span>,
+  <span class="key">"verification_results"</span>: [...],
+  <span class="key">"artifacts_produced"</span>: [...],
+  <span class="key">"completed_at"</span>: <span class="string">"ISO8601"</span>
+}</pre>
+    </div>
+
+    <div class="section-header">
+      <h3>Usage</h3>
+      <div class="line"></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>From /go</h3>
+        <p><code>/code --task-file "active-task_{RUN_ID}.json"</code></p>
+      </div>
+      <div class="card">
+        <h3>Direct use</h3>
+        <p><code>/code "Add user authentication"</code></p>
+      </div>
+      <div class="card">
+        <h3>Fast route</h3>
+        <p><code>/code "fix typo" --fast --no-checklist</code></p>
+      </div>
+      <div class="card">
+        <h3>Stats mode</h3>
+        <p><code>/code stats</code></p>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h3>Key Flags</h3>
+      <div class="line"></div>
+    </div>
+    <div class="flags">
+      <span class="flag">--fast</span>
+      <span class="flag">--no-checklist</span>
+      <span class="flag">--task-file</span>
+    </div>
+
+    <div class="section-header">
+      <h3>What /go owns</h3>
+      <div class="line"></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>Orchestration</h3>
+        <p>Worktree enforcement, task selection, loop control, simplify gating, 7-pass review, PR artifacts</p>
+      </div>
+      <div class="card">
+        <h3>What /code owns</h3>
+        <p>Spec-and-validate orchestrator: spec → ai-pcli delegate → validate. TDD phases delegate to qwen/gemini/codex/opencode.</p>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h3 id="environment-isolation">Environment Isolation</h3>
+      <div class="line"></div>
+    </div>
+    <div class="card" style="grid-column: 1 / -1;">
+      <p style="font-size: 0.8rem; color: var(--muted); line-height: 1.6;">
+        When <code>/code</code> is invoked via <code>/go</code>, the subagent is spawned with its working directory already set to the isolated worktree created by <code>/go</code>. This isolation is enforced at the OS process level.
+      </p>
+      <ul style="font-size: 0.8rem; color: var(--muted); line-height: 1.8; margin-top: 0.75rem; padding-left: 1.25rem;">
+        <li><code>/code</code> inherits the worktree's <code>cwd</code> from its parent process.</li>
+        <li>Every tool <code>/code</code> invokes (ai-pCLI, bash, external LLMs) inherits the same <code>cwd</code>.</li>
+        <li>All file operations, git commands, and test runs are scoped to the worktree by construction.</li>
+        <li>Spillage into the main branch is prevented by OS-level process isolation, not by skill-level checks.</li>
+      </ul>
+      <p style="font-size: 0.8rem; color: var(--accent); margin-top: 0.75rem;">
+        No worktree detection or switching logic is needed in <code>/code</code> for <code>/go</code>-backed calls. The isolation is automatic and transparent.
+      </p>
+      <p style="font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; font-style: italic;">
+        Standalone <code>/code</code> calls (not via <code>/go</code>) use the user's current directory as-is — intentionally unsecured but convenient for small, local tasks.
+      </p>
+    </div>
+
+    <div class="footer">
+      /code v4.0 — Single-Task TDD Implementation Engine
+    </div>
+  </div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+  let currentTheme = 'dark';
+  const DIAGRAM_COLORS = {
+    dark: {
+      inputSource: { fill: '#1a1d27', stroke: '#22d3ee', color: '#e4e4e7' },
+      workflowStep: { fill: '#1a1d27', stroke: '#60a5fa', color: '#e4e4e7' },
+      decisionGate: { fill: '#1a1d27', stroke: '#fbbf24', color: '#e4e4e7' },
+      routeOut: { fill: '#1a1d27', stroke: '#c084fc', color: '#e4e4e7' },
+      terminalState: { fill: '#1a1d27', stroke: '#4ade80', color: '#e4e4e7' },
+      delegatedStep: { fill: '#1a1d27', stroke: '#7c3aed', color: '#e4e4e7' }
+    },
+    light: {
+      inputSource: { fill: '#f3f4f6', stroke: '#0891b2', color: '#111827' },
+      workflowStep: { fill: '#f3f4f6', stroke: '#2563eb', color: '#111827' },
+      decisionGate: { fill: '#f3f4f6', stroke: '#d97706', color: '#111827' },
+      routeOut: { fill: '#f3f4f6', stroke: '#7c3aed', color: '#111827' },
+      terminalState: { fill: '#f3f4f6', stroke: '#16a34a', color: '#111827' },
+      delegatedStep: { fill: '#f3f4f6', stroke: '#7c3aed', color: '#111827' }
+    }
+  };
+
+  function buildDiagramSource(theme) {
+    const c = DIAGRAM_COLORS[theme] || DIAGRAM_COLORS.dark;
+    return `flowchart TD
+    classDef inputSource fill:${c.inputSource.fill},stroke:${c.inputSource.stroke},color:${c.inputSource.color}
+    classDef workflowStep fill:${c.workflowStep.fill},stroke:${c.workflowStep.stroke},color:${c.workflowStep.color}
+    classDef decisionGate fill:${c.decisionGate.fill},stroke:${c.decisionGate.stroke},color:${c.decisionGate.color}
+    classDef routeOut fill:${c.routeOut.fill},stroke:${c.routeOut.stroke},color:${c.routeOut.color}
+    classDef terminalState fill:${c.terminalState.fill},stroke:${c.terminalState.stroke},color:${c.terminalState.color}
+    classDef delegatedStep fill:${c.delegatedStep.fill},stroke:${c.delegatedStep.stroke},color:${c.delegatedStep.color}
+
+    GO(["/go<br/>task-file"]):::inputSource -->|"active-task_\\${'{RUN_ID}'}.json"| B[read_task]
+    USER(["user prompt<br/>direct args"]):::inputSource -->|"standalone"| B
+    B --> C[pre_execution_checklist]
+    C --> F{"all Qs<br/>passed?"}
+    F -->|No| PL["emit replan-request<br/>→ /planning"]
+    F -->|Yes| X{"Q4:<br/>need explore?"}
+    X -->|No| G[TDD RED]
+    X -->|Yes| EX[explore_codebase]
+    EX --> G
+    G -->|delegate| AID[TDD RED<br/>ai-pcli]
+    AID --> H[TDD GREEN]
+    H -->|delegate| AIG[TDD GREEN<br/>ai-pcli]
+    AIG --> I[TDD REFACTOR]
+    I -->|delegate| AII[TDD REFACTOR<br/>ai-pcli]
+    AII --> J[smoke_validation]
+    J --> K([write_task_result]):::terminalState
+    K --> RESULT(["task-result_\\${'{RUN_ID}'}.json"])
+
+    class GO,USER inputSource
+    class B,C,EX,G,H,I,J,K workflowStep
+    class F,X decisionGate
+    class PL routeOut
+    class RESULT terminalState
+    class AID,AIG,AII delegatedStep`;
+  }
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    flowchart: { htmlLabels: true, curve: 'basis', padding: 15, nodeSpacing: 30, rankSpacing: 40, useMaxWidth: true }
+  });
+
+  function setTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    mermaid.initialize({ startOnLoad: false, theme });
+    const container = document.querySelector('.mermaid-container');
+    const pre = document.getElementById('pipelineDiagram');
+    if (container && pre) {
+      container.innerHTML = '';
+      const newPre = document.createElement('pre');
+      newPre.className = 'mermaid';
+      newPre.id = 'pipelineDiagram';
+      newPre.textContent = buildDiagramSource(theme);
+      container.appendChild(newPre);
+      mermaid.run({ nodes: [newPre] });
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('tocToggle');
+    const toc = document.getElementById('toc');
+    if (btn && toc) {
+      btn.addEventListener('click', () => {
+        toc.classList.toggle('collapsed');
+        document.body.classList.toggle('toc-hidden');
+      });
+    }
+
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      });
+    }
+
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+  });
+
+  window.toggleStage = function(header) {
+    const stage = header.closest('.stage');
+    stage.classList.toggle('collapsed');
+  };
+</script>
+</body>
+</html>

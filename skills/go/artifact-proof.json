@@ -1,0 +1,75 @@
+{
+  "skill_name": "go",
+  "skill_version": "2.0.0",
+  "source_path": "P:\\packages\\cc-skills-sdlc\\skills\\go\\SKILL.md",
+  "artifact_path": "P:\\packages\\cc-skills-sdlc\\skills\\go\\index.html",
+  "workflow_model_path": "P:\\packages\\cc-skills-sdlc\\skills\\go\\workflow-model.json",
+  "generated_at": "2026-04-27T21:50:00Z",
+  "generator_skill_version": "2.0.0",
+  "mermaid_version": "11",
+  "coverage": {
+    "workflow_steps_declared": 7,
+    "workflow_steps_in_model": 8,
+    "workflow_sections_rendered": 9,
+    "decision_points_detected": 2,
+    "decision_points_rendered": 2,
+    "route_outs_detected": 4,
+    "route_outs_rendered": 4,
+    "terminal_states_detected": 4,
+    "terminal_states_rendered": 4,
+    "artifacts_detected": 11,
+    "artifacts_listed": 10
+  },
+  "browser_verification": {
+    "mermaid_rendered": true,
+    "toc_toggle_ok": true,
+    "toc_links_ok": true,
+    "theme_toggle_ok": true,
+    "zoom_controls_ok": true,
+    "drag_pan_ok": true,
+    "search_ok": true,
+    "accordion_ok": true,
+    "console_errors": []
+  },
+  "critic_results": {
+    "mermaid_gate_passed": true,
+    "artifact_gate_passed": true,
+    "artifact_gate_issues": [],
+    "unresolved_ambiguities": [
+      {
+        "gap": "route_dispatch_missing_from_workflow_steps",
+        "severity": "medium",
+        "description": "SKILL.md workflow_steps does not include 'route_dispatch' as a separate entry — prose describes routing in Step 2 but workflow_steps jumps from task_selection to verify_end_to_end",
+        "resolution": "route_dispatch captured in workflow-model.json as a decision step; diagram includes it as a diamond node"
+      },
+      {
+        "gap": "verify_end_to_end_naming_mismatch",
+        "severity": "low",
+        "description": "SKILL.md prose uses 'Step 3: Verification' but workflow_steps uses 'verify_end_to_end'",
+        "resolution": "index.html accordion uses workflow_steps name (verify_end_to_end) as canonical"
+      }
+    ]
+  },
+  "toc_hardening": {
+    "aria_expanded": true,
+    "aria_controls": true,
+    "aria_label_on_button": true,
+    "aria_hidden_on_nav": true,
+    "dataset_bound_guard": true,
+    "mobile_css": true,
+    "explicit_initial_state": true,
+    "aria_state_synced_on_toggle": true
+  },
+  "viewport_hardening": {
+    "advanced_viewport_mode": true,
+    "viewports_map": true,
+    "container_bound_wheel": true,
+    "passive_false_wheel": true,
+    "await_before_transform": true,
+    "pointer_capture_drag": true,
+    "reset_restores_identity": true,
+    "theme_preserves_viewport": true
+  },
+  "html_line_count": 1374,
+  "skill_md_line_count": 531
+}

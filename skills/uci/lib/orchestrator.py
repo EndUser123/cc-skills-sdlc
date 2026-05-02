@@ -85,7 +85,7 @@ class AgentResult:
 class OrchestratorConfig:
     """Configuration for orchestrator behavior."""
 
-    log_dir: Path = field(default_factory=lambda: Path(".claude/state/uci"))
+    log_dir: Path = field(default_factory=lambda: Path(".claude/.state/uci"))
     log_retention_days: int = 30
     max_concurrent_agents: int = 12
     agent_timeout_seconds: int = 300
@@ -714,7 +714,7 @@ Respond ONLY with valid JSON array. No prose."""
             output: Raw output (for debugging)
 
         Returns:
-            Relative path to artifact file (from .claude/state/uci/)
+            Relative path to artifact file (from .claude/.state/uci/)
         """
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         artifact_file = self.log_dir / f"artifact-{agent_name}-{timestamp}.json"

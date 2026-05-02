@@ -1,0 +1,887 @@
+{
+  "metadata": {
+    "created_at": "2026-05-02T16:58:39.304317",
+    "target_path": "skill-guard",
+    "session_id": "default",
+    "plan_version": 1
+  },
+  "overview": {
+    "total_findings": 104,
+    "priority_breakdown": {
+      "P0": 0,
+      "P1": 15,
+      "P2": 41,
+      "P3": 48
+    },
+    "estimated_effort_hours": 87.5,
+    "risk_level": "medium"
+  },
+  "changes_by_priority": {
+    "P1": [
+      {
+        "id": "BUG-001",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/inference.py",
+        "change_description": "add_tool_mapping() mutates DEFAULT_TOOL_MAPPINGS module-level dict at runtime with no locking",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-002",
+        "title": "Untitled",
+        "file": "skill_guard/skill_execution_state.py",
+        "change_description": "_LEGACY_SKILL_METADATA_CACHE and _HOOKS_LEDGER_MODULE globals with bare except blocks no synchronization",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-005",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "_db_initialized global boolean with non-atomic check-then-act initialization bare except swallows errors",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-012",
+        "title": "Untitled",
+        "file": "skill_guard/skill_execution_state.py",
+        "change_description": "_load_skill_frontmatter() swallows YAML failures KeyboardInterrupt SystemExit",
+        "risk_analysis": "MEDIUM: Affects control flow, characterization tests required",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "OC-001",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "God object: 20+ functions",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "OC-002",
+        "title": "Untitled",
+        "file": "breadcrumb/tracker.py",
+        "change_description": "God object: 900+ lines",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "OC-003",
+        "title": "Untitled",
+        "file": "PreToolUse/PreToolUse_skill_pattern_gate.py",
+        "change_description": "270-line function",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-003",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "set_breadcrumb() performs 4 I/O operations per update: SQLite update, JSONL log append, cache update, and full JSON file rewrite with fsync. This is excessive for a single breadcrumb update.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-006",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/cache.py",
+        "change_description": "_evict_if_needed() calls min(_access_times) without checking if _access_times is empty. Will raise ValueError if evict is called on empty cache.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-001",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "handle_pre_tool_use is synchronous but called from async hook runtime",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-002",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "create_run performs blocking file I/O synchronously",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-003",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "skill_execution_state.py is a 1057-line god object with 20+ responsibilities",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-005",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "Dual state management systems - execution_state.json vs skill_execution_pending.json",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-001",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "_parse_transcript_for_response edge cases untested - empty file, missing fields, except Exception: pass",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-016",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "_atomic_write_json non-atomic delete-then-rename - data-loss window between unlink and rename",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      }
+    ],
+    "P2": [
+      {
+        "id": "BUG-003",
+        "title": "Untitled",
+        "file": "skill_guard/skill_execution_state.py",
+        "change_description": "_state_dir_cache shared dict without locking around access",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-004",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "Global _cache with threading.RLock only intra-process no cross-process isolation",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-006",
+        "title": "Untitled",
+        "file": "skill_guard/PreToolUse/PreToolUse_skill_pattern_gate.py",
+        "change_description": "SKILL_EXECUTION_REGISTRY returned directly without defensive copy",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-007",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/database.py",
+        "change_description": "_connection_pool check-then-invalidate window",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-009",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/cache.py",
+        "change_description": "_evict_if_needed() calls min(_access_times) without empty-dict guard",
+        "risk_analysis": "MEDIUM: Affects control flow, characterization tests required",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-010",
+        "title": "Untitled",
+        "file": "skill_guard/skill_execution_state.py",
+        "change_description": "_get_active_turn_scope() catches all exceptions returns empty strings ImportError indistinguishable",
+        "risk_analysis": "MEDIUM: Affects control flow, characterization tests required",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-011",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "get_breadcrumb_trail() non-atomic read-verify-invalidate cycle",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-013",
+        "title": "Untitled",
+        "file": "skill_guard/execution_store.py",
+        "change_description": "_atomic_write_json() silent fallback to non-atomic write on repeated OSError",
+        "risk_analysis": "MEDIUM: Affects control flow, characterization tests required",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-015",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/inference.py",
+        "change_description": "add_tool_mapping() no input validation empty string could match all tools",
+        "risk_analysis": "MEDIUM: Affects control flow, characterization tests required",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-001",
+        "title": "Untitled",
+        "file": "breadcrumb/tracker.py",
+        "change_description": "Duplicate skill name normalization",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-002",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "Duplicate atomic write",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-003",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "Double SKILL.md parsing",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "OC-004",
+        "title": "Untitled",
+        "file": "breadcrumb/tracker.py",
+        "change_description": "Mutable dict returned",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "CONC-001",
+        "title": "Untitled",
+        "file": "breadcrumb/cache.py",
+        "change_description": "Thread safety gap",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "OC-005",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "Inconsistent sanitization",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-001",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/cache.py",
+        "change_description": "_load_from_log() performs O(n) reversal then O(n) iteration over all log entries. For large logs, list(reversed(log.replay())) creates a full copy before state reconstruction iterates again.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-002",
+        "title": "Untitled",
+        "file": "skill_guard/execution_store.py",
+        "change_description": "replay_events() reads entire file into memory with read_text().splitlines() then iterates. For large event logs, this loads the full file upfront instead of line-by-line streaming.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-004",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "get_breadcrumb_trail() makes up to 4 file reads: cache miss triggers breadcrumb_file read, then read_text() again for terminal_id verification, then another json.loads() for cache validation. Non-atomic multi-read pattern.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-005",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/sqlite_backend.py",
+        "change_description": "get_active_trails() calls json.loads() 3 times per row inside the fetch loop. These JSON parses could be deferred or batched.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-007",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/database.py",
+        "change_description": "_is_connection_valid() runs SELECT 1 on every get_connection() call to validate pooled connections. This adds latency to every database operation.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-003",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "sys.path manipulation at module load with hardcoded P: drive paths",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-004",
+        "title": "Untitled",
+        "file": "tdd_contract_auto_gate.py",
+        "change_description": "Hardcoded P: drive path for hooks root",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-008",
+        "title": "Untitled",
+        "file": "hook_compat.py",
+        "change_description": "Bare 'except Exception:' masks KeyboardInterrupt and SystemExit",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-010",
+        "title": "Untitled",
+        "file": "tdd_contract_auto_gate.py",
+        "change_description": "Bare 'except Exception: pass' silently swallows all exceptions",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-011",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "Phase transitions mutate run.phase as side effect - violates command-query separation",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-013",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "_parse_transcript_for_response uses bare 'except Exception: pass'",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-001",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "Duplicate path resolution logic in execution_hooks.py and StopHook_skill_execution_gate.py",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-002",
+        "title": "Untitled",
+        "file": "StopHook_skill_execution_gate.py",
+        "change_description": "Inline terminal detection bypasses centralized utils/terminal_detection.py",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-004",
+        "title": "Untitled",
+        "file": "breadcrumb/enforcement.py",
+        "change_description": "Duplicate enforcement logic - breadcrumb vs StopHook validate_execution()",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-008",
+        "title": "Untitled",
+        "file": "breadcrumb/",
+        "change_description": "Poor module cohesion in breadcrumb/ - 9 files with no clear structural principle",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-011",
+        "title": "Untitled",
+        "file": "StopHook_skill_execution_gate.py",
+        "change_description": "Input data mutation for caching in _get_transcript_snapshot",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-002",
+        "title": "Untitled",
+        "file": "tracker.py",
+        "change_description": "Cache hit with terminal_id mismatch not explicitly verified",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-003",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "_atomic_write_json failure modes untested - mkdir failure, disk full, Windows handle hold",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-004",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "hybrid contract with response_text=None and all artifacts done returns ACTIVE (untested)",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-005",
+        "title": "Untitled",
+        "file": "cache.py",
+        "change_description": "_load_from_log empty/single-entry/corrupted log not covered",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-006",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "Only Read tested from 9 _INVESTIGATION_TOOLS - WebSearch/WebFetch/AskUserQuestion/mcp__* untested",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-008",
+        "title": "Untitled",
+        "file": "execution_run.py",
+        "change_description": "from_jsonable missing required fields - KeyError not verified",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-012",
+        "title": "Untitled",
+        "file": "enforcement.py",
+        "change_description": "verify_with_enforcement has no direct unit test",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-017",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "transition_phase falls through to stale state file update after ledger append",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-019",
+        "title": "Untitled",
+        "file": "skill_auto_discovery.py",
+        "change_description": "get_skill_config uses 'workflow' but contract_type can be 'workflow-execution' causing mismatch",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-020",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "evaluate_completion hybrid branch modifies missing_requirements after all_done computed",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      }
+    ],
+    "P3": [
+      {
+        "id": "BUG-014",
+        "title": "Untitled",
+        "file": "skill_guard/execution_runtime.py",
+        "change_description": "evaluate_completion() list comprehension reads and modifies run.missing_requirements simultaneously",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-004",
+        "title": "Untitled",
+        "file": "breadcrumb/tracker.py",
+        "change_description": "Duplicated terminal_id checks",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-005",
+        "title": "Untitled",
+        "file": "breadcrumb/enforcement.py",
+        "change_description": "Duplicated step normalization",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-006",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "Explicit field mapping",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-007",
+        "title": "Untitled",
+        "file": "breadcrumb/tracker.py",
+        "change_description": "Expensive cache re-read",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "DRY-008",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "Unused _normalize_string_list",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-008",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/cache.py",
+        "change_description": "detect_terminal_id() called on every _get_cache_key() invocation, which happens on every get_state(), update_state(), and invalidate(). Terminal detection involves environment reads and path operations.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-009",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "initialize_breadcrumb_trail() checks breadcrumb_file.exists() twice in succession (line 314 and 558 via get_breadcrumb_trail path). Could be combined into single check with early return.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PERF-010",
+        "title": "Untitled",
+        "file": "skill_guard/breadcrumb/tracker.py",
+        "change_description": "Breadcrumb file writes use json.dumps(trail, indent=2) with pretty-printing on every update. For high-frequency updates, indent=0 or removing indentation would reduce I/O.",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-001",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-002",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-003",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-004",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-005",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-006",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-007",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-008",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-009",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-010",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-011",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-012",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-013",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-014",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-015",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "QUAL-016",
+        "title": "Untitled",
+        "file": "unknown",
+        "change_description": "",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-005",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "ResponseCheckResult dataclass lacks __slots__",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-006",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "ExecutionStore ABC uses '...' ellipsis instead of NotImplementedError",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-007",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "_parse_transcript_for_response reads entire file into memory",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-009",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "evaluate_completion uses sequential if/elif chain instead of dict dispatch",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-012",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "_atomic_write_json rename-to-overwrite not truly atomic on Windows",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-014",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "time import via __import__('time').time() instead of proper import",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "PY25-015",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "Module-level imports duplicate time from execution_runtime.py",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-006",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "Hardcoded absolute paths instead of deriving from __file__",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-007",
+        "title": "Untitled",
+        "file": "execution_run.py",
+        "change_description": "RunStatus uses uppercase constants without being an enum.Enum",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-009",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "Circular import risk in execution chain",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-010",
+        "title": "Untitled",
+        "file": "StopHook_skill_execution_gate.py",
+        "change_description": "Silent exception suppression in state management - _clear_governance_state",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-012",
+        "title": "Untitled",
+        "file": "execution_run.py",
+        "change_description": "RunStatus should use enum.Enum for type safety",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-013",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "Module-level path manipulation inside function - hidden global state side effects",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-014",
+        "title": "Untitled",
+        "file": "StopHook_skill_execution_gate.py",
+        "change_description": "Overly broad exception handling - bare except: catches ImportError",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "ARCH-015",
+        "title": "Untitled",
+        "file": "StopHook_skill_execution_gate.py",
+        "change_description": "Missing type annotations on complex functions - validate_execution",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-007",
+        "title": "Untitled",
+        "file": "tracker.py",
+        "change_description": "Silent step invalidation - no cache+file inconsistency test",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-009",
+        "title": "Untitled",
+        "file": "log.py",
+        "change_description": "_rotate_log rename failure untested",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-010",
+        "title": "Untitled",
+        "file": "tracker.py",
+        "change_description": "SQLite fallback path (db init fails) not tested",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-011",
+        "title": "Untitled",
+        "file": "execution_runtime.py",
+        "change_description": "record_artifact_created - empty/None path not validated",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-013",
+        "title": "Untitled",
+        "file": "execution_store.py",
+        "change_description": "replay_events OSError types indistinguishable in tests",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-014",
+        "title": "Untitled",
+        "file": "tracker.py",
+        "change_description": "parse_error from _load_workflow_steps ignored by caller",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "TEST-015",
+        "title": "Untitled",
+        "file": "execution_hooks.py",
+        "change_description": "handle_stop unknown contract_type returns allow=True (not asserted)",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      },
+      {
+        "id": "BUG-021",
+        "title": "Untitled",
+        "file": "skill_execution_state.py",
+        "change_description": "_load_skill_frontmatter workflow_steps normalization doesn't validate non-empty step identifiers",
+        "risk_analysis": "MEDIUM: Standard refactoring risk",
+        "rollback_strategy": "Git revert on test failure. Create characterization test before change."
+      }
+    ]
+  },
+  "execution_order": [
+    {
+      "step": 1,
+      "priority": "P1",
+      "reason": "Improve error handling (prevents future bugs)",
+      "count": 15
+    },
+    {
+      "step": 2,
+      "priority": "P2",
+      "reason": "Remove duplication (improves maintainability)",
+      "count": 41
+    },
+    {
+      "step": 3,
+      "priority": "P3",
+      "reason": "Apply conventions (low risk, polish)",
+      "count": 48
+    }
+  ],
+  "validation_strategy": {
+    "test_approach": "characterization tests for each change",
+    "rollback_trigger": "test failures or syntax errors",
+    "validation_tools": [
+      "pytest",
+      "py_compile"
+    ]
+  }
+}

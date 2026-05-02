@@ -95,6 +95,20 @@
           },
           "default": []
         },
+        "estimated_complexity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Task complexity estimate. If 'high', /go must confirm before dispatching to /code."
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Task IDs that must be completed before this task can be dispatched. /go validates all dependencies are completed before routing."
+        },
         "notes": {
           "type": "string"
         }

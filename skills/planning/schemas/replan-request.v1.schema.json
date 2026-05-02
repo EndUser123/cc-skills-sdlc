@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/planning/replan-request.v1.schema.json",
+  "title": "PlanningReplanRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "original_task_id", "failure_reason", "current_context", "requested_at"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "planning.replan-request.v1"
+    },
+    "original_task_id": {
+      "type": "string",
+      "description": "The task ID that needs re-scoping"
+    },
+    "failure_reason": {
+      "type": "string",
+      "enum": [
+        "acceptance_criteria_ambiguous",
+        "scope_in_missing_or_unclear",
+        "scope_unclear",
+        "dependency_blocked",
+        "architecture_ambiguity",
+        "external_constraint_change"
+      ],
+      "description": "Why the task cannot proceed as currently scoped"
+    },
+    "failure_evidence": {
+      "type": "string",
+      "description": "Concrete evidence of the failure — what was tried, what was observed"
+    },
+    "current_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "completed_tasks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "in_progress_tasks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "new_constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "upstream_changes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Skill that emitted this request: /code, /go, or /planning itself"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requires_arch_decision": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, this replan requires /design to emit a new ADR before /planning can proceed"
+    }
+  }
+}

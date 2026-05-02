@@ -46,7 +46,7 @@ class ProviderState:
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker behavior."""
-    state_file: Path = field(default_factory=lambda: Path(".claude/state/uci/circuit_breaker.json"))
+    state_file: Path = field(default_factory=lambda: Path(".claude/.state/uci/circuit_breaker.json"))
     default_failure_threshold: int = 5
     default_success_threshold: int = 2
     default_timeout_seconds: int = 60

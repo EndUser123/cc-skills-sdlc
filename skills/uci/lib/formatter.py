@@ -495,7 +495,7 @@ class UCIFormatter:
 
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             ext = "json" if formatted.format == OutputFormat.JSON else "md"
-            output_path = Path(".claude/state/uci") / f"review-{timestamp}.{ext}"
+            output_path = Path(".claude/.state/uci") / f"review-{timestamp}.{ext}"
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(formatted.content, encoding="utf-8")

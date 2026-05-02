@@ -1,6 +1,6 @@
 ---
 name: planning
-description: Build and verify implementation plans with strict readiness gating. Produces separate artifacts: plan, review results, and findings. A plan cannot be marked implementation-ready while containing placeholders, unresolved blockers, raw review output, implied producer/consumer contracts, or missing required Contract Authority Packet consumption.
+description: "Build and verify implementation plans with strict readiness gating. Produces separate artifacts: plan, review results, and findings. A plan cannot be marked implementation-ready while containing placeholders, unresolved blockers, raw review output, implied producer/consumer contracts, or missing required Contract Authority Packet consumption."
 category: planning
 enforcement: advisory
 depends_on:
