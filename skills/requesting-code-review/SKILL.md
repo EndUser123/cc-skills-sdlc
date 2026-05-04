@@ -1,70 +1,20 @@
----
-name: requesting-code-review
-description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
----
-
 # Requesting Code Review
 
 ## Overview
 
-Dispatch a code-reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process, and preserves your own context for continued work.
+Offload code evaluation to a specialized reviewer subagent to preserve context and catch issues early.
 
-**Core principle:** Review early, review often.
+**Mandatory Protocol:** See `__lib/review_management.md` for When to Request, Git SHA identification, and Context Provisioning rules.
 
-## When to Request Review
+## Quick Start
 
-**Mandatory:**
-- After each task in subagent-driven development
-- After completing major feature
-- Before merge to main
+1. **Identify SHAs**: `git rev-parse HEAD~1` (Base) vs `git rev-parse HEAD` (Head).
+2. **Dispatch Reviewer**:
+   - Agent Type: `code-reviewer`
+   - Inputs: Plan, Requirements, Implementation Summary.
 
-**Optional but valuable:**
-- When stuck (fresh perspective)
-- Before refactoring (baseline check)
-- After fixing complex bug
+## Integration
 
-## How to Request
-
-**1. Get git SHAs:**
-```bash
-BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
-HEAD_SHA=$(git rev-parse HEAD)
-```
-
-**2. Dispatch code-reviewer subagent:**
-
-Use Task tool with code-reviewer type, fill template with what was implemented and the plan/requirements.
-
-**3. Act on feedback:**
-- Fix Critical issues immediately
-- Fix Important issues before proceeding
-- Note Minor issues for later
-- Push back if reviewer is wrong (with reasoning)
-
-## Integration with Workflows
-
-**Subagent-Driven Development:**
-- Review after EACH task
-- Catch issues before they compound
-- Fix before moving to next task
-
-**Executing Plans:**
-- Review after each batch (3 tasks)
-- Get feedback, apply, continue
-
-**Ad-Hoc Development:**
-- Review before merge
-- Review when stuck
-
-## Red Flags
-
-**Never:**
-- Skip review because "it's simple"
-- Ignore Critical issues
-- Proceed with unfixed Important issues
-- Argue with valid technical feedback
-
-**If reviewer wrong:**
-- Push back with technical reasoning
-- Show code/tests that prove it works
-- Request clarification
+- **Subagent-Driven**: Mandatory review after EACH task.
+- **Executing Plans**: Review after every 3 tasks (batch).
+- **Ad-Hoc**: Review before merge to `main`.

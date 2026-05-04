@@ -1,14 +1,14 @@
 # Agent Configuration Details
 
-## 8-Agent Discovery Configuration
+## 10-Agent Discovery Configuration
 
-Each agent scores findings on the 8-dimension analysis rubric (see SKILL.md), weighting by its specialty.
+Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), weighting by its specialty.
 
 ### Agent Assignments
 
 | Agent | Type | Focus | Specialty Dimensions |
 |-------|------|-------|---------------------|
-| 1 | `adversarial-compliance` | Bugs/Logic | Immutability (race conditions, error handling, TOCTOU) |
+| 1 | `adversarial-bugs` | Bugs/Logic | Immutability (race conditions, error handling, TOCTOU) |
 | 2 | `adversarial-performance` | DRY/Simplicity | Object Calisthenics (duplication, extraction, concurrency) |
 | 3 | `adversarial-performance` (tuned `--focus performance`) | Performance | Performance (leaks, bottlenecks, N+1, algorithmic) |
 | 4 | `adversarial-quality` | Conventions | Naming, Type System (type hints, patterns, maintainability) |
@@ -16,6 +16,8 @@ Each agent scores findings on the 8-dimension analysis rubric (see SKILL.md), we
 | 6 | `/ai-pi-zai-glm51` | Architecture | Coupling/Cohesion, Domain Integrity |
 | 7 | `/ai-pi-mm-m27` | Testing | Coverage gaps, missing scenarios, brittle tests |
 | 8 | `/ai-gemini` | Deep insight | Semantic bugs, idiom violations |
+| 9 | `adversarial-security` | Security/Data Exposure | Auth flow, injection vectors, data access |
+| 10 | `adversarial-io-validation` | I/O Safety | Path traversal, file operations, external assumptions |
 
 ### Agent Launch Protocol
 

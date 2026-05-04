@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Add lib directory to path for imports
-lib_dir = Path(__file__).parent / "lib"
+lib_dir = Path(__file__).parent / "__lib"
 if str(lib_dir) not in sys.path:
     sys.path.insert(0, str(lib_dir))
 

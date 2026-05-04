@@ -376,7 +376,7 @@ def test_performance_regression():
 
 # Import shared test modules from tdd skill if available
 try:
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tdd" / "lib"))
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tdd" / "__lib"))
     from tdd.lib.evidence_writer import generate_evidence_artifact
 
     EVIDENCE_WRITER_AVAILABLE = True

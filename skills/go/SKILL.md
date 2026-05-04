@@ -28,11 +28,14 @@ hooks:
 
 # /go — Thin Orchestrator
 
-**Role:** `/go` is a **thin orchestrator** that stays on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome. It does not implement TDD, simplification, or review logic itself — it delegates to `/code`, `/refactor`, `/planning`, or `/design_1.0` via subagents that work in isolated worktrees.
+**Role:** `/go` is a **thin orchestrator** that stay on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome.
+
+**Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `__lib/sdlc_schemas.py`.
 
 **MANDATORY SEQUENCE:** Worktree Check → Task Selection → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
 
 **State root:** `.claude/.artifacts/{TERMINAL_ID}/go/`
+
 
 ---
 

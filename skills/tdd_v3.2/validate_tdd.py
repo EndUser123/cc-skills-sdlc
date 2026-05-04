@@ -13,10 +13,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "__lib"))
 from session_models import SessionState, TddEvidence, PhaseReceipt  # type: ignore
 from pydantic import ValidationError
+import sdlc_state
 
-STATE_ROOT = Path(os.getcwd()) / ".claude-state" / "tdd"
+STATE_ROOT = sdlc_state.resolve_tdd_state_root()
 ACTIVE_PTR = STATE_ROOT / ".active_run"
 MAX_RETRIES = 3
 

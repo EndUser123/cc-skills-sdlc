@@ -13,24 +13,11 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "__lib"))
 from session_models import SessionState, PhaseReceipt  # type: ignore
+import sdlc_state
 
-
-def _resolve_state_root() -> Path:
-    """Resolve STATE_ROOT, routing workspace root to .claude/.claude-state/tdd/.
-
-    When cwd is the workspace root (P:\\), .claude/ exists and is the canonical
-    home for Claude Code state. This prevents dot-directories at workspace root.
-    """
-    cwd = Path(os.getcwd()).resolve()
-    # Workspace root detection: cwd.name == '' means we're at a drive root
-    # and .claude existence confirms it's the Claude Code workspace root
-    if cwd.name == "" and (cwd / ".claude").exists():
-        return cwd / ".claude" / ".claude-state" / "tdd"
-    return cwd / ".claude-state" / "tdd"
-
-
-STATE_ROOT = _resolve_state_root()
+STATE_ROOT = sdlc_state.resolve_tdd_state_root()
 
 # Allowed transitions:
 #   init -> red

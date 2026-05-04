@@ -59,110 +59,25 @@ suggest:
 
 ## Purpose
 
-Create and verify implementation plans with strict readiness gating. A plan cannot be marked `implementation-ready` while it contains placeholders, unresolved blocker findings, raw review output, implied producer/consumer contracts, missing required Contract Authority Packet consumption, stale explicit file/line evidence, or vague layered execution semantics.
+Create and verify implementation plans with strict readiness gating.
+
+**Mandatory Standards:** See `__lib/planning_standards.md` for the v2 Plan Shape, No-Placeholder rule, and Integration Trace protocol.
 
 ## Implicit-Decision Prompts
 
-Before accepting a draft as semantically complete, `/planning` should ask itself:
+Before accepting a draft, `/planning` must challenge itself on:
+- Execution ambiguity
+- Stale evidence
+- Implicit consumer contracts
+- Unhappy-path test coverage
 
-- What decisions in this plan still materially change execution if interpreted differently?
-- What evidence claims in this plan would become stale if the workspace changed?
-- What steps or layers are conditional, and what exact signal triggers them?
-- What part of this plan would a downstream `/code` or `/tdd` consumer have to guess?
-- What file, contract, or test target is assumed to exist but not verified?
-- What existing mechanism in the cited implementation overlaps with the proposed extension, and is it replaced, preserved, or routed differently?
-- For every new state/artifact field, who writes it, who reads it, what shape does it have, and what happens when it is absent?
-- If the plan adds an alternate flow or mode, what exact selector distinguishes it from the standard flow?
-- What unhappy-path tests prove interruption, stale state, TTL expiry, malformed state, or fallback behavior?
-- Does each implementation change describe logic that belongs to the component it claims to modify?
-- If the plan parses model output into structured state, what validation, retry, or fallback rule handles malformed or incomplete output?
-- Does the plan reference any helper function or formatter without saying whether it already exists or must be added?
-- Do assumptions/defaults contradict the schema or data shape described elsewhere in the plan?
-- What prior decision packet, blocker, or correction most changed what this plan now needs to say? (`trace`)
-- What is the strongest execution-side objection to accepting this plan as implementation-ready? (`challenge`)
-- What repeated planning defect should be promoted into a validator or gate instead of rediscovered manually next time? (`graduate`)
-- Does this plan look complete but have hidden integration gaps when traced end-to-end with a concrete query? Specifically: does every TASK output have a named consumer, and is every consumer's handling of that output defined? (`integration_trace`)
-
-These are internal planning prompts, not user interview questions. Their job is to surface hidden execution ambiguity before `auto_verify.py` has to reject the artifact.
+See `__lib/planning_standards.md` for the full list of internal prompts.
 
 ## Integration Trace (Mandatory for Multi-TASK Plans)
 
-**Purpose**: Catch the most common planning failure — TASKs that look complete in isolation but have integration gaps when you try to code them.
+**Purpose**: Catch integration gaps between tasks before coding begins.
+**Protocol**: See `__lib/planning_standards.md#integration-trace`.
 
-**When to run**: After `synthesize` rewrites the plan, before `present_results`. Mandatory for plans with 3 or more TASKS. Optional for simpler plans but recommended when the plan covers a new subsystem or cross-component flow.
-
-### What It Does
-
-Pick one **concrete example query** that exercises the full plan (not a hypothetical — a specific user intent or system event). Walk it through all TASKS in order, asking at each step:
-
-> **"What component consumes this output? Is that consumption defined in the plan?"**
-
-A TASK is **integration-complete** if both are true:
-1. Its output artifact/field/state is explicitly named
-2. The downstream consumer is identified, and what that consumer does with the output is stated somewhere in the plan
-
-A TASK has an **integration gap** if:
-- It produces something but no consumer is named
-- A consumer is named but the plan doesn't show what it does with the input
-- The consumer is another TASK that has its own unmet input dependencies
-- The "consumer" is "the system" or "the output" with no specific handler defined
-
-### Integration Trace Protocol
-
-```
-For each TASK in execution order:
-  1. Name the output artifact/field/state this TASK produces
-  2. Name the component that consumes this output (TASK-N, external component, or "none/unknown")
-  3. If the consumer is another TASK in this plan:
-     a. Does that consuming TASK list this input as a dependency?
-     b. Does the consuming TASK's description show how it uses this input?
-  4. If the consumer is external (filesystem, CLI, hook, API):
-     a. Is that consumer's handling of this output defined in the plan?
-  5. If no consumer is named → this is a gap
-  6. If consumer is named but usage is not shown → this is a gap
-```
-
-### Gap Handling
-
-If the Integration Trace finds a gap:
-- Flag it as a planning blocker (not a verification warning)
-- The plan cannot be `implementation-ready` while an integration gap is unresolved
-- Remediation options:
-  - Add the missing consumer/usage to the producing TASK
-  - Add a new TASK to handle the orphaned output
-  - Explicitly mark the output as terminal (no consumer) and define failure behavior
-- Route to `/design` if the gap reveals a missing boundary contract
-
-### Common Gap Patterns (for fast recognition)
-
-| Gap Pattern | Looks Like | Reality |
-|---|---|---|
-| **Orphaned output** | "TASK-5 produces synthesis report" | No TASK or component consumes the report |
-| **Implied router** | "TASK-3 routes to appropriate handler" | No handler is defined; routing logic is not specified |
-| **Synthesis assumption** | "TASK-10 handles synthesis" | No `synthesis_core.py` or equivalent is specified as existing or to-be-built |
-| **Contradiction gap** | "TASK-5 detects contradiction" | No logic defines what to do when a contradiction is found |
-| **Branch undefined** | "TASK-4 branches based on type" | The branching condition and each branch's target are not named |
-
-### Output Format
-
-After running the trace, emit a brief Integration Trace Summary:
-
-```markdown
-## Integration Trace Summary
-
-**Example query:** [concrete user intent or system event]
-
-| TASK | Output | Consumer | Status |
-|------|--------|----------|--------|
-| TASK-1 | X | TASK-2 | ✓ Defined |
-| TASK-2 | Y | TASK-3 | ✓ Defined |
-| TASK-3 | Z | external (hook) | ✓ Defined |
-| TASK-4 | W | none | ⚠ Orphaned — define or mark terminal |
-| TASK-5 | V | TASK-4 | ✓ Defined |
-
-**Gaps found:** 1 (TASK-4 output is not consumed)
-**Status:** [draft / in-review / implementation-ready] — integration gaps remaining
-```
 
 ## Trace, Challenge, And Graduate
 

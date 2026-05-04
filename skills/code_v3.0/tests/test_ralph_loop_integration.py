@@ -147,7 +147,7 @@ class TestRalphLoopIntegration:
             pytest.skip("task_detector module not available - expected for RED phase")
 
         # Verify detector module exists
-        module_path = Path(__file__).parent.parent / "lib" / "task_detector.py"
+        module_path = Path(__file__).parent.parent / "__lib" / "task_detector.py"
         assert module_path.exists(), "task_detector module should exist for integration"
 
         # Verify detect_task_type function is callable

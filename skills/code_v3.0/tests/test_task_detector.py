@@ -26,7 +26,7 @@ class TestTaskDetector:
 
     def test_task_detector_module_exists(self):
         """Task detector module should exist."""
-        module_path = Path(__file__).parent.parent / "lib" / "task_detector.py"
+        module_path = Path(__file__).parent.parent / "__lib" / "task_detector.py"
 
         assert module_path.exists(), f"Task detector module should exist at {module_path}"
 

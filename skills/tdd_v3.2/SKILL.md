@@ -17,36 +17,32 @@ verification:
     - description: "Confirm evidence.json exists for this run"
       tool: "Bash"
       args:
-        command: "ls -la .claude-state/tdd/$RUN_ID/evidence.json 2>/dev/null || echo 'MISSING'"
+        command: "ls -la .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/evidence.json 2>/dev/null || echo 'MISSING'"
     - description: "Confirm validated.json exists (validation passed)"
       tool: "Bash"
       args:
-        command: "ls -la .claude-state/tdd/$RUN_ID/validated.json 2>/dev/null || echo 'NOT VALIDATED'"
+        command: "ls -la .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/validated.json 2>/dev/null || echo 'NOT VALIDATED'"
     - description: "Show test files modified"
       tool: "Bash"
       args:
-        command: "python -c \"import json; e=json.load(open('.claude-state/tdd/$RUN_ID/evidence.json')); print('test_files:', e.get('test_files_modified',[])); print('impl_files:', e.get('impl_files_modified',[]))\" 2>/dev/null || echo 'CANNOT READ'"
+        command: "python -c \"import json; e=json.load(open('.claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/evidence.json')); print('test_files:', e.get('test_files_modified',[])); print('impl_files:', e.get('impl_files_modified',[]))\" 2>/dev/null || echo 'CANNOT READ'"
     - description: "Verify RED receipt exists and GREEN receipt exists"
       tool: "Bash"
       args:
-        command: "ls .claude-state/tdd/$RUN_ID/red_receipt.json .claude-state/tdd/$RUN_ID/green_receipt.json 2>/dev/null || echo 'RECEIPTS MISSING'"
+        command: "ls .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/red_receipt.json .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/green_receipt.json 2>/dev/null || echo 'RECEIPTS MISSING'"
   summary_mode: evidence_only
   expected_artifacts:
-    - ".claude-state/tdd/{RUN_ID}/evidence.json"
-    - ".claude-state/tdd/{RUN_ID}/validated.json"
-    - ".claude-state/tdd/{RUN_ID}/red_receipt.json"
-    - ".claude-state/tdd/{RUN_ID}/green_receipt.json"
+    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/evidence.json"
+    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/validated.json"
+    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/red_receipt.json"
+    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/green_receipt.json"
 ---
 
 # /tdd Protocol (NTP v3.2)
 
 You are operating under a **Wrapper-Only Native Tool-Gated TDD Protocol**.
 
-Every code change MUST pass through RED → GREEN → VALIDATE before you respond.
-
-You NEVER run the test command directly — you ALWAYS use `run_phase.py`.
-
----
+**Mandatory Protocol:** See `__lib/tdd_protocol.md` for the RED → GREEN → VALIDATE workflow.
 
 ## Invocation
 
@@ -56,169 +52,26 @@ You NEVER run the test command directly — you ALWAYS use `run_phase.py`.
 
 **Modes:** `feature` | `bugfix` | `refactor`
 
----
+## Summary of Phases
 
-## Execution — Follow Exactly
+1. **Step 0: Initialize** - `generate_context.py` to create `session.json`.
+2. **Step 1: RED** - `run_phase.py --phase red` (Must fail).
+3. **Step 2: GREEN** - `run_phase.py --phase green` (Must pass).
+4. **Step 3: REFACTOR** - (Optional) `run_phase.py --phase refactor`.
+5. **Step 4: Evidence** - Create `evidence.json`.
+6. **Step 5: Validate** - `validate_tdd.py` (Must pass).
 
-### Step 0: Initialize Session
+## Evidence-Bound Verification (MANDATORY)
 
-```bash
-python .claude/skills/tdd/generate_context.py "[mode]" "<description>"
-```
-
-This prints:
-
-- a **run ID**
-- a **detected test command**
-- a **Standard Operating Procedure (SOP)**
-
-and creates `.claude-state/tdd/<RUN_ID>/session.json`.
+You MUST complete this step before stopping. See `__lib/tdd_protocol.md` for formatting rules.
 
 ---
 
-### Step 1: RED — Write Failing Tests
+## Prohibited Behaviors
 
-1. Write tests that define the expected behavior.
-2. Execute tests via wrapper:
+1. **Never run tests directly.** Always use `run_phase.py`.
+2. **Never edit receipts or logs.**
+3. **Never skip RED.**
+4. **Never exceed 3 validation attempts.**
+5. **If you claim refactor work, you must prove it.**
 
-```bash
-python .claude/skills/tdd/run_phase.py --run-id "<RUN_ID>" --phase red
-# Optional (narrow scope):
-# python .claude/skills/tdd/run_phase.py --run-id "<RUN_ID>" --phase red --override-cmd "pytest tests/foo_test.py"
-```
-
-The wrapper:
-
-- runs the test command,
-- captures stdout/stderr and exit code,
-- writes `red.stdout.log` / `red.stderr.log`,
-- writes `red_receipt.json` with an HMAC signature.
-
-RED MUST FAIL.
-
----
-
-### Step 2: GREEN — Minimal Implementation
-
-1. Implement the minimum code to make tests pass.
-2. Execute GREEN via wrapper:
-
-```bash
-python .claude/skills/tdd/run_phase.py --run-id "<RUN_ID>" --phase green
-```
-
-GREEN MUST PASS.
-
----
-
-### Step 3: REFACTOR (optional but enforced when claimed)
-
-If you refactor any files, you MUST:
-
-```bash
-python .claude/skills/tdd/run_phase.py --run-id "<RUN_ID>" --phase refactor
-```
-
-REFACTOR MUST PASS and have a distinct stdout from GREEN.
-
----
-
-### Step 4: Draft Evidence
-
-Create:
-
-```text
-.claude-state/tdd/<RUN_ID>/evidence.json
-```
-
-matching `TddEvidence` in `session_models.py`.
-
-You **reference** receipts — you do NOT embed raw logs.
-
-Required fields:
-
-- `metadata.run_id`, `metadata.mode`, `metadata.task`, `metadata.cwd`,
-  `metadata.test_command`, `metadata.started_at`
-- `target_component`, `expected_behavior`
-- `test_files_modified`, `impl_files_modified`
-- `red.receipt_path` → `"red_receipt.json"`
-- `green.receipt_path` → `"green_receipt.json"`
-
-Optional:
-
-- `refactor.receipt_path`
-- `files_refactored`
-- `failure_summary` (human-readable notes)
-
----
-
-### Step 5: Validate
-
-```bash
-python .claude/skills/tdd/validate_tdd.py "<RUN_ID>"
-```
-
-The validator will:
-
-- load `session.json` and `evidence.json`,
-- verify HMAC-signed receipts and log hashes,
-- check RED fails and GREEN passes,
-- enforce ordering (GREEN after RED),
-- enforce refactor semantics if present.
-
-On SUCCESS:
-
-- it writes `validated.json` under `.claude-state/tdd/<RUN_ID>/`,
-- updates `session.phase` to `validated`,
-- clears `.active_run` so the post-response hook will allow your reply.
-
-On FAILURE:
-
-- it increments `session.retries`,
-- prints detailed errors,
-- stops after **3 attempts**. On 3rd failure, you MUST ask the user for guidance.
-
----
-
-### Step 6: Evidence-Bound Verification (MANDATORY)
-
-You MUST complete this step before stopping. No exceptions.
-
-Do NOT write a freeform summary. Instead:
-
-1. Run each command from the `verification.commands` frontmatter
-2. Write results to artifact: `P:/.claude/.artifacts/{terminal_id}/tdd/verification.json`
-3. Paste each tool's output verbatim
-4. For each command: PASS or FAIL with one sentence
-
-**Prohibited in summaries:**
-- Line numbers not shown in this turn's tool output
-- File contents not read in this turn
-- Claims about test results not from this turn's run_phase.py output
-- "All tests pass" without showing actual pytest output from this turn
-
-**Format:**
-```
-## Verification Results
-
-### [command description]
-[verbatim tool output]
-Status: PASS/FAIL — [one sentence]
-```
-
-1. **Never run tests directly.** Always use `run_phase.py` for RED/GREEN/REFACTOR.
-2. **Never edit receipts or logs.** You MUST NOT modify `*_receipt.json`, `*.stdout.log`, `*.stderr.log`, `session.json`, or `validated.json`.
-3. **Never skip RED.** Wrapper and validator assume RED happened before GREEN.
-4. **Never exceed 3 validation attempts.** After 3 failures, STOP and ask for help.
-5. **If you claim refactor work, you must prove it.** Any non-empty `files_refactored`
-   requires a passing REFACTOR phase and distinct stdout from GREEN.
-
----
-
-## Multi-Terminal Isolation
-
-- Each TDD session is partitioned by `run_id` under `.claude-state/tdd/`
-- Active session pointer is `.active_run` file (O(1) check, not directory scan)
-- Stale pointer cleanup: if run_dir missing, pointer is cleaned automatically
-- Validation includes `run_id` cross-check to prevent session confusion
-- Localized `SessionState.retries` avoids global locking (Windows-compatible)

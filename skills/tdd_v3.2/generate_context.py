@@ -1,7 +1,7 @@
 """
 Context generator for /tdd v3.2.
 
-- Creates per-run directory under .claude-state/tdd/<run_id>/
+- Creates per-run directory under .claude/.artifacts/{terminal_id}/tdd/<run_id>/
 - Creates an O(1) .active_run pointer
 - Detects test command
 - Caps workspace scan depth to protect context windows
@@ -19,16 +19,18 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "__lib"))
 from session_models import SessionState
+import sdlc_state
 
-STATE_ROOT = Path(os.getcwd()) / ".claude-state" / "tdd"
+STATE_ROOT = sdlc_state.resolve_tdd_state_root()
 ACTIVE_PTR = STATE_ROOT / ".active_run"
 STALE_THRESHOLD_SECONDS = 3600
 
 _SKIP_DIRS = frozenset(
     {
         ".claude",
-        ".claude-state",
+        ".artifacts",
         "venv",
         ".venv",
         "node_modules",

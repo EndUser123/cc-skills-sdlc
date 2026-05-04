@@ -5,7 +5,7 @@ full context through the orchestrator. Each phase reads from files and
 writes outputs to files, with the orchestrator only passing filenames.
 
 File layout per pre-mortem session:
-    P:/.claude/.evidence/pre-mortem/pre-mortem-{timestamp}/
+    P:/.claude/.artifacts/{terminal_id}/pre-mortem/
         work.md          - original work input
         p1_findings.md  - Phase 1 output
         p2.md      - Phase 2 output
@@ -65,27 +65,27 @@ except ImportError:
 def _get_terminal_id() -> str:
     """Get terminal ID for session isolation.
 
-    Delegates to canonical_terminal_id() from core.terminal_id (search-research
-    package) for a collision-resistant, consistent terminal identifier.
-    Falls back to pid+ns hash if the canonical function is unavailable.
-
-    Returns:
-        Terminal identifier string.
+    Uses canonical_terminal_id() from search-research/core/terminal_id.py
+    for a collision-resistant, consistent terminal identifier.
+    Falls back to hostname+pid if the canonical function is unavailable.
     """
     try:
-        import sys
+        # Hardcoded absolute path: canonical_terminal_id() uses WT_SESSION which is stable
+        # and avoids any symlink/junction resolution issues on Windows
+        terminal_id_file = Path("P:/packages/search-research/core/terminal_id.py")
+        if not terminal_id_file.exists():
+            raise FileNotFoundError(f"terminal_id.py not found at {terminal_id_file}")
 
-        # search-research is at P:/packages/search-research/src
-        # Go up from .claude/skills/pre-mortem/lib/ to P:\
-        search_research_root = (
-            Path(__file__).parent.parent.parent.parent.parent / "packages" / "search-research" / "src"
-        )
-        if str(search_research_root) not in sys.path:
-            sys.path.insert(0, str(search_research_root))
-        from core.terminal_id import canonical_terminal_id
+        import importlib.util
 
-        return canonical_terminal_id()
-    except (socket.gaierror, OSError, ModuleNotFoundError):
+        spec = importlib.util.spec_from_file_location("terminal_id_module", terminal_id_file)
+        if spec is None or spec.loader is None:
+            raise ImportError("Could not load spec")
+        module = importlib.util.module_from_spec(spec)
+        _sys.modules["terminal_id_module"] = module
+        spec.loader.exec_module(module)
+        return module.canonical_terminal_id()
+    except Exception:
         # Fallback: hostname + pid (same algorithm as state_manager._resolve_terminal_id)
         hostname = socket.gethostname()
         pid = os.getpid()
@@ -94,7 +94,7 @@ def _get_terminal_id() -> str:
 
 # Staging root - P:/.claude/.artifacts/{terminal_id}/pre-mortem/
 def _resolve_artifacts_dir(skill_name: str) -> Path:
-    base = Path.cwd().resolve() / ".claude" / ".artifacts"
+    base = Path("P:/.claude/.artifacts")
     terminal_id = _get_terminal_id()
     return base / terminal_id / skill_name
 

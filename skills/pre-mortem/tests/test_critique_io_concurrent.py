@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "__lib"))
 
 
 def _worker_save_registry(args: tuple[str, str, str]) -> None:

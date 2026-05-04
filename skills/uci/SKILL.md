@@ -172,7 +172,7 @@ Conditionally triggers sequential agent execution when justified by code charact
 
 See `references/sequential-trigger.md` for two-phase evaluation, triggering conditions, and cost-constrained mode.
 
-**Implementation**: `lib/sequential_trigger.py`
+**Implementation**: `__lib/sequential_trigger.py`
 
 ## Workflow
 

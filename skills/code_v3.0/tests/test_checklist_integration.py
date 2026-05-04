@@ -140,7 +140,7 @@ class TestPreExecutionChecklist:
 
     def test_checklist_validation_module_exists(self):
         """Checklist validation module should exist."""
-        module_path = Path(__file__).parent.parent / "lib" / "checklist.py"
+        module_path = Path(__file__).parent.parent / "__lib" / "checklist.py"
 
         assert module_path.exists(), f"Checklist module should exist at {module_path}"
 
