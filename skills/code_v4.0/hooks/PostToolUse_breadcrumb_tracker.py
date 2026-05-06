@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 """
-PostToolUse hook for /code skill - Track workflow step completion + phase ledger.
+PostToolUse hook for /code (code_v4.0) - Track workflow step completion + phase ledger.
 
-Marks workflow steps as complete in breadcrumb trail AND writes phase markers
-to the ledger for gateable phases (smoke, full tests, audit).
-
-Usage: This hook is automatically called after tool execution during /code skill
-Input: JSON via stdin with tool details and results
-Output: JSON via stdout with continue decision
+Uses the shared enforce.phase_ledger under skill_id="code_v4.0".
 """
 
 from __future__ import annotations
@@ -16,19 +11,18 @@ import json
 import sys
 from pathlib import Path
 
-# Add skill-guard to path
+_ROOT = Path(__file__).resolve().parents[3]
+_ENFORCE = _ROOT / "enforce"
+if str(_ENFORCE) not in sys.path:
+    sys.path.insert(0, str(_ENFORCE))
+
 skill_guard_path = Path("P:/packages/skill-guard")
 if str(skill_guard_path) not in sys.path:
     sys.path.insert(0, str(skill_guard_path))
 
 from skill_guard.breadcrumb.tracker import set_breadcrumb
+from enforce.phase_ledger import write_phase_marker
 
-# Import the phase ledger helper
-_hooks_dir = Path(__file__).resolve().parent
-sys.path.insert(0, str(_hooks_dir))
-from code_phase_ledger import write_phase_marker
-
-# Map tool names to workflow steps
 TOOL_TO_STEP = {
     "Ask": "analyze_query_intent",
     "Bash": "tdd_implementation",
@@ -40,7 +34,6 @@ TOOL_TO_STEP = {
     "Agent": "design_solution",
 }
 
-# Bash commands that indicate gateable phases
 AUDIT_COMMANDS = frozenset([
     "ruff", "ruff check", "ruff format",
     "mypy", "pylint", "tsc", "tsc --noEmit",
@@ -49,22 +42,18 @@ AUDIT_COMMANDS = frozenset([
 
 
 def _is_pytest(cmd: str) -> bool:
-    """Return True if cmd is a pytest invocation."""
     return "pytest" in cmd or "py.test" in cmd
 
 
 def _is_smoke(cmd: str) -> bool:
-    """Return True if cmd looks like a quick/smoke pytest run."""
-    return _is_pytest(cmd) and ("-x" in cmd or "--exitfirst" in cmd or "test_" in cmd and "tests" not in cmd)
+    return _is_pytest(cmd) and ("-x" in cmd or "--exitfirst" in cmd or ("test_" in cmd and "tests" not in cmd))
 
 
 def _is_full_suite(cmd: str) -> bool:
-    """Return True if cmd looks like a full test suite run."""
     return _is_pytest(cmd) and not _is_smoke(cmd)
 
 
 def _audit_exit_from_cmd(cmd: str, stdout: str, stderr: str, exit_code: int) -> int | None:
-    """Map tool invocation to an audit exit code."""
     combined = stdout + stderr
     tool = None
     if "ruff" in cmd:
@@ -81,7 +70,6 @@ def _audit_exit_from_cmd(cmd: str, stdout: str, stderr: str, exit_code: int) -> 
 
 
 def detect_completed_step(tool_name: str, tool_input: dict) -> str | None:
-    """Detect which workflow step completed based on tool usage."""
     if tool_name in TOOL_TO_STEP:
         return TOOL_TO_STEP[tool_name]
     if tool_name == "Skill":
@@ -94,7 +82,7 @@ def detect_completed_step(tool_name: str, tool_input: dict) -> str | None:
 
 
 def main() -> None:
-    """Track workflow step completion and write ledger markers."""
+    skill_id = "code_v4.0"
     try:
         input_data = json.loads(sys.stdin.read())
         tool_name = input_data.get("tool_name", "")
@@ -106,25 +94,27 @@ def main() -> None:
 
         step = detect_completed_step(tool_name, tool_input)
         if step:
-            set_breadcrumb("code", step)
+            set_breadcrumb("code_v4.0", step)
 
-        # Wire gateable phases into the ledger
         if tool_name == "Bash":
             cmd = tool_input.get("command", "")
             if _is_full_suite(cmd):
-                write_phase_marker("full_test_suite", {"pytest_exit": exit_code})
+                write_phase_marker(skill_id, "full_test_suite", {"pytest_exit": exit_code})
             elif _is_smoke(cmd):
-                write_phase_marker("smoke_validation", {"pytest_exit": exit_code})
+                write_phase_marker(skill_id, "smoke_validation", {"pytest_exit": exit_code})
             audit_exit = _audit_exit_from_cmd(cmd, stdout, stderr, exit_code)
             if audit_exit is not None:
-                write_phase_marker("audit_quality_checks", {"tool_exit": audit_exit, "tool": cmd.split()[0] if cmd else "unknown"})
+                write_phase_marker(
+                    skill_id, "audit_quality_checks",
+                    {"tool_exit": audit_exit, "tool": cmd.split()[0] if cmd else "unknown"},
+                )
 
         print(json.dumps({"continue": True}))
         sys.exit(0)
 
     except Exception as e:
         print(json.dumps({"continue": True}), file=sys.stderr)
-        print(f"Breadcrumb tracking failed: {e}", file=sys.stderr)
+        print(f"Phase ledger write failed: {e}", file=sys.stderr)
         sys.exit(0)
 
 

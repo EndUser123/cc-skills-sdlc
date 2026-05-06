@@ -39,6 +39,8 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | qmd-wiki | qmd-wiki |
 | rca | Debug RCA Skill v2.12.0 |
 | review_bundle | Review Bundle Creation |
+| ship | /ship — Deploy readiness and runtime snapshot |
+| snapshot | /snapshot — Session snapshot capture and restore (moved to snapshot package) |
 | spec-compliance | Purpose |
 | specify | Specify — Detailed Specification |
 | sqd | /sqd — SDLC Quality Dispatcher |
@@ -47,7 +49,10 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | synergy | Code Editing Patterns |
 | system-internals-verification | Purpose |
 | t | Code Editing Patterns |
+| task | /task — Task list orchestration |
+| team | /team — Multi-agent task coordination |
 | tdd | TDD - Test-Driven Development with PARALLEL Delegation |
+| tilldone | /tilldone — Batch convergence runner |
 | tldr-code | TLDR-Code: Token-Efficient Code Analysis |
 | tldr-deep | TLDR Deep Analysis |
 | tldr-overview | TLDR Project Overview |

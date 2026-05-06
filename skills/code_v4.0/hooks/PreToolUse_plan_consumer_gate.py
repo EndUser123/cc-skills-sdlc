@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""
+PreToolUse hook for /code (code_v4.0) — plan consumer gate + shared ledger write.
+
+Authoritative success point: validate_plan_for_execution() returns allowed=True.
+At that point, writes consumer_contract_precheck to the shared phase ledger
+under skill_id="code_v4.0".
+"""
+
 from __future__ import annotations
 
 import json
@@ -7,14 +15,12 @@ import sys
 from pathlib import Path
 
 
-def _add_import_paths() -> None:
-    root = Path(__file__).resolve().parents[2]
-    package_src = root / "contract-primitives" / "src"
-    if str(package_src) not in sys.path:
-        sys.path.insert(0, str(package_src))
-    hooks_dir = root / "hooks"
-    if str(hooks_dir) not in sys.path:
-        sys.path.insert(0, str(hooks_dir))
+_ROOT = Path(__file__).resolve().parents[3]
+_ENFORCE = _ROOT / "enforce"
+if str(_ENFORCE) not in sys.path:
+    sys.path.insert(0, str(_ENFORCE))
+if str(_ROOT / "contract-primitives" / "src") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "contract-primitives" / "src"))
 
 
 def _should_skip_for_path(file_path: str) -> bool:
@@ -57,8 +63,8 @@ def main() -> None:
         print(json.dumps({"decision": "approve", "reason": "Editing the source plan/ADR artifact"}))
         sys.exit(0)
 
-    _add_import_paths()
     from contract_primitives import discover_local_plan_path, validate_plan_for_execution
+    from enforce.phase_ledger import write_phase_marker, read_phase_ledger
 
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     plan_path = discover_local_plan_path(project_dir=project_dir, cwd=os.getcwd())
@@ -66,12 +72,8 @@ def main() -> None:
         print(json.dumps({"decision": "approve", "reason": "No local plan artifact discovered"}))
         sys.exit(0)
 
-    # Ledger check: if contract precheck was already recorded, approve silently.
-    # If not, validate_plan_for_execution() is the authoritative gate;
-    # on allowed, write the ledger marker here (this is the phase write point).
-    from code_phase_ledger import write_phase_marker, read_phase_ledger
-
-    ledger = read_phase_ledger()
+    # Check if precheck already recorded in shared ledger (skill_id="code_v4.0")
+    ledger = read_phase_ledger("code_v4.0")
     precheck_done = False
     if ledger:
         precheck_phase = ledger.get("phases", {}).get("consumer_contract_precheck", {})
@@ -85,6 +87,7 @@ def main() -> None:
     if result.allowed:
         if not precheck_done:
             write_phase_marker(
+                "code_v4.0",
                 "consumer_contract_precheck",
                 {
                     "result": "pass",

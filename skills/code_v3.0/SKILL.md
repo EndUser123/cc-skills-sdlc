@@ -32,6 +32,12 @@ hooks:
       hooks:
         - type: command
           command: "python \"$CLAUDE_PROJECT_DIR\"/.claude/skills/code/hooks/PreToolUse_plan_consumer_gate.py"
+  Stop:
+    - matcher: ".*"
+      hooks:
+        - type: command
+          command: "python \"$CLAUDE_PROJECT_DIR\"/.claude/skills/code/hooks/Stop_code_phase_gate.py"
+          description: "Verify all gateable phases passed before DONE"
 workflow_steps:
   - pre_execution_checklist
   - analyze_query_intent
