@@ -33,6 +33,7 @@ description: Wiki skill architecture and schema conventions
 | Query | question string | synthesized answer | optionally writes wiki page |
 | Lint | none | health report | none (read-only) |
 | Index | none | index.md rebuilt | index.md written |
+| Update | optional topic, --auto flag | stale candidates ranked by age + search frequency | log.md appended on refresh, wiki page rewritten, qmd index updated |
 
 ## Graceful Degradation
 
