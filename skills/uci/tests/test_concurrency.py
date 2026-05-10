@@ -15,12 +15,12 @@ class TestOrchestratorConcurrency:
 
     def test_orchestrator_exists(self):
         """Test that orchestrator.py module exists."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         assert orchestrator.exists(), "orchestrator.py should exist"
 
     def test_orchestrator_has_parallel_class(self):
         """Test that orchestrator has ParallelAgentOrchestrator class."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have ParallelAgentOrchestrator class
@@ -28,7 +28,7 @@ class TestOrchestratorConcurrency:
 
     def test_orchestrator_has_log_rotation(self):
         """Test that orchestrator implements log rotation (30-day retention)."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention log rotation or retention
@@ -39,7 +39,7 @@ class TestOrchestratorConcurrency:
 
     def test_orchestrator_has_sanitization(self):
         """Test that orchestrator sanitizes API keys from logs."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention sanitization
@@ -47,7 +47,7 @@ class TestOrchestratorConcurrency:
 
     def test_orchestrator_has_config(self):
         """Test that orchestrator has OrchestratorConfig."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have OrchestratorConfig dataclass/typedict
@@ -59,12 +59,12 @@ class TestCircuitBreakerConcurrency:
 
     def test_circuit_breaker_exists(self):
         """Test that circuit_breaker.py module exists."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         assert breaker.exists(), "circuit_breaker.py should exist"
 
     def test_circuit_breaker_has_llm_circuit_breaker(self):
         """Test that circuit_breaker has LLMCircuitBreaker class."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should have LLMCircuitBreaker class
@@ -72,7 +72,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_circuit_breaker_has_state_enum(self):
         """Test that circuit_breaker has CircuitState enum."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should have CircuitState
@@ -80,7 +80,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_circuit_breaker_has_provider_state(self):
         """Test that circuit_breaker has ProviderState."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should have ProviderState
@@ -88,7 +88,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_circuit_breaker_has_health_monitoring(self):
         """Test that circuit_breaker supports health monitoring."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should mention health monitoring
@@ -96,7 +96,7 @@ class TestCircuitBreakerConcurrency:
 
     def test_circuit_breaker_has_failover(self):
         """Test that circuit_breaker supports automatic failover."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should mention failover
@@ -109,7 +109,7 @@ class TestStateIsolation:
     def test_state_directory_isolation(self):
         """Test that state is isolated per terminal."""
         # Look for terminal ID usage in orchestrator
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention terminal_id or per-terminal isolation
@@ -120,7 +120,7 @@ class TestStateIsolation:
 
     def test_log_file_locking(self):
         """Test that api_responses_log.jsonl uses file locking."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention file locking or concurrent access
@@ -131,7 +131,7 @@ class TestStateIsolation:
 
     def test_provider_registry_isolation(self):
         """Test that provider registry handles concurrent access."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should handle concurrent provider access
@@ -142,7 +142,7 @@ class TestStateIsolation:
         """Test that brainstorm memory is per-terminal."""
         # This tests that brainstorm/chunks used during review
         # don't create conflicts between terminals
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have temporary or isolation patterns
@@ -157,7 +157,7 @@ class TestConcurrencySafety:
 
     def test_no_race_conditions_in_logging(self):
         """Test that logging doesn't have race conditions."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should use proper file handling (append mode, context manager)
@@ -166,7 +166,7 @@ class TestConcurrencySafety:
     def test_atomic_operations(self):
         """Test that critical operations are atomic."""
         # Look for atomic write patterns
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have try-except for error handling
@@ -175,7 +175,7 @@ class TestConcurrencySafety:
     def test_state_directory_cleanup(self):
         """Test that state directories can be cleaned up safely."""
         # Test isolation allows safe cleanup
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should handle cleanup
@@ -187,7 +187,7 @@ class TestLogRotation:
 
     def test_log_rotation_mechanism(self):
         """Test that log rotation is implemented."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have rotation logic
@@ -195,7 +195,7 @@ class TestLogRotation:
 
     def test_log_retention_period(self):
         """Test that logs are kept for 30 days."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention 30-day retention
@@ -203,7 +203,7 @@ class TestLogRotation:
 
     def test_api_key_sanitization(self):
         """Test that API keys are sanitized from logs."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should mention API key sanitization
@@ -215,7 +215,7 @@ class TestDegradedMode:
 
     def test_degraded_mode_handling(self):
         """Test that system handles degraded mode gracefully."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should mention degraded mode
@@ -223,7 +223,7 @@ class TestDegradedMode:
 
     def test_circuit_state_tracking(self):
         """Test that circuit state is tracked."""
-        breaker = Path("P:/.claude/skills/uci/lib/circuit_breaker.py")
+        breaker = Path("P:\\\\\\.claude/skills/uci/lib/circuit_breaker.py")
         content = breaker.read_text(encoding="utf-8")
 
         # Should have state tracking
@@ -235,7 +235,7 @@ class TestConcurrentAgentExecution:
 
     def test_parallel_execution_safe(self):
         """Test that parallel agent execution is safe."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should support parallel execution
@@ -243,7 +243,7 @@ class TestConcurrentAgentExecution:
 
     def test_aggregation_is_thread_safe(self):
         """Test that result aggregation is thread-safe."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should collect results from parallel agents
@@ -256,7 +256,7 @@ class TestMultiTerminalScenarios:
     def test_simultaneous_reviews_same_repo(self):
         """Test that multiple terminals can review the same repo simultaneously."""
         # This tests file locking and log rotation
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should handle concurrent access to same files
@@ -265,7 +265,7 @@ class TestMultiTerminalScenarios:
     def test_different_scopes_concurrent(self):
         """Test that different scopes can be reviewed concurrently."""
         # Different terminals reviewing different scopes
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should support scope parameter
@@ -283,7 +283,7 @@ class TestCoreConcurrencyIntegration:
         ]
 
         for module in modules:
-            module_path = Path(f"P:/.claude/skills/uci/lib/{module}")
+            module_path = Path(f"P:\\\\\\.claude/skills/uci/lib/{module}")
             assert module_path.exists(), f"{module} should exist"
 
             content = module_path.read_text(encoding="utf-8")

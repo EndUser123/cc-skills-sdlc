@@ -6,7 +6,7 @@ RED PHASE TESTS - These tests FAIL because scripts/fix_state_paths.py doesn't ex
 
 Tests cover:
 - Git Bash path detection (/p/..., /c/..., etc.)
-- Normalization to Windows native format (P:\..., C:\...)
+- Normalization to Windows native format (P:\\\\\\..., C:\...)
 - JSON file modification in place
 - Backup creation and restoration
 - Recursive directory scanning
@@ -74,7 +74,7 @@ def sample_mixed_paths_file(temp_state_dir):
 
     data = {
         "git_bash": "/p/.claude/skills/code",
-        "windows": "P:\\\\.claude\\\\skills\\\\code",
+        "windows": "P:\\\\\\\\\.claude\\\\skills\\\\code",
         "relative": "src/main.py",
         "another_drive": "/c/Users/test",
         "nested": {
@@ -164,7 +164,7 @@ class TestPathDetection:
         assert any("/c/" in path for path in git_paths)
 
     def test_fix_paths_ignores_windows_paths(self, sample_mixed_paths_file):
-        """Should ignore Windows native paths (P:\\\\..., C:\\\\...)."""
+        """Should ignore Windows native paths (P:\\\\\\\\\..., C:\\\\...)."""
         from scripts.fix_state_paths import detect_git_bash_paths
 
         data = json.loads(sample_mixed_paths_file.read_text())
@@ -196,7 +196,7 @@ class TestPathNormalization:
         git_bash_path = "/p/.claude/skills/code"
         windows_path = normalize_path(git_bash_path)
 
-        assert windows_path == "P:\\\\.claude\\\\skills\\\\code"
+        assert windows_path == "P:\\\\\\\\\.claude\\\\skills\\\\code"
 
     def test_fix_paths_multiple_drives(self):
         """Should handle multiple drive letters (/c/, /d/, /p/, etc.)."""
@@ -205,7 +205,7 @@ class TestPathNormalization:
         test_cases = [
             ("/c/Users/test", "C:\\\\Users\\\\test"),
             ("/d/Projects/code", "D:\\\\Projects\\\\code"),
-            ("/p/.claude/skills", "P:\\\\.claude\\\\skills"),
+            ("/p/.claude/skills", "P:\\\\\\\\\.claude\\\\skills"),
         ]
 
         for git_bash, expected_windows in test_cases:
@@ -217,7 +217,7 @@ class TestPathNormalization:
         from scripts.fix_state_paths import normalize_path
 
         # Windows paths should be preserved
-        windows_path = "P:\\\\.claude\\\\skills\\\\code"
+        windows_path = "P:\\\\\\\\\.claude\\\\skills\\\\code"
         assert normalize_path(windows_path) == windows_path
 
         # Relative paths should be preserved
@@ -267,7 +267,7 @@ class TestJSONModification:
         assert modified_content != original_content
 
         # Should contain Windows paths
-        assert "P:\\\\" in modified_content
+        assert "P:\\\\\\\\\" in modified_content
         assert "/p/" not in modified_content
 
     def test_fix_paths_preserves_non_path_content(self, temp_state_dir, no_paths_file):
@@ -312,10 +312,10 @@ class TestJSONModification:
 
         # Should find and normalize deep nested path
         assert changes > 0
-        assert modified_data["level1"]["level2"]["level3"]["deep_path"] == "P:\\\\.claude\\\\deep\\\\file.py"
+        assert modified_data["level1"]["level2"]["level3"]["deep_path"] == "P:\\\\\\\\\.claude\\\\deep\\\\file.py"
 
         # Should normalize path in array
-        assert modified_data["level1"]["array"][0]["item"] == "P:\\\\.claude\\\\array\\\\item.py"
+        assert modified_data["level1"]["array"][0]["item"] == "P:\\\\\\\\\.claude\\\\array\\\\item.py"
 
     def test_fix_paths_valid_json_output(self, temp_state_dir, sample_json_file):
         """Should produce valid JSON after modification."""
@@ -496,7 +496,7 @@ class TestEdgeCases:
         modified_data = json.loads(sample_mixed_paths_file.read_text())
 
         # Should normalize Git Bash paths
-        assert modified_data["git_bash"] == "P:\\\\.claude\\\\skills\\\\code"
+        assert modified_data["git_bash"] == "P:\\\\\\\\\.claude\\\\skills\\\\code"
 
         # Should preserve Windows paths
         assert modified_data["windows"] == original_data["windows"]
@@ -506,7 +506,7 @@ class TestEdgeCases:
 
         # Should normalize other Git Bash paths
         assert modified_data["another_drive"] == "C:\\\\Users\\\\test"
-        assert modified_data["nested"]["git_path"] == "P:\\\\.claude\\\\config.json"
+        assert modified_data["nested"]["git_path"] == "P:\\\\\\\\\.claude\\\\config.json"
 
     def test_fix_paths_special_characters(self, temp_state_dir):
         """Should handle paths with spaces, dashes, dots, etc."""
@@ -563,7 +563,7 @@ class TestIntegrationTests:
 
         # Should have normalized paths
         file1_data = json.loads((temp_state_dir / "file1.json").read_text())
-        assert "P:\\\\" in file1_data["path"]
+        assert "P:\\\\\\\\\" in file1_data["path"]
 
     def test_fix_paths_cli_invocation(self, temp_state_dir):
         """Should be invocable from CLI with correct arguments."""

@@ -94,7 +94,7 @@ contract_authority_packet:
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/arch_decisions/ADR-004-example.md"
+  source_adr: "P:\\\\\\packages/example/arch_decisions/ADR-004-example.md"
   plan_title: "Example implementation"
   goal: "Implement the example change."
   implementation_changes:
@@ -161,7 +161,7 @@ contract_authority_packet:
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/arch_decisions/ADR-005-example.md"
+  source_adr: "P:\\\\\\packages/example/arch_decisions/ADR-005-example.md"
   plan_title: "Example implementation"
   goal: "Implement the example change."
   implementation_changes:
@@ -218,7 +218,7 @@ contract_authority_packet:
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/arch_decisions/ADR-006-example.md"
+  source_adr: "P:\\\\\\packages/example/arch_decisions/ADR-006-example.md"
   plan_title: "Example implementation"
   goal: "Implement the example change."
   implementation_changes:

@@ -29,8 +29,8 @@ except ImportError:
     from pathlib import Path
 
     # Direct import path: go up to .claude and import hooks.__lib.rsn_formatter
-    _uci_lib_dir = Path(__file__).parent  # P:\.claude\skills\uci\lib
-    _claude_dir = _uci_lib_dir.parent.parent.parent  # P:\.claude
+    _uci_lib_dir = Path(__file__).parent  # $CLAUDE_ROOT/skills\uci\lib
+    _claude_dir = _uci_lib_dir.parent.parent.parent  # P:\\\\\\.claude
     sys.path.insert(0, str(_claude_dir))
     from hooks.__lib.rsn_formatter import RSNFormatter
 

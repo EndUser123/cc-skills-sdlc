@@ -38,7 +38,7 @@ try:
         sys.path.insert(0, str(_hook_dir))
     from rca.research_with_cache import store_research_result
 except ImportError:
-    CSF_SRC = os.environ.get("CSF_SRC", "P:/__csf/src")
+    CSF_SRC = os.environ.get("CSF_SRC", "P:\\\\\\__csf/src")
     if os.path.exists(CSF_SRC):
         sys.path.insert(0, CSF_SRC)
         try:

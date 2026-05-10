@@ -29,7 +29,7 @@ Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), w
 
 ### Output Paths
 
-- Artifacts dir: `P:/.claude/.artifacts/{terminal_id}/refactor/`
+- Artifacts dir: `P:\\\\\\.claude/.artifacts/{terminal_id}/refactor/`
 - Output path: `{artifacts_dir}/{target}/refactor/findings-{agent-name}.json`
 - terminal_id resolution: `CLAUDE_TERMINAL_ID` → `WT_SESSION` → `ConEmuServerPID` → `console_unknown`
 

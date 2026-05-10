@@ -125,9 +125,9 @@ Documentation must be checked and updated in the same directory as modified file
 
 ## CSF Project Documentation
 
-For CSF-specific documentation (P:\__csf\, P:\packages\, .claude\hooks\, .claude\skills\), the project uses a hierarchical README tree with cross-reference update rules.
+For CSF-specific documentation ($__CSF_ROOT/, P:\\\\\\packages\, .claude\hooks\, .claude\skills\), the project uses a hierarchical README tree with cross-reference update rules.
 
-- **CSF README updates**: See [references/csf-readme-updates.md](references/csf-readme-updates.md) -- when and how to update P:\__csf\README.md, including the documentation file requirements table
+- **CSF README updates**: See [references/csf-readme-updates.md](references/csf-readme-updates.md) -- when and how to update $__CSF_ROOT/README.md, including the documentation file requirements table
 - **CSF README tree structure**: See [references/csf-readme-tree.md](references/csf-readme-tree.md) -- hierarchical README layout, documentation update rules per path, and skill-specific documentation sync
 
 ## Workflow

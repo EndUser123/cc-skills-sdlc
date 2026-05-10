@@ -55,8 +55,8 @@ Phase 8-11 (selected implementation):
 ### Worktree Naming
 
 ```
-P:/worktrees/<feature-slug>-primary/    # Claude implementation
-P:/worktrees/<feature-slug>-deepseek/   # DeepSeek implementation
+P:\\\\\\worktrees/<feature-slug>-primary/    # Claude implementation
+P:\\\\\\worktrees/<feature-slug>-deepseek/   # DeepSeek implementation
 ```
 
 State files keyed on `cwd` to prevent cross-worktree state contamination (per CLAUDE.md isolation pattern).
@@ -65,7 +65,7 @@ State files keyed on `cwd` to prevent cross-worktree state contamination (per CL
 
 ```bash
 # DeepSeek implements the plan in worktree B
-cd P:/worktrees/<feature-slug>-deepseek
+cd P:\\\\\\worktrees/<feature-slug>-deepseek
 opencode run \
   --model deepseek-v3.2 \
   --include-dir . \
@@ -84,7 +84,7 @@ codex -a full-auto \
 
 ### Compare Step Output
 
-Written to `P:/worktrees/<feature-slug>-compare/compare.md`:
+Written to `P:\\\\\\worktrees/<feature-slug>-compare/compare.md`:
 
 ```markdown
 ## Implementation Comparison: <feature>
@@ -107,7 +107,7 @@ Written to `P:/worktrees/<feature-slug>-compare/compare.md`:
 
 ### TASK-001: Verify worktree creation is safe in this codebase
 - Run `git worktree list` to see existing worktrees
-- Confirm `P:/worktrees/` exists or can be created
+- Confirm `P:\\\\\\worktrees/` exists or can be created
 - Confirm no hooks block operations in worktrees (check `PreToolUse` hooks for path guards)
 - **Output**: Verified worktree creation command and any hook exclusions needed
 
@@ -120,7 +120,7 @@ Written to `P:/worktrees/<feature-slug>-compare/compare.md`:
 - Write `references/worktree-compare-rubric.md` with scoring criteria
 - Criteria: test pass rate (weight 0.5), coverage (0.2), implementation clarity (0.2), line count (0.1)
 - Define "Manual merge required" threshold: test pass rate differs by >10% or both have unique valid patterns
-- **Output**: `P:/packages/cc-skills-sdlc/skills/code/references/worktree-compare-rubric.md`
+- **Output**: `P:\\\\\\packages/cc-skills-sdlc/skills/code/references/worktree-compare-rubric.md`
 
 ### TASK-004: Add --parallel-llm flag to SKILL.md
 - Add `--parallel-llm [deepseek|codex]` to the argument-hint in SKILL.md frontmatter

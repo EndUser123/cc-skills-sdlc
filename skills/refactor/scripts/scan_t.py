@@ -3,7 +3,7 @@ from pathlib import Path
 sys.path.insert(0, '.')
 from scripts.complexity_scanner import scan_complexity
 
-files = list(Path('P:/packages/cc-skills-sdlc/skills/t').rglob('*.py'))
+files = list(Path('P:\\\\\\packages/cc-skills-sdlc/skills/t').rglob('*.py'))
 files = [str(f) for f in files if '__pycache__' not in str(f)]
 print(f'Scanning {len(files)} files in skills/t...')
 

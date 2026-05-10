@@ -24,7 +24,7 @@ class TestNormalizePath:
     def test_git_bash_to_windows(self):
         """Convert Git Bash style to Windows native."""
         result = normalize_path("/p/project/src/file.py")
-        # Should convert to P:\project\src\file.py format
+        # Should convert to P:\\\\\\project\src\file.py format
         assert "P:" in result
         assert "project" in result
         assert "src" in result
@@ -32,7 +32,7 @@ class TestNormalizePath:
 
     def test_windows_path_unchanged(self):
         """Windows path should remain valid."""
-        result = normalize_path("P:/project/src/file.py")
+        result = normalize_path("P:\\\\\\project/src/file.py")
         assert "P:" in result
         assert "\\" in result or "/" in result  # Native separators
 
@@ -78,11 +78,11 @@ class TestPathTypeDetection:
         """Detect Git Bash style paths."""
         assert is_git_bash_path("/p/file.py") == True
         assert is_git_bash_path("/c/file.py") == True
-        assert is_git_bash_path("P:/file.py") == False
+        assert is_git_bash_path("P:\\\\\\file.py") == False
 
     def test_is_windows_path(self):
         """Detect Windows style paths."""
-        assert is_windows_path("P:/file.py") == True
+        assert is_windows_path("P:\\\\\\file.py") == True
         assert is_windows_path("C:/file.py") == True
         assert is_windows_path("/p/file.py") == False
 
@@ -104,7 +104,7 @@ class TestNormalizePathExceptionHandling:
         When: normalize_path() is called
         Then: The function returns the normalized path without resolution
         """
-        test_path = "P:/nonexistent/path/to/file.txt"
+        test_path = "P:\\\\\\nonexistent/path/to/file.txt"
 
         # Mock Path to raise OSError on resolve()
         with patch('utils.normalize_paths.Path') as mock_path_class:
@@ -154,7 +154,7 @@ class TestNormalizePathExceptionHandling:
         When: normalize_path() is called
         Then: The function returns the normalized path without resolution
         """
-        test_path = "P:/invalid/path/with/null/byte"
+        test_path = "P:\\\\\\invalid/path/with/null/byte"
 
         # Mock Path to raise ValueError on resolve()
         with patch('utils.normalize_paths.Path') as mock_path_class:
@@ -180,7 +180,7 @@ class TestNormalizePathExceptionHandling:
         Then: The function returns the fully resolved absolute path
         """
         input_path = "/p/project/src/module.py"
-        resolved_path = "P:/project/src/module.py"
+        resolved_path = "P:\\\\\\project/src/module.py"
 
         # Mock Path to return a resolved path
         with patch('utils.normalize_paths.Path') as mock_path_class:
@@ -235,7 +235,7 @@ class TestNormalizePathListEdgeCases:
         """
         # Arrange
         from utils.normalize_paths import normalize_path_list
-        path_list = [None, "P:/valid/path.py", None]
+        path_list = [None, "P:\\\\\\valid/path.py", None]
 
         # Act
         result = normalize_path_list(path_list)
@@ -255,7 +255,7 @@ class TestNormalizePathListEdgeCases:
         """
         # Arrange
         from utils.normalize_paths import normalize_path_list
-        path_list = ["", "P:/valid/path.py", ""]
+        path_list = ["", "P:\\\\\\valid/path.py", ""]
 
         # Act
         result = normalize_path_list(path_list)
@@ -275,7 +275,7 @@ class TestNormalizePathListEdgeCases:
         """
         # Arrange
         from utils.normalize_paths import normalize_path_list
-        path_list = [None, "", "P:/valid/path.py", None, ""]
+        path_list = [None, "", "P:\\\\\\valid/path.py", None, ""]
 
         # Act
         result = normalize_path_list(path_list)

@@ -17,7 +17,7 @@ Refactor a single file with the full 15-step workflow.
 
 ### DEDUPLICATE
 ```bash
-python scripts/deduplicate.py P:/.claude/.artifacts base_provider
+python scripts/deduplicate.py P:\\\\\\.claude/.artifacts base_provider
 ```
 Output: `{artifacts_dir}/base_provider/refactor/deduplicated.json`
 

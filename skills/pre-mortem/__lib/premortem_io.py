@@ -5,14 +5,14 @@ full context through the orchestrator. Each phase reads from files and
 writes outputs to files, with the orchestrator only passing filenames.
 
 File layout per pre-mortem session:
-    P:/.claude/.artifacts/{terminal_id}/pre-mortem/
+    P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/
         work.md          - original work input
         p1_findings.md  - Phase 1 output
         p2.md      - Phase 2 output
         p3.md      - Phase 3 output (final)
 
 Session registry (compact resilience):
-    P:/.claude/.evidence/pre-mortem/sessions.json
+    P:\\\\\\.claude/.evidence/pre-mortem/sessions.json
     Maps terminal_id -> session_dir for recovery after compaction.
 
 Usage:
@@ -72,7 +72,7 @@ def _get_terminal_id() -> str:
     try:
         # Hardcoded absolute path: canonical_terminal_id() uses WT_SESSION which is stable
         # and avoids any symlink/junction resolution issues on Windows
-        terminal_id_file = Path("P:/packages/search-research/core/terminal_id.py")
+        terminal_id_file = Path("P:\\\\\\packages/search-research/core/terminal_id.py")
         if not terminal_id_file.exists():
             raise FileNotFoundError(f"terminal_id.py not found at {terminal_id_file}")
 
@@ -92,9 +92,9 @@ def _get_terminal_id() -> str:
         return f"{hostname}-{pid}"
 
 
-# Staging root - P:/.claude/.artifacts/{terminal_id}/pre-mortem/
+# Staging root - P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/
 def _resolve_artifacts_dir(skill_name: str) -> Path:
-    base = Path("P:/.claude/.artifacts")
+    base = Path("P:\\\\\\.claude/.artifacts")
     terminal_id = _get_terminal_id()
     return base / terminal_id / skill_name
 
@@ -111,7 +111,7 @@ class PreMortemSession:
 
         Args:
             staging_root: Override staging root directory.
-                         Defaults to P:/.claude/.evidence/pre-mortem/
+                         Defaults to P:\\\\\\.claude/.evidence/pre-mortem/
         """
         self.staging_root = staging_root or STAGING_ROOT
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

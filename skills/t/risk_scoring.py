@@ -14,7 +14,7 @@ from enum import Enum
 
 def _ensure_import_paths() -> None:
     """Ensure CSF modules are in sys.path."""
-    for candidate in ("P:/__csf/src", "P:/__csf", "P:/"):
+    for candidate in ("P:\\\\\\__csf/src", "P:\\\\\\__csf", "P:\\\\\\"):
         if candidate not in sys.path:
             sys.path.insert(0, candidate)
 

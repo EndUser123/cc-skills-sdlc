@@ -77,9 +77,9 @@ except (ImportError, ModuleNotFoundError) as e:
         f"CKS Integration Error: Unable to import Constitutional Knowledge System (CKS): {e}\n"
         "The arch skill will continue with generic analysis without CKS historical data.\n"
         "To enable CKS integration:\n"
-        "  1. Verify CKS is installed at: P:/__csf/\n"
-        "  2. Check CKS source path exists: P:/__csf/src\n"
-        "  3. Ensure CKS database exists: P:/__csf/data/cks.db\n"
+        "  1. Verify CKS is installed at: P:\\\\\\__csf/\n"
+        "  2. Check CKS source path exists: P:\\\\\\__csf/src\n"
+        "  3. Ensure CKS database exists: P:\\\\\\__csf/data/cks.db\n"
         "Proceeding with generic analysis..."
     )
 
@@ -695,7 +695,7 @@ def retrieve_context_hint(limit: int = 5) -> SubjectInferenceContext:
                         path = args.get("file_path") or args.get("path") or args.get("target_path")
                         if path and isinstance(path, str):
                             # Clean up path (strip project root if present)
-                            clean_path = path.replace("P:/", "").replace("P:\\", "")
+                            clean_path = path.replace("P:\\\\\\", "").replace("P:\\\\\\\", "")
                             if clean_path not in found_paths:
                                 found_paths.append(clean_path)
 

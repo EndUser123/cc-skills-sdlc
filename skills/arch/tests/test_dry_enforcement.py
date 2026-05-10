@@ -4,7 +4,7 @@ Unit tests for DRY principle enforcement in validate_templates.py.
 These tests verify DRY (Don't Repeat Yourself) enforcement for template validation.
 All tests are currently FAILING - this is the RED phase of TDD.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_dry_enforcement.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_dry_enforcement.py -v
 """
 
 import pytest

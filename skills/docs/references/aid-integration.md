@@ -23,4 +23,4 @@ aid <directory> --ai-action flow-for-multi-file-docs
 - Legacy code documentation (automated discovery)
 - Documentation updates after refactoring (sync with code)
 
-**Integration module**: `P:\.claude\skills\arch\aid_integration.py`
+**Integration module**: `$CLAUDE_ROOT/skills\arch\aid_integration.py`

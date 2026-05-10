@@ -9,7 +9,7 @@ Dispatch specialist agents in parallel to analyze the code target, then consolid
 Read the work file to understand what files need review:
 
 ```bash
-cat "P:/{session_dir}/work.md"
+cat "P:\\\\\\{session_dir}/work.md"
 ```
 
 ## Step 2: Select Appropriate Specialists
@@ -37,7 +37,7 @@ For each selected specialist, dispatch a Task in parallel:
 ```bash
 Task(
   subagent_type="general-purpose",
-  description="Review the code at: P:/{session_dir}/work.md for [specialist-domain]. Write findings to: P:/{session_dir}/specialists/[specialist-name}.md"
+  description="Review the code at: P:\\\\\\{session_dir}/work.md for [specialist-domain]. Write findings to: P:\\\\\\{session_dir}/specialists/[specialist-name}.md"
 )
 ```
 
@@ -48,10 +48,10 @@ Task(
 After all specialists complete, read their outputs and create consolidated findings:
 
 ```bash
-cat "P:/{session_dir}/specialists/"*.md
+cat "P:\\\\\\{session_dir}/specialists/"*.md
 ```
 
-**Output format** (write to `P:/{session_dir}/p1_findings.md`):
+**Output format** (write to `P:\\\\\\{session_dir}/p1_findings.md`):
 
 ```markdown
 ## Triage Classification

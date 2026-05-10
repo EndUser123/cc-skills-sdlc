@@ -4,7 +4,7 @@ Test for QUAL-003: Missing FileNotFoundError handling in load_contracts().
 This test verifies that load_contracts() properly handles FileNotFoundError
 when a non-existent contracts file path is provided.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_contracts_error_handling.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_contracts_error_handling.py -v
 """
 
 import pytest

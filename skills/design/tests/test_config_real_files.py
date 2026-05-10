@@ -5,7 +5,7 @@ These tests use actual config files (not environment variables) to verify
 config file loading works correctly. This complements the environment variable
 tests and ensures full integration coverage.
 
-Run with: pytest P:/packages/arch/skill/tests/test_config_real_files.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_config_real_files.py -v
 
 Purpose: Verify config file loading without ARCH_* env vars set (Action 6b)
 Issue: Tests should fail appropriately when config files are malformed (Action 6c)

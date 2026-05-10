@@ -19,7 +19,7 @@ regression = subprocess.run(["pytest", "tests/", "-v"], capture_output=True)
 
 ### Evidence Storage
 
-All artifacts stored in `P:/packages/cc-skills-sdlc/skills/refactor/` — subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`.
+All artifacts stored in `P:\\\\\\packages/cc-skills-sdlc/skills/refactor/` — subdirectories: `commands/`, `tests/`, `files/`, `state/`, `refactor/`.
 
 **New directories** (Priority 1 enhancements):
 - `refactor/rollbacks/` — Rollback plans with git state

@@ -21,15 +21,15 @@ PHASE_TO_STEP = {
 }
 
 
-def main():
-    input_data = json.loads(sys.stdin.read())
+def run(input_data: dict) -> dict | None:
+    """In-process hook logic."""
     tool_name = input_data.get("tool_name", "")
     tool_output = input_data.get("tool_output", "") or ""
     tool_input = input_data.get("tool_input", {})
 
     state = read_state()
     if not state:
-        sys.exit(0)  # No active state, nothing to transition
+        return None  # No active state, nothing to transition
 
     current_phase = state.get("phase", "")
     session_id = state.get("session_id")
@@ -80,6 +80,12 @@ def main():
             # STEP_START for the new phase
             append_ledger(next_phase, "STEP_START", new_session_id)
 
+    return None
+
+
+def main():
+    input_data = json.loads(sys.stdin.read())
+    run(input_data)
     sys.exit(0)
 
 

@@ -17,7 +17,7 @@ class TestNewAgentRegistration:
 
     def test_state_machine_agent_registered(self):
         """Test that adversarial-state-machine agent is registered."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have state-machine in AGENT_REGISTRY
@@ -25,7 +25,7 @@ class TestNewAgentRegistration:
 
     def test_invariants_agent_registered(self):
         """Test that adversarial-invariants agent is registered."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have invariants in AGENT_REGISTRY
@@ -33,7 +33,7 @@ class TestNewAgentRegistration:
 
     def test_io_validation_agent_registered(self):
         """Test that adversarial-io-validation agent is registered."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have io-validation in AGENT_REGISTRY
@@ -45,7 +45,7 @@ class TestNewAgentTierClassification:
 
     def test_new_agents_have_extended_tier(self):
         """Test that all 3 new agents are classified as tier="extended"."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Look for tier classification around new agents
@@ -65,7 +65,7 @@ class TestTierBasedModeActivation:
 
     def test_triage_mode_excludes_new_agents(self):
         """Test that triage mode does NOT include new agents (cognitive load mitigation)."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Find MODE_AGENTS["triage"] definition
@@ -84,7 +84,7 @@ class TestTierBasedModeActivation:
 
     def test_standard_mode_excludes_new_agents(self):
         """Test that standard mode does NOT include new agents (cognitive load mitigation)."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Find MODE_AGENTS["standard"] definition
@@ -107,7 +107,7 @@ class TestTierBasedModeActivation:
         This is the mitigation strategy to reduce cognitive load while preserving
         critical state-transition detection.
         """
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Find MODE_AGENTS["deep"] section
@@ -161,7 +161,7 @@ class TestTierBasedModeActivation:
         - adversarial-invariants
         - adversarial-io-validation
         """
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Find comprehensive mode definition - it should be "all"
@@ -183,17 +183,17 @@ class TestNewAgentSpecFiles:
 
     def test_state_machine_agent_spec_exists(self):
         """Test that adversarial-state-machine.md spec file exists."""
-        spec_file = Path("P:/.claude/agents/adversarial-state-machine.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-state-machine.md")
         assert spec_file.exists(), "adversarial-state-machine.md should exist"
 
     def test_invariants_agent_spec_exists(self):
         """Test that adversarial-invariants.md spec file exists."""
-        spec_file = Path("P:/.claude/agents/adversarial-invariants.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-invariants.md")
         assert spec_file.exists(), "adversarial-invariants.md should exist"
 
     def test_io_validation_agent_spec_exists(self):
         """Test that adversarial-io-validation.md spec file exists."""
-        spec_file = Path("P:/.claude/agents/adversarial-io-validation.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-io-validation.md")
         assert spec_file.exists(), "adversarial-io-validation.md should exist"
 
 
@@ -202,7 +202,7 @@ class TestNewAgentSpecContent:
 
     def test_state_machine_spec_has_focus(self):
         """Test that state-machine agent spec defines focus area."""
-        spec_file = Path("P:/.claude/agents/adversarial-state-machine.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-state-machine.md")
         content = spec_file.read_text(encoding="utf-8")
 
         # Should mention state transition focus
@@ -211,7 +211,7 @@ class TestNewAgentSpecContent:
 
     def test_invariants_spec_has_focus(self):
         """Test that invariants agent spec defines focus area."""
-        spec_file = Path("P:/.claude/agents/adversarial-invariants.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-invariants.md")
         content = spec_file.read_text(encoding="utf-8")
 
         # Should mention invariants focus
@@ -222,7 +222,7 @@ class TestNewAgentSpecContent:
 
     def test_io_validation_spec_has_focus(self):
         """Test that io-validation agent spec defines focus area."""
-        spec_file = Path("P:/.claude/agents/adversarial-io-validation.md")
+        spec_file = Path("P:\\\\\\.claude/agents/adversarial-io-validation.md")
         content = spec_file.read_text(encoding="utf-8")
 
         # Should mention I/O focus
@@ -237,7 +237,7 @@ class TestAdversarialFraming:
 
     def test_orchestrator_has_adversarial_framework(self):
         """Test that orchestrator.py includes adversarial framing section."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have adversarial framework in prompts
@@ -255,7 +255,7 @@ class TestTOCTOUEnhancement:
 
     def test_performance_agent_has_toctou_detection(self):
         """Test that adversarial-performance.md includes TOCTOU detection."""
-        perf_agent = Path("P:/.claude/agents/adversarial-performance.md")
+        perf_agent = Path("P:\\\\\\.claude/agents/adversarial-performance.md")
         content = perf_agent.read_text(encoding="utf-8")
 
         # Should mention TOCTOU

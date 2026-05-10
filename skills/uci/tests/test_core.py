@@ -14,12 +14,12 @@ class TestScopeDetector:
 
     def test_scope_detector_exists(self):
         """Test that scope_detector.py module exists."""
-        scope_detector = Path("P:/.claude/skills/uci/lib/scope_detector.py")
+        scope_detector = Path("P:\\\\\\.claude/skills/uci/lib/scope_detector.py")
         assert scope_detector.exists(), "scope_detector.py should exist"
 
     def test_scope_detector_has_detect_scope(self):
         """Test that scope_detector has detect_scope function."""
-        scope_detector = Path("P:/.claude/skills/uci/lib/scope_detector.py")
+        scope_detector = Path("P:\\\\\\.claude/skills/uci/lib/scope_detector.py")
         content = scope_detector.read_text(encoding="utf-8")
 
         # Should have detect_scope function
@@ -27,7 +27,7 @@ class TestScopeDetector:
 
     def test_scope_detector_has_scope_type(self):
         """Test that scope_detector defines ScopeType."""
-        scope_detector = Path("P:/.claude/skills/uci/lib/scope_detector.py")
+        scope_detector = Path("P:\\\\\\.claude/skills/uci/lib/scope_detector.py")
         content = scope_detector.read_text(encoding="utf-8")
 
         # Should have ScopeType (enum or class)
@@ -35,7 +35,7 @@ class TestScopeDetector:
 
     def test_scope_detector_priority_order(self):
         """Test that scope detector follows priority order."""
-        scope_detector = Path("P:/.claude/skills/uci/lib/scope_detector.py")
+        scope_detector = Path("P:\\\\\\.claude/skills/uci/lib/scope_detector.py")
         content = scope_detector.read_text(encoding="utf-8")
 
         # Should mention priority: user-specified > feature branch > staged > latest commit
@@ -46,7 +46,7 @@ class TestScopeDetector:
 
     def test_scope_detector_exported(self):
         """Test that detect_scope is exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export detect_scope
@@ -58,12 +58,12 @@ class TestImpactEffort:
 
     def test_impact_effort_module_exists(self):
         """Test that impact_effort.py module exists."""
-        impact_effort = Path("P:/.claude/skills/uci/lib/impact_effort.py")
+        impact_effort = Path("P:\\\\\\.claude/skills/uci/lib/impact_effort.py")
         assert impact_effort.exists(), "impact_effort.py should exist"
 
     def test_impact_effort_has_calculate_function(self):
         """Test that impact_effort has calculate_impact_effort function."""
-        impact_effort = Path("P:/.claude/skills/uci/lib/impact_effort.py")
+        impact_effort = Path("P:\\\\\\.claude/skills/uci/lib/impact_effort.py")
         content = impact_effort.read_text(encoding="utf-8")
 
         # Should have calculate_impact_effort function
@@ -74,7 +74,7 @@ class TestImpactEffort:
 
     def test_impact_effort_has_level_enum(self):
         """Test that impact_effort defines Level (HIGH/MED/LOW)."""
-        impact_effort = Path("P:/.claude/skills/uci/lib/impact_effort.py")
+        impact_effort = Path("P:\\\\\\.claude/skills/uci/lib/impact_effort.py")
         content = impact_effort.read_text(encoding="utf-8")
 
         # Should have Level with HIGH, MED, LOW values
@@ -83,7 +83,7 @@ class TestImpactEffort:
 
     def test_impact_effort_has_sort_function(self):
         """Test that impact_effort can sort findings by priority."""
-        impact_effort = Path("P:/.claude/skills/uci/lib/impact_effort.py")
+        impact_effort = Path("P:\\\\\\.claude/skills/uci/lib/impact_effort.py")
         content = impact_effort.read_text(encoding="utf-8")
 
         # Should have sort_findings_by_priority function
@@ -91,7 +91,7 @@ class TestImpactEffort:
 
     def test_impact_effort_exported(self):
         """Test that impact_effort functions are exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export key functions
@@ -104,12 +104,12 @@ class TestVerdictSynthesis:
 
     def test_verdict_module_exists(self):
         """Test that verdict.py module exists."""
-        verdict = Path("P:/.claude/skills/uci/lib/verdict.py")
+        verdict = Path("P:\\\\\\.claude/skills/uci/lib/verdict.py")
         assert verdict.exists(), "verdict.py should exist"
 
     def test_verdict_has_synthesize_function(self):
         """Test that verdict has synthesize_verdict function."""
-        verdict = Path("P:/.claude/skills/uci/lib/verdict.py")
+        verdict = Path("P:\\\\\\.claude/skills/uci/lib/verdict.py")
         content = verdict.read_text(encoding="utf-8")
 
         # Should have synthesize_verdict function
@@ -117,7 +117,7 @@ class TestVerdictSynthesis:
 
     def test_verdict_has_verdict_class(self):
         """Test that verdict defines Verdict dataclass/enum."""
-        verdict = Path("P:/.claude/skills/uci/lib/verdict.py")
+        verdict = Path("P:\\\\\\.claude/skills/uci/lib/verdict.py")
         content = verdict.read_text(encoding="utf-8")
 
         # Should have Verdict class
@@ -125,7 +125,7 @@ class TestVerdictSynthesis:
 
     def test_verdict_three_tier_levels(self):
         """Test that verdict has three tiers: Ready to Merge / Needs Attention / Needs Work."""
-        verdict = Path("P:/.claude/skills/uci/lib/verdict.py")
+        verdict = Path("P:\\\\\\.claude/skills/uci/lib/verdict.py")
         content = verdict.read_text(encoding="utf-8")
 
         # Should mention three-tier verdict levels
@@ -144,7 +144,7 @@ class TestVerdictSynthesis:
 
     def test_verdict_exported(self):
         """Test that verdict functions are exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export key functions
@@ -156,12 +156,12 @@ class TestFormatter:
 
     def test_formatter_module_exists(self):
         """Test that formatter.py module exists."""
-        formatter = Path("P:/.claude/skills/uci/lib/formatter.py")
+        formatter = Path("P:\\\\\\.claude/skills/uci/lib/formatter.py")
         assert formatter.exists(), "formatter.py should exist"
 
     def test_formatter_has_uci_formatter_class(self):
         """Test that formatter has UCIFormatter class."""
-        formatter = Path("P:/.claude/skills/uci/lib/formatter.py")
+        formatter = Path("P:\\\\\\.claude/skills/uci/lib/formatter.py")
         content = formatter.read_text(encoding="utf-8")
 
         # Should have UCIFormatter class
@@ -169,7 +169,7 @@ class TestFormatter:
 
     def test_formatter_has_output_format(self):
         """Test that formatter defines OutputFormat."""
-        formatter = Path("P:/.claude/skills/uci/lib/formatter.py")
+        formatter = Path("P:\\\\\\.claude/skills/uci/lib/formatter.py")
         content = formatter.read_text(encoding="utf-8")
 
         # Should have OutputFormat (markdown, json, summary)
@@ -177,7 +177,7 @@ class TestFormatter:
 
     def test_formatter_exported(self):
         """Test that formatter is exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export UCIFormatter
@@ -189,12 +189,12 @@ class TestAssessmentMode:
 
     def test_assessment_mode_exists(self):
         """Test that assessment_mode.py module exists."""
-        assessment = Path("P:/.claude/skills/uci/lib/assessment_mode.py")
+        assessment = Path("P:\\\\\\.claude/skills/uci/lib/assessment_mode.py")
         assert assessment.exists(), "assessment_mode.py should exist"
 
     def test_assessment_mode_has_class(self):
         """Test that assessment_mode has AssessmentMode class."""
-        assessment = Path("P:/.claude/skills/uci/lib/assessment_mode.py")
+        assessment = Path("P:\\\\\\.claude/skills/uci/lib/assessment_mode.py")
         content = assessment.read_text(encoding="utf-8")
 
         # Should have AssessmentMode class
@@ -202,7 +202,7 @@ class TestAssessmentMode:
 
     def test_assessment_mode_has_finding_class(self):
         """Test that assessment_mode has AssessmentFinding dataclass."""
-        assessment = Path("P:/.claude/skills/uci/lib/assessment_mode.py")
+        assessment = Path("P:\\\\\\.claude/skills/uci/lib/assessment_mode.py")
         content = assessment.read_text(encoding="utf-8")
 
         # Should have AssessmentFinding dataclass
@@ -210,7 +210,7 @@ class TestAssessmentMode:
 
     def test_assessment_mode_has_report_class(self):
         """Test that assessment_mode has AssessmentReport dataclass."""
-        assessment = Path("P:/.claude/skills/uci/lib/assessment_mode.py")
+        assessment = Path("P:\\\\\\.claude/skills/uci/lib/assessment_mode.py")
         content = assessment.read_text(encoding="utf-8")
 
         # Should have AssessmentReport dataclass
@@ -218,7 +218,7 @@ class TestAssessmentMode:
 
     def test_assessment_mode_quality_checks(self):
         """Test that assessment_mode has 6-check quality validation."""
-        assessment = Path("P:/.claude/skills/uci/lib/assessment_mode.py")
+        assessment = Path("P:\\\\\\.claude/skills/uci/lib/assessment_mode.py")
         content = assessment.read_text(encoding="utf-8")
 
         # Should have QUALITY_CHECKS with 6 checks
@@ -226,7 +226,7 @@ class TestAssessmentMode:
 
     def test_assessment_mode_exported(self):
         """Test that assessment_mode is exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export key classes and functions
@@ -248,12 +248,12 @@ class TestCoreIntegration:
         ]
 
         for module in modules:
-            module_path = Path(f"P:/.claude/skills/uci/lib/{module}")
+            module_path = Path(f"P:\\\\\\.claude/skills/uci/lib/{module}")
             assert module_path.exists(), f"{module} should exist"
 
     def test_all_core_modules_exported(self):
         """Test that all core layer functions are exported."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export all core functions

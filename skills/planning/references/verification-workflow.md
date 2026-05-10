@@ -19,7 +19,7 @@ If the input cannot be converted to concrete content, the result stays `draft`. 
 ## Step 2: auto_verify.py (Deterministic Checks)
 
 ```bash
-python P:/.claude/skills/planning/__lib/auto_verify.py <plan_path>
+python P:\\\\\\.claude/skills/planning/__lib/auto_verify.py <plan_path>
 ```
 
 **New checks in v2:**
@@ -57,7 +57,7 @@ If `next_action.resume_policy == automatic_return_to_caller`, do not ask the use
 If auto_verify finds issues, Claude runs `auto_fix.py` -- but ONLY for:
 
 ```bash
-python P:/.claude/skills/planning/__lib/auto_fix.py <plan_path>
+python P:\\\\\\.claude/skills/planning/__lib/auto_fix.py <plan_path>
 ```
 
 **auto_fix v2 is limited to:**

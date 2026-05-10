@@ -103,17 +103,17 @@ pruned_branches = generator.prune_branches(branches)
 
 ## Files Modified
 
-1. **P:\.claude\skills\code\SKILL.md**
+1. **$CLAUDE_ROOT/skills\code\SKILL.md**
    - Updated version to 2.22.0
    - Added Step 4.7: Graph-of-Thought (GoT) Enhancement
    - Added Step 8.2: Tree-of-Thought (ToT) Enhancement
    - Updated argument-hint to include `--no-got` and `--no-tot` flags
    - Added comprehensive changelog entry
 
-2. **P:\.claude\skills\code\utils\got_planner.py** (existing)
+2. **$CLAUDE_ROOT/skills\code\utils\got_planner.py** (existing)
    - GoT planner implementation
 
-3. **P:\.claude\skills\code\utils\tot_tracer.py** (existing)
+3. **$CLAUDE_ROOT/skills\code\utils\tot_tracer.py** (existing)
    - ToT tracer implementation
 
 4. **Test files** (all existing)

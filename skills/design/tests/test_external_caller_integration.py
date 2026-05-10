@@ -7,7 +7,7 @@ and use select_template. It catches breaking changes to the function signature.
 Purpose: When select_template() signature changes (e.g., return type changes),
 external callers break. This test verifies the public API contract.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_external_caller_integration.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_external_caller_integration.py -v
 """
 
 import sys

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/block-state.schema.json",
+  "title": "GoBlockState",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "status",
+    "reason_code",
+    "opened_at"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "terminal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["blocked", "retryable", "waived", "resolved"]
+    },
+    "reason_code": {
+      "type": "string",
+      "enum": [
+        "worktree_required",
+        "task_file_missing",
+        "task_file_invalid",
+        "no_eligible_task",
+        "verification_failed",
+        "simplify_failed",
+        "review_failed",
+        "max_attempts_reached",
+        "upstream_blocked",
+        "user_input_required",
+        "schema_violation",
+        "unknown"
+      ]
+    },
+    "reason_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "origin_step": {
+      "type": "string",
+      "enum": [
+        "worktree_enforcement",
+        "task_selection",
+        "task_contract",
+        "verify_end_to_end",
+        "simplify_code",
+        "seven_pass_review",
+        "local_pr_artifacts",
+        "loop_check"
+      ]
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 3
+    },
+    "can_retry": {
+      "type": "boolean",
+      "default": false
+    },
+    "requires_user_input": {
+      "type": "boolean",
+      "default": false
+    },
+    "waiver_allowed": {
+      "type": "boolean",
+      "default": false
+    },
+    "waived_by": {
+      "type": "string"
+    },
+    "waived_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "blocked_by_task": {
+      "type": "string"
+    },
+    "unblock_action": {
+      "type": "string"
+    },
+    "retry_after_seconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

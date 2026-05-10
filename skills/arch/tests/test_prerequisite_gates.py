@@ -3,7 +3,7 @@
 These tests verify that the semantic analysis in Stage 0 (Pre-Flight Checks)
 correctly distinguishes optimization queries from genuine prerequisite needs.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_prerequisite_gates.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_prerequisite_gates.py -v
 
 TDD RED Phase: These tests FAIL because prerequisite_analyzer module doesn't exist yet.
 """
@@ -36,7 +36,7 @@ def skip_if_not_implemented():
     if not PREREQUISITE_ANALYZER_EXISTS:
         pytest.fail(
             "RED PHASE: prerequisite_analyzer module not implemented yet. "
-            "Create P:/.claude/skills/arch/prerequisite_analyzer.py with "
+            "Create P:\\\\\\.claude/skills/arch/prerequisite_analyzer.py with "
             "PrerequisiteAnalyzer class to proceed to GREEN phase."
         )
 

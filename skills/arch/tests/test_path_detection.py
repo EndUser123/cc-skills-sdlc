@@ -16,7 +16,7 @@ This regex approach has issues:
 These tests FAIL in RED phase because the new Path-based detection
 functions do not exist yet.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_path_detection.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_path_detection.py -v
 """
 
 from pathlib import Path
@@ -75,7 +75,7 @@ class TestDetectPathBackslashesUsingPath:
         from path_detection import detect_path_backslashes
 
         test_cases = [
-            "P:\\data\\file.txt",
+            "P:\\\\\\\data\\file.txt",
             "C:\\Users\\test\\document.md",
             ".\\relative\\path",
         ]
@@ -131,7 +131,7 @@ class TestDetectPathBackslashesUsingPath:
 
         test_cases = [
             "C:\\Users\\café\\document.md",
-            "P:\\data\\文件\\readme.txt",
+            "P:\\\\\\\data\\文件\\readme.txt",
             "/home/user/тест/file.py",  # Unix with Unicode, no backslash
         ]
 
@@ -224,7 +224,7 @@ class TestExtractPathComponentsUsingParts:
         # Arrange
         from path_detection import extract_path_components
 
-        test_path = "P:\\__csf\\data\\cks.db"
+        test_path = "P:\\\\\\\__csf\\data\\cks.db"
 
         # Act
         components = extract_path_components(test_path)

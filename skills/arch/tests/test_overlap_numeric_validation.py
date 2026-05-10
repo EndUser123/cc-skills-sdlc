@@ -10,7 +10,7 @@ Requirements:
 2. Test that value is validated against DUPLICATE_OVERLAP_THRESHOLD (50%)
 3. Test that HIGH_OVERLAP_THRESHOLD (70%) causes validation failure
 
-Run with: pytest P:/.claude/skills/arch/tests/test_overlap_numeric_validation.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_overlap_numeric_validation.py -v
 """
 
 import pytest

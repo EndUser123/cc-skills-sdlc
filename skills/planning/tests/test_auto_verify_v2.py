@@ -1527,7 +1527,7 @@ Use Windows junction points and keep skill behavior unchanged.
 
 ## Test Matrix
 
-pytest P:/packages/cc-skills-sdlc/contract-primitives/tests/
+pytest P:\\\\\\packages/cc-skills-sdlc/contract-primitives/tests/
 
 ## Contract Authority Reference
 
@@ -1592,7 +1592,7 @@ Use Windows junction points and keep skill behavior unchanged.
 **Acceptance Criteria:**
 - Package exists at the new location
 
-**Rollback (if TASK-007 fails):** Move source back to `P:/packages/contract-primitives/`, restore original directory.
+**Rollback (if TASK-007 fails):** Move source back to `P:\\\\\\packages/contract-primitives/`, restore original directory.
 
 ### TASK-002: Create junctions
 

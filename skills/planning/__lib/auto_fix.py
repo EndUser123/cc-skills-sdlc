@@ -14,7 +14,7 @@ This module does NOT:
 - Write any content that is not purely structural
 
 Usage:
-    python P:/.claude/skills/planning/__lib/auto_fix.py <plan_path> [status] [unresolved_blockers] [--reorder]
+    python P:\\\\\\.claude/skills/planning/__lib/auto_fix.py <plan_path> [status] [unresolved_blockers] [--reorder]
 
 Output:
     Updated plan file with only structural fixes applied

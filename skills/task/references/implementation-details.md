@@ -47,7 +47,7 @@ daemon_running = len(pipes) > 0
 from hooks.terminal_detection import detect_terminal_id  # Calls GetConsoleWindow()
 
 # ALSO WORKS: Read discovery file (if it exists)
-cat P:/__csf/data/semantic_daemon_discovery.json
+cat P:\\\\\\__csf/data/semantic_daemon_discovery.json
 ```
 
 ### Add Task

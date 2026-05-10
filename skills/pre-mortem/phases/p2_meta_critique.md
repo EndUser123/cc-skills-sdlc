@@ -11,10 +11,10 @@ Critique the Phase 1 specialist findings — not the original work. Focus on:
 ## Input
 
 Read these files:
-- **Original Work:** `cat "P:/{session_dir}/work.md"`
-- **Phase 1 Findings:** `cat "P:/{session_dir}/p1_findings.md"`
+- **Original Work:** `cat "P:\\\\\\{session_dir}/work.md"`
+- **Phase 1 Findings:** `cat "P:\\\\\\{session_dir}/p1_findings.md"`
 - **Specialist JSON outputs (session-scoped — dynamic glob):**
-  - `cat "P:/{session_dir}/specialists/*.json"` — read all specialist JSON files from the session's specialists subdirectory
+  - `cat "P:\\\\\\{session_dir}/specialists/*.json"` — read all specialist JSON files from the session's specialists subdirectory
 
 ## Analysis Steps
 
@@ -23,12 +23,12 @@ Read these files:
 **Kill criterion (COMP-003 + COMP-005):** Before reading any specialist JSONs, verify this is the **current session's** outputs — not a prior session's stale files.
 
 **A. Session identity check — must pass both:**
-1. `P:/{session_dir}/p1_findings.md` must exist (Phase 1 always writes this last; its presence proves the session completed)
-2. `P:/{session_dir}/work.md` must exist and contain the work being reviewed (re-read it and verify it matches the original target)
+1. `P:\\\\\\{session_dir}/p1_findings.md` must exist (Phase 1 always writes this last; its presence proves the session completed)
+2. `P:\\\\\\{session_dir}/work.md` must exist and contain the work being reviewed (re-read it and verify it matches the original target)
 
 **B. Specialist files check:**
-- Use a file glob on `P:/{session_dir}/specialists/*.json`
-- If **zero specialist files exist**: Write a calibration failure note to `P:/{session_dir}/p2.md` and exit Phase 2 early
+- Use a file glob on `P:\\\\\\{session_dir}/specialists/*.json`
+- If **zero specialist files exist**: Write a calibration failure note to `P:\\\\\\{session_dir}/p2.md` and exit Phase 2 early
 
 **Why both checks:** A prior session may have stale `specialists/*.json` files even after the current session has its own directory. Checking p1_findings.md existence alone is insufficient — a prior session's directory could persist after the current session creates a new directory. The combination of p1_findings.md + work.md content verification proves session identity.
 
@@ -63,7 +63,7 @@ Flag both types explicitly.
 
 ## Output Schema
 
-Write your meta-critique to `P:/{session_dir}/p2.md`:
+Write your meta-critique to `P:\\\\\\{session_dir}/p2.md`:
 
 ```
 ## Cross-Agent Contradictions

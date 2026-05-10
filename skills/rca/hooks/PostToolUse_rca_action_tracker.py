@@ -46,7 +46,7 @@ try:
     )
 except ImportError:
     # Fallback: try CSF path for development environments
-    CSF_SRC = os.environ.get("CSF_SRC", "P:/__csf/src")
+    CSF_SRC = os.environ.get("CSF_SRC", "P:\\\\\\__csf/src")
     if os.path.exists(CSF_SRC):
         sys.path.insert(0, CSF_SRC)
         try:

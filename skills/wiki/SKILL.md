@@ -80,7 +80,18 @@ Select files to ingest (press Enter for 0 = all): _
 Usage: `/wiki ingest <source>` or `/wiki ingest` (scans downloads, default: all)
 
 ### Query
-Accept question → `search-research --backend QMD_WIKI` → LLM synthesizes answer
+Accept question → run in parallel:
+1. `search-research --mode quick "<question>"` (QMD_WIKI backend)
+2. `Grep` against known local doc files matching the question domain (see Known Local Docs below)
+→ First quality result wins → LLM synthesizes answer
+
+**Known Local Docs**: Grep these in parallel with QMD when the question matches:
+| Pattern | File |
+|---|---|
+| hook, stop, pretool, posttool, userprompt | `P:/.claude/docs/claude-hooks-v3.1.md` |
+| skill, slash command, SKILL.md | `P:/.claude/docs/claude-skills-v3.0.md` |
+| agent, subagent | `P:/.claude/docs/claude-agents-v1.0.md` |
+| claude code, claude-code, settings, permissions | `P:/.claude/docs/claude-code-reference.md` |
 
 **Auto-save high-value results**: If the synthesized answer is substantive (non-trivial insight, new connection, resolved ambiguity, or decision-relevant synthesis), save it directly to the wiki without asking. Write to `wiki/concepts/<slug>.md` with YAML frontmatter. Only ask the user if the synthesis is uncertain or incomplete.
 

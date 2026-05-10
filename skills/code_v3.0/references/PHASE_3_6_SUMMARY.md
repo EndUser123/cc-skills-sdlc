@@ -43,7 +43,7 @@ python scripts/validate_done_claim.py --plan plan.md --ledger resume_ledger.json
 #### Task 3.3: Path Normalization Integration ✅
 **File**: `scripts/normalize_paths_before_run.py`
 - **Function**: `normalize_paths_in_command(command_str)`
-- **Integration**: Auto-normalizes Git Bash paths (`/p/...`) to Windows native (`P:\...`) before pytest/test commands
+- **Integration**: Auto-normalizes Git Bash paths (`/p/...`) to Windows native (`P:\\\\\\...`) before pytest/test commands
 - **Safety**: Preserves non-path arguments, logs transformations
 - **Tests**: 9 tests passing
 
@@ -117,7 +117,7 @@ Lease expires: 2026-03-01T12:00:00Z
 **File**: `scripts/fix_state_paths.py`
 - **Functions**:
   - `detect_git_bash_paths(data)` - Recursively scans JSON for Git Bash paths
-  - `normalize_git_bash_path(path)` - Converts `/p/...` to `P:\...`
+  - `normalize_git_bash_path(path)` - Converts `/p/...` to `P:\\\\\\...`
   - `fix_paths_in_data(data)` - Recursively normalizes paths in JSON structures
   - `fix_paths_in_file(file_path, backup)` - Processes single file with backup
   - `find_state_files(state_dir)` - Scans for JSON files

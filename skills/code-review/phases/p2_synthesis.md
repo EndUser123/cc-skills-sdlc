@@ -7,8 +7,8 @@ Read the work target and Phase 1 findings, then produce a final synthesized revi
 ## Step 1: Read Inputs
 
 ```bash
-cat "P:/{session_dir}/work.md"
-cat "P:/{session_dir}/p1_findings.md"
+cat "P:\\\\\\{session_dir}/work.md"
+cat "P:\\\\\\{session_dir}/p1_findings.md"
 ```
 
 ## Step 2: Calculate Health Score
@@ -23,7 +23,7 @@ Health Score = `100 - (CRITICAL×20 + HIGH×10 + MEDIUM×5 + LOW×2)`, capped at
 
 ## Step 3: Synthesize Final Report
 
-Write to `P:/{session_dir}/review.md`:
+Write to `P:\\\\\\{session_dir}/review.md`:
 
 ```markdown
 # Code Review Report
@@ -76,4 +76,4 @@ Write to `P:/{session_dir}/review.md`:
 
 ## Step 4: Deliver Final Output
 
-Read `P:/{session_dir}/review.md` and present to user.
+Read `P:\\\\\\{session_dir}/review.md` and present to user.

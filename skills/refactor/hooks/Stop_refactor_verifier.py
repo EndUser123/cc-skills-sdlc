@@ -53,7 +53,7 @@ def get_artifacts_dir(state: dict) -> Path:
     artifacts_dir = evidence.get("artifacts_dir", "")
     if artifacts_dir:
         return Path(artifacts_dir)
-    return Path(f"P:/.claude/.artifacts/{state.get('instance', instance_id)}/refactor")
+    return Path(f"P:\\\\\\.claude/.artifacts/{state.get('instance', instance_id)}/refactor")
 
 
 def check_artifacts(state: dict) -> list[str]:
@@ -126,29 +126,28 @@ def verify(state: dict) -> dict:
     return verdict
 
 
-def main():
-    input_data = json.loads(sys.stdin.read())
-
+def run(input_data: dict) -> dict | None:
+    """In-process hook logic."""
     state = read_state()
     if not state:
-        # No active state - allow stop, skill may have completed cleanly
-        verdict = {
-            "can_stop": True,
-            "session_id": None,
-            "phase": "unknown",
-            "completed_steps": [],
-            "missing_steps": [],
-            "artifact_gaps": [],
-            "blocking_gaps": [],
-            "note": "No active state found"
-        }
-        print(json.dumps(verdict))
-        sys.exit(0)
-        return
+        return None
 
     verdict = verify(state)
-    print(json.dumps(verdict))
-    sys.exit(0 if verdict["can_stop"] else 1)
+    if not verdict["can_stop"]:
+        return {
+            "decision": "block",
+            "reason": f"/refactor blocked STOP: {', '.join(verdict['blocking_gaps'])}"
+        }
+    return None
+
+
+def main():
+    input_data = json.loads(sys.stdin.read())
+    result = run(input_data)
+    if result:
+        print(json.dumps(result))
+        sys.exit(2)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

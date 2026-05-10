@@ -26,49 +26,49 @@ from typing import Any
 TELEMETRY_SOURCES: list[dict[str, Any]] = [
     {
         "name": "hook_execution_logs",
-        "path": "P:/.claude/hooks/logs",
+        "path": "P:\\\\\\.claude/hooks/logs",
         "pattern": "*.log",
-        "description": "Hook execution logs from P:/.claude/hooks/logs/",
+        "description": "Hook execution logs from P:\\\\\\.claude/hooks/logs/",
         "format": "text",
     },
     {
         "name": "hook_state_files",
-        "path": "P:/.claude/hooks/state",
+        "path": "P:\\\\\\.claude/hooks/state",
         "pattern": "*.json",
-        "description": "Session/terminal state files from P:/.claude/hooks/state/",
+        "description": "Session/terminal state files from P:\\\\\\.claude/hooks/state/",
         "format": "json",
     },
     {
         "name": "skill_invocations",
-        "path": "P:/.claude/state/skill_invocations.jsonl",
+        "path": "P:\\\\\\.claude/state/skill_invocations.jsonl",
         "pattern": "*.jsonl",
         "description": "Skill invocation audit log",
         "format": "jsonl",
     },
     {
         "name": "evidence_store_db",
-        "path": "P:/__csf/data/cks.db",
+        "path": "P:\\\\\\__csf/data/cks.db",
         "pattern": "*.db",
         "description": "CKS evidence store SQLite database",
         "format": "sqlite",
     },
     {
         "name": "session_transcripts",
-        "path": "P:/.claude/transcripts",
+        "path": "P:\\\\\\.claude/transcripts",
         "pattern": "*.jsonl",
         "description": "Session transcript files",
         "format": "jsonl",
     },
     {
         "name": "claude_logs",
-        "path": "P:/.claude/logs",
+        "path": "P:\\\\\\.claude/logs",
         "pattern": "*.log",
         "description": "Claude Code general logs",
         "format": "text",
     },
     {
         "name": "hook_diagnostics",
-        "path": "P:/.claude/hooks/hook_diagnostics.py",
+        "path": "P:\\\\\\.claude/hooks/hook_diagnostics.py",
         "pattern": None,
         "description": "Hook diagnostics script (existence check)",
         "format": "script",
@@ -82,14 +82,14 @@ TELEMETRY_SOURCES: list[dict[str, Any]] = [
     },
     {
         "name": "intent_files",
-        "path": "P:/.claude/hooks/state",
+        "path": "P:\\\\\\.claude/hooks/state",
         "pattern": "pending_command_intent_*.json",
         "description": "Pending command intent files",
         "format": "json",
     },
     {
         "name": "hook_events_db",
-        "path": "P:/.claude/hooks/events.db",
+        "path": "P:\\\\\\.claude/hooks/events.db",
         "pattern": None,
         "description": "Hook observability SQLite database (constitutional_events, BloatAnalysis, TruthValidation)",
         "format": "sqlite",
@@ -247,7 +247,7 @@ def query_events_db(keyword: str, since_days: int | None = None, limit: int = 10
     import sqlite3
     from datetime import datetime
 
-    db_path = Path("P:/.claude/hooks/events.db")
+    db_path = Path("P:\\\\\\.claude/hooks/events.db")
     if not db_path.exists():
         return []
 

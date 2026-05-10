@@ -307,10 +307,10 @@ def main():
 
 ## References
 
-- **Plan document**: `P:\.claude\hooks\plan_gav_phase2_drift_detection.md`
-- **TRACE report**: `P:\.claude\hooks\TRACE_REPORT_artifact_grounder.md`
-- **Implementation**: `P:\.claude\hooks\PostToolUse_artifact_validator.py`
-- **Tests**: `P:\.claude\hooks\tests\test_artifact_validation_hooks.py`
+- **Plan document**: `$CLAUDE_ROOT/hooks\plan_gav_phase2_drift_detection.md`
+- **TRACE report**: `$CLAUDE_ROOT/hooks\TRACE_REPORT_artifact_grounder.md`
+- **Implementation**: `$CLAUDE_ROOT/hooks\PostToolUse_artifact_validator.py`
+- **Tests**: `$CLAUDE_ROOT/hooks\tests\test_artifact_validation_hooks.py`
 
 ---
 

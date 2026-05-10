@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULT_ADVERSARIAL_ROOT = Path("P:/.claude/plans/adversarial")
+DEFAULT_ADVERSARIAL_ROOT = Path("P:\\\\\\.claude/plans/adversarial")
 REFERENCE_PROMPTS_PATH = Path(__file__).resolve().parents[1] / "references" / "adversarial-agent-prompts.md"
 AGENT_FINDINGS_FILENAMES = {
     "compliance": "compliance-findings.json",

@@ -11,23 +11,33 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from state_manager_refactor import read_state
 
-def main():
-    input_data = json.loads(sys.stdin.read())
+def run(input_data: dict) -> dict | None:
+    """In-process hook logic."""
     tool_name = input_data.get("tool_name", "")
 
     state = read_state()
     if not state:
-        # No active state - allow all tools (skill not in progress or state expired)
-        sys.exit(0)
+        return None
 
     allowed = state.get("allowed_tools", [])
     phase = state.get("phase", "unknown")
 
     if tool_name not in allowed:
-        print(f"⛔ /refactor [{phase}]: '{tool_name}' not allowed. Allowed: {allowed}", file=sys.stderr)
-        sys.exit(2)  # Block the tool
+        return {
+            "decision": "deny",
+            "reason": f"/refactor [{phase}]: '{tool_name}' not allowed. Allowed: {allowed}"
+        }
 
-    sys.exit(0)  # Allow
+    return None
+
+
+def main():
+    input_data = json.loads(sys.stdin.read())
+    result = run(input_data)
+    if result:
+        print(f"⛔ {result['reason']}", file=sys.stderr)
+        sys.exit(2)
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

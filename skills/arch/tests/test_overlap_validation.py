@@ -8,7 +8,7 @@ string (e.g., '85.0% overlap') and validate against thresholds:
 - 50-70%: warn
 - >70%: fail
 
-Run with: pytest P:/.claude/skills/arch/tests/test_overlap_validation.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_overlap_validation.py -v
 
 Context: TEST-007 - No overlap percentage validation in test_validate_templates.py
 

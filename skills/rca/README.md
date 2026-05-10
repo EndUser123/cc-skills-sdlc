@@ -25,7 +25,7 @@ pip install rca
 Or from source:
 
 ```bash
-cd P:/packages/rca
+cd P:\\\\\\packages/rca
 pip install -e .
 ```
 
@@ -197,10 +197,10 @@ from rca import LocalToolAdapter
 adapter = LocalToolAdapter()
 
 # Local search (replaces WebSearch)
-results = adapter.search("error pattern", path="P:/src")
+results = adapter.search("error pattern", path="P:\\\\\\src")
 
 # Local read (replaces remote file fetch)
-content = adapter.read("P:/src/file.py")
+content = adapter.read("P:\\\\\\src/file.py")
 
 # Local execute (replaces remote execution)
 output = adapter.execute("python test.py")
@@ -212,7 +212,7 @@ output = adapter.execute("python test.py")
 |----------|---------|---------|
 | `DEBUGRCA_LOCAL_ONLY` | unset | Enable local-only mode (set to "1") |
 | `DEBUGRCA_SATURATION_THRESHOLD` | 0.75 | Evidence saturation threshold (0.0-1.0) |
-| `DEBUGRCA_STATE_DIR` | `P:/.claude/state/rca` | State directory for persistence |
+| `DEBUGRCA_STATE_DIR` | `P:\\\\\\.claude/state/rca` | State directory for persistence |
 | `DEBUGRCA_TOOL_GATE_ENABLED` | true | Enable tool availability gate |
 
 ## Tool Requirements
@@ -233,7 +233,7 @@ output = adapter.execute("python test.py")
 
 ```bash
 # Run all tests
-cd P:/packages/rca
+cd P:\\\\\\packages/rca
 pytest tests/ -v
 
 # Run with coverage

@@ -104,17 +104,17 @@ def automated_verification(max_iterations=3):
 
 ## Files Modified
 
-1. **`P:\.claude\skills\code\SKILL.md`**
+1. **`$CLAUDE_ROOT/skills\code\SKILL.md`**
    - Version bumped from 2.19.0 → 2.20.0
    - Phase 5 VERIFY Stage: Added coverage threshold check (lines 433-453)
    - Phase 7 AUDIT: Replaced manual protocol with verification loop (lines 708-730)
    - Changelog: Added v2.20.0 entry with full details
 
-2. **`P:\.claude\skills\code\BORROWABLE_PATTERNS_ANALYSIS.md`**
+2. **`$CLAUDE_ROOT/skills\code\BORROWABLE_PATTERNS_ANALYSIS.md`**
    - Updated "Next Steps" section to mark Phases 1-3 as COMPLETE
    - Phase 4 (Validation) remains pending
 
-3. **`P:\.claude\skills\code\IMPLEMENTATION_SUMMARY_v2.20.0.md`** (this file)
+3. **`$CLAUDE_ROOT/skills\code\IMPLEMENTATION_SUMMARY_v2.20.0.md`** (this file)
    - Created implementation summary
    - Documents all changes made
    - Tracks completion status
@@ -268,7 +268,7 @@ Both patterns are:
 
 ## References
 
-- **Hosted Skills Analysis**: `P:\.claude\skills\code\HOSTED_SKILLS_ANALYSIS.md`
-- **Borrowable Patterns**: `P:\.claude\skills\code\BORROWABLE_PATTERNS_ANALYSIS.md`
-- **Main Skill File**: `P:\.claude\skills\code\SKILL.md` (v2.20.0)
-- **Execution Path Verification**: `P:\.claude\skills\code\IMPLEMENTATION_SUMMARY_execution_path_verification.md` (v2.19.0 reference)
+- **Hosted Skills Analysis**: `$CLAUDE_ROOT/skills\code\HOSTED_SKILLS_ANALYSIS.md`
+- **Borrowable Patterns**: `$CLAUDE_ROOT/skills\code\BORROWABLE_PATTERNS_ANALYSIS.md`
+- **Main Skill File**: `$CLAUDE_ROOT/skills\code\SKILL.md` (v2.20.0)
+- **Execution Path Verification**: `$CLAUDE_ROOT/skills\code\IMPLEMENTATION_SUMMARY_execution_path_verification.md` (v2.19.0 reference)

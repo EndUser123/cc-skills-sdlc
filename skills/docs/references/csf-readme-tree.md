@@ -3,7 +3,7 @@
 The CSF project uses a hierarchical README structure for documentation:
 
 ```
-P:/
+P:\\\\\\
 ├── README.md                    # Main CSF documentation hub
 ├── __csf/
 │   └── README.md                # Project-specific (modules, commands)
@@ -26,11 +26,11 @@ When modifying files in these locations:
 
 | Modified Path | Check Documentation |
 |---------------|-------------------|
-| `P:\*` (root files) | `P:\README.md` (main hub) |
-| `P:\__csf\*` | `P:\__csf\README.md` |
-| `P:\packages\*` | `P:\packages\README.md` + specific package README |
-| `P:\.claude\hooks\*` | `P:\\.claude\hooks\README.md` |
-| `P:\.claude\skills\*` | `P:\.claude\skills\README.md` |
+| `P:\\\\\\*` (root files) | `P:\\\\\\README.md` (main hub) |
+| `$__CSF_ROOT/*` | `$__CSF_ROOT/README.md` |
+| `P:\\\\\\packages\*` | `P:\\\\\\packages\README.md` + specific package README |
+| `$CLAUDE_ROOT/hooks\*` | `P:\\\\\\\.claude\hooks\README.md` |
+| `$CLAUDE_ROOT/skills\*` | `$CLAUDE_ROOT/skills\README.md` |
 
 ## Cross-Reference Updates
 
@@ -39,7 +39,7 @@ When creating NEW documentation:
 - Add to appropriate catalog/index
 - Maintain tree structure consistency
 
-**Example:** Creating `packages/new-package/` -> Update `P:\packages\README.md` AND `P:\README.md`
+**Example:** Creating `packages/new-package/` -> Update `P:\\\\\\packages\README.md` AND `P:\\\\\\README.md`
 
 ## Skill-Specific Documentation
 

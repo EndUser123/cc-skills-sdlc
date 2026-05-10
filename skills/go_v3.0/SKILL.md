@@ -18,6 +18,12 @@ suggest:
   - /code
   - refactor
 hooks:
+  PreToolUse:
+    - matcher: "^/go"
+      hooks:
+        - type: command
+          command: "python \"$CLAUDE_PLUGIN_ROOT\"/skills/go_v3.0/hooks/PreToolUse_go_invocation_receipt.py"
+          description: "Write invocation receipt to phase ledger"
   Stop:
     - matcher: ".*"
       hooks:

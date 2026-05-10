@@ -10,7 +10,7 @@ These tests verify that:
 This is a refactoring verification test - the config module should already exist,
 but SKILL.md may still contain the inline implementation that should be removed.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_config_extraction.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_extraction.py -v
 """
 
 import pytest

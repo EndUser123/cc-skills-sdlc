@@ -4,7 +4,7 @@ Unit tests for validate_templates.py in RED phase.
 These tests verify the functionality of the template validation script.
 All tests are currently FAILING - this is the RED phase of TDD.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_validate_templates.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_validate_templates.py -v
 """
 
 import pytest

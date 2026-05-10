@@ -260,7 +260,7 @@ def main():
 
     evidence_file = log_checklist_answers(
         sample_answers,
-        Path("P:/.claude/skills/code"),
+        Path("P:\\\\\\.claude/skills/code"),
         terminal_id="test_terminal"
     )
     print(f"Evidence logged to: {evidence_file}")

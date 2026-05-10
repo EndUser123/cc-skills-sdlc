@@ -68,7 +68,7 @@ INTERACTIVE_PATTERNS = [
 ]
 
 # Workspace-level state location (persists across subprocess calls)
-STATE_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "P:/")) / ".claude" / "state"
+STATE_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "P:\\\\\\")) / ".claude" / "state"
 STATE_FILE = STATE_DIR / "code_continuous_mode.flag"
 
 

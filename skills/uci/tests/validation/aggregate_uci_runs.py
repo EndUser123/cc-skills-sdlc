@@ -192,7 +192,7 @@ def aggregate_runs(state_dir: Path, output_dir: Path) -> int:
 
 def main():
     """Main entry point."""
-    # Resolve paths relative to project root (P:\)
+    # Resolve paths relative to project root (P:\\\\\\)
     project_root = Path(__file__).resolve().parents[3]  # Go from tests/validation/ to project root
     state_dir = project_root / ".claude" / "state"
     output_dir = state_dir / "uci"

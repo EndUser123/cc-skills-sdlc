@@ -10,14 +10,14 @@
 - Updated with Tier 1 features documentation
 - Added environment variable reference
 - Added Python package integration guide
-- Location: `P:\.claude\skills\rca.md`
+- Location: `$CLAUDE_ROOT/skills\rca.md`
 
 ### 2. README Documentation
 - Created comprehensive module reference
 - Added usage examples for all components
 - Added installation instructions
 - Added testing guidelines
-- Location: `P:\.claude\skills\debugrca\README.md`
+- Location: `$CLAUDE_ROOT/skills\debugrca\README.md`
 
 ### 3. Inline Docstrings
 All modules have comprehensive docstrings:
@@ -41,7 +41,7 @@ All modules have comprehensive docstrings:
 - Created comprehensive rollback documentation
 - Defined 3 rollback levels (Module, Hook, Full)
 - Added rollback verification procedures
-- Location: `P:\.claude\skills\debugrca\ROLLBACK.md`
+- Location: `$CLAUDE_ROOT/skills\debugrca\ROLLBACK.md`
 
 ## Module Summary
 
@@ -60,13 +60,13 @@ All modules have comprehensive docstrings:
 ## Hook Integration
 
 ### Tool Gate Hook
-- Location: `P:\.claude\hooks\PreToolUse\debugrca_tool_gate.py`
+- Location: `$CLAUDE_ROOT/hooks\PreToolUse\debugrca_tool_gate.py`
 - Purpose: Enforces tool availability requirements
 - Required tools: Grep, Read, Bash (WebSearch optional)
 - Environment: `DEBUGRCA_TOOL_GATE_ENABLED=true`
 
 ### Test Hook
-- Location: `P:\.claude\hooks\tests\test_debugrca_tool_gate.py`
+- Location: `$CLAUDE_ROOT/hooks\tests\test_debugrca_tool_gate.py`
 - 30 tests for hook functionality
 - Tests local-only mode behavior
 
@@ -76,7 +76,7 @@ All modules have comprehensive docstrings:
 |----------|---------|---------|
 | `DEBUGRCA_LOCAL_ONLY` | unset | Enable local-only mode |
 | `DEBUGRCA_SATURATION_THRESHOLD` | 0.75 | Evidence saturation threshold |
-| `DEBUGRCA_STATE_DIR` | `P:/.claude/state/rca` | State directory |
+| `DEBUGRCA_STATE_DIR` | `P:\\\\\\.claude/state/rca` | State directory |
 | `DEBUGRCA_TOOL_GATE_ENABLED` | true | Tool gate on/off |
 
 ## Installation
@@ -86,7 +86,7 @@ All modules have comprehensive docstrings:
 pip install rca
 
 # From source
-cd P:/packages/rca
+cd P:\\\\\\packages/rca
 pip install -e .
 ```
 
@@ -144,28 +144,28 @@ To verify the installation:
 
 ```bash
 # Run tests
-cd P:/packages/rca
+cd P:\\\\\\packages/rca
 pytest tests/ -v
 
 # Check imports
 python -c "from rca import EvidenceSaturationDetector; print('OK')"
 
 # Check hook
-python P:/.claude/hooks/PreToolUse/debugrca_tool_gate.py
+python P:\\\\\\.claude/hooks/PreToolUse/debugrca_tool_gate.py
 ```
 
 ## Files Created/Modified
 
 ### Created
-- `P:\.claude\skills\debugrca\README.md`
-- `P:\.claude\skills\debugrca\ROLLBACK.md`
-- `P:\.claude\skills\debugrca\INTEGRATION_SUMMARY.md`
+- `$CLAUDE_ROOT/skills\debugrca\README.md`
+- `$CLAUDE_ROOT/skills\debugrca\ROLLBACK.md`
+- `$CLAUDE_ROOT/skills\debugrca\INTEGRATION_SUMMARY.md`
 
 ### Modified
-- `P:\.claude\skills\rca.md` - Added Tier 1 features
-- `P:\.claude\skills\rca\phase_state_manager.py` - Fixed cursor cleanup
-- `P:\.claude\skills\rca\tests\conftest.py` - Added warning filters
-- `P:\.claude\skills\rca\tests\test_cks_integration.py` - Added warning filters
+- `$CLAUDE_ROOT/skills\rca.md` - Added Tier 1 features
+- `$CLAUDE_ROOT/skills\rca\phase_state_manager.py` - Fixed cursor cleanup
+- `$CLAUDE_ROOT/skills\rca\tests\conftest.py` - Added warning filters
+- `$CLAUDE_ROOT/skills\rca\tests\test_cks_integration.py` - Added warning filters
 
 ## Sign-off
 

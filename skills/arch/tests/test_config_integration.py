@@ -9,7 +9,7 @@ Unlike test_config_validation.py which mocks Path.exists() and Path.read_text(),
 these tests create actual config files on disk and verify load_arch_config()
 correctly loads them.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_config_integration.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_integration.py -v
 """
 
 import json

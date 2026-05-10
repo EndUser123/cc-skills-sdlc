@@ -178,8 +178,8 @@ def main():
     print()
 
     # Load baseline findings
-    print("Loading baseline /uci runs from P:/.claude/state/uci/...")
-    baseline_findings, num_runs = load_baseline_findings("P:/.claude/state/uci")
+    print("Loading baseline /uci runs from P:\\\\\\.claude/state/uci/...")
+    baseline_findings, num_runs = load_baseline_findings("P:\\\\\\.claude/state/uci")
 
     if num_runs == 0:
         print("ERROR: No baseline runs found!")

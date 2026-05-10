@@ -12,7 +12,7 @@ The function only checks for empty/whitespace strings but allows:
 - Null bytes (potential string truncation attacks)
 - URL-encoded sequences
 
-Run with: pytest P:/.claude/skills/arch/tests/test_path_traversal.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_path_traversal.py -v
 
 Expected: All tests FAIL because the function does NOT validate these inputs
           (this is the RED phase - documenting the vulnerability)
@@ -171,20 +171,20 @@ class TestPathTraversalVulnerability:
 
     def test_path_traversal_p_drive_absolute_path(self):
         """
-        Test that P:/ drive absolute paths are REJECTED.
+        Test that P:\\\\\\ drive absolute paths are REJECTED.
 
-        Given: A template_name with P:/ absolute path
-        When: Calling resolve_template_path("P:/__csf/data/secret")
+        Given: A template_name with P:\\\\\\ absolute path
+        When: Calling resolve_template_path("P:\\\\\\__csf/data/secret")
         Then: Should raise ValueError (SECURITY: reject absolute paths)
 
         CURRENT BEHAVIOR (VULNERABLE):
-        - The function accepts P:/ drive paths
+        - The function accepts P:\\\\\\ drive paths
 
         EXPECTED BEHAVIOR (AFTER FIX):
         - Should raise ValueError
         """
         # Arrange
-        malicious_template = "P:/__csf/data/secret"
+        malicious_template = "P:\\\\\\__csf/data/secret"
 
         # Act & Assert
         with pytest.raises(ValueError, match=r"(absolute path|invalid|unsafe)"):

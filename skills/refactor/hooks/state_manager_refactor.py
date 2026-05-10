@@ -14,7 +14,7 @@ import time
 import uuid
 
 instance_id = hashlib.md5(str(Path.cwd()).encode()).hexdigest()[:8]
-STATE_DIR = Path("P:/.claude/hooks/state")
+STATE_DIR = Path("P:\\\\\\.claude/hooks/state")
 STATE_FILE = STATE_DIR / f"refactor_{instance_id}.json"
 LEDGER_FILE = STATE_DIR / f"refactor_{instance_id}_ledger.jsonl"
 

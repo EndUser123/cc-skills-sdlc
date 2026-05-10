@@ -8,7 +8,7 @@ Implement 8 priority improvements to the `/refactor` skill following architectur
 
 ### Module Structure
 ```
-P:\.claude\skills\refactor\
+$CLAUDE_ROOT/skills\refactor\
 ├── SKILL.md                      # Update with 8 improvements (workflow documentation)
 ├── __init__.py                   # Entry point (exists)
 ├── __csf/src/refactor/                      # NEW: Python automation modules

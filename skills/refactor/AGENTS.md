@@ -49,7 +49,7 @@ Multi-file refactoring with orchestration - discovers synergies and assigns task
 # Sanitize name (remove @, ?, *, etc.)
 $name = "refactor" -replace '[@?*:<>|+]', ''
 
-New-Item -ItemType Junction -Path "P:\.claude\skills\$name" -Target "P:\packages\cc-skills-sdlc\skills\refactor"
+New-Item -ItemType Junction -Path "$CLAUDE_ROOT/skills\$name" -Target "$CLAUDE_PLUGIN_ROOT/skills\refactor"
 ```
 
 ## Key Constraints
@@ -67,8 +67,8 @@ New-Item -ItemType Junction -Path "P:\.claude\skills\$name" -Target "P:\packages
 
 ```powershell
 # Check junction resolves correctly
-Get-Item "P:\.claude\skills\refactor" | Select-Object LinkType, Target
+Get-Item "$CLAUDE_ROOT/skills\refactor" | Select-Object LinkType, Target
 
 # Check hooks directory for broken symlinks
-Get-ChildItem P:/.claude/hooks -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and -not (Test-Path $_.Target) }
+Get-ChildItem P:\\\\\\.claude/hooks -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and -not (Test-Path $_.Target) }
 ```

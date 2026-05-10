@@ -9,7 +9,7 @@ scenarios including:
 - Warning message includes helpful fix suggestions
 - Generic analysis proceeds when CKS unavailable
 
-Run with: pytest P:/.claude/skills/arch/tests/test_cks_fallback.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_cks_fallback.py -v
 """
 
 import pytest
@@ -31,7 +31,7 @@ class TestCKSModuleNotFound:
         Then: CKS_AVAILABLE should be False
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
+        cks_src_path = Path("P:\\\\\\__csf/src")
 
         with patch.object(Path, "exists", return_value=False):
             # Act
@@ -61,7 +61,7 @@ class TestCKSModuleNotFound:
         Then: Warning should be shown with helpful message
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
+        cks_src_path = Path("P:\\\\\\__csf/src")
 
         with patch.object(Path, "exists", return_value=False):
             # Act
@@ -81,8 +81,8 @@ class TestCKSModuleNotFound:
             assert CKS_AVAILABLE is False
             assert "CKS source path not found" in cks_error_msg
             assert (
-                "P:/__csf/src" in cks_error_msg
-                or "P:\\__csf\\src" in cks_error_msg
+                "P:\\\\\\__csf/src" in cks_error_msg
+                or "P:\\\\\\\__csf\\src" in cks_error_msg
                 or "__csf" in cks_error_msg
             )
 
@@ -99,8 +99,8 @@ class TestCKSDatabaseMissing:
         Then: CKS_AVAILABLE should be False
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
-        cks_db_path = Path("P:/__csf/data/cks.db")
+        cks_src_path = Path("P:\\\\\\__csf/src")
+        cks_db_path = Path("P:\\\\\\__csf/data/cks.db")
 
         # Mock Path.exists to return True for source, False for DB
         def mock_exists(self):
@@ -143,8 +143,8 @@ class TestCKSDatabaseMissing:
         Then: Warning should include database path information
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
-        cks_db_path = Path("P:/__csf/data/cks.db")
+        cks_src_path = Path("P:\\\\\\__csf/src")
+        cks_db_path = Path("P:\\\\\\__csf/data/cks.db")
 
         def mock_exists(self):
             if str(self) == str(cks_src_path):
@@ -175,8 +175,8 @@ class TestCKSDatabaseMissing:
             assert "CKS database not found" in cks_error_msg
             # Note: Windows paths may use backslash, check for both
             assert (
-                "P:/__csf/data/cks.db" in cks_error_msg
-                or "P:\\__csf\\data\\cks.db" in cks_error_msg
+                "P:\\\\\\__csf/data/cks.db" in cks_error_msg
+                or "P:\\\\\\\__csf\\data\\cks.db" in cks_error_msg
                 or "cks.db" in cks_error_msg
             )
 
@@ -193,7 +193,7 @@ class TestCKSImportError:
         Then: CKS_AVAILABLE should be False and execution continues
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
+        cks_src_path = Path("P:\\\\\\__csf/src")
 
         with patch.object(Path, "exists", return_value=True):
             # Act
@@ -226,8 +226,8 @@ class TestCKSImportError:
         Then: CKS_AVAILABLE should be False
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
-        cks_db_path = Path("P:/__csf/data/cks.db")
+        cks_src_path = Path("P:\\\\\\__csf/src")
+        cks_db_path = Path("P:\\\\\\__csf/data/cks.db")
 
         with patch.object(Path, "exists", return_value=True):
             # Act
@@ -266,8 +266,8 @@ class TestCKSAvailable:
         Then: CKS_AVAILABLE should be True
         """
         # Arrange
-        cks_src_path = Path("P:/__csf/src")
-        cks_db_path = Path("P:/__csf/data/cks.db")
+        cks_src_path = Path("P:\\\\\\__csf/src")
+        cks_db_path = Path("P:\\\\\\__csf/data/cks.db")
 
         with patch.object(Path, "exists", return_value=True):
             # Act
@@ -335,7 +335,7 @@ class TestWarningMessageContent:
         Then: Message should include actionable fix suggestions
         """
         # Arrange
-        cks_error_msg = "CKS source path not found: P:/__csf/src"
+        cks_error_msg = "CKS source path not found: P:\\\\\\__csf/src"
 
         # Act - generate warning message
         warning_message = f"""
@@ -347,8 +347,8 @@ Constitutional Knowledge System (CKS) is not accessible:
 Proceeding with generic analysis without CKS historical data.
 
 Recommendation:
-1. Verify CKS installation at P:/__csf/
-2. Check database path: P:/__csf/data/cks.db
+1. Verify CKS installation at P:\\\\\\__csf/
+2. Check database path: P:\\\\\\__csf/data/cks.db
 3. Consider installing CKS for evidence-based improvements
 
 Continue with generic analysis? [Y/n]
@@ -356,8 +356,8 @@ Continue with generic analysis? [Y/n]
 
         # Assert - message contains key elements
         assert "CKS_UNAVAILABLE_WARNING" in warning_message
-        assert "CKS installation at P:/__csf/" in warning_message
-        assert "database path: P:/__csf/data/cks.db" in warning_message
+        assert "CKS installation at P:\\\\\\__csf/" in warning_message
+        assert "database path: P:\\\\\\__csf/data/cks.db" in warning_message
         assert "Recommendation:" in warning_message
 
     def test_warning_contains_error_details(self):
@@ -370,8 +370,8 @@ Continue with generic analysis? [Y/n]
         """
         # Arrange
         specific_errors = [
-            "CKS source path not found: P:/__csf/src",
-            "CKS database not found: P:/__csf/data/cks.db",
+            "CKS source path not found: P:\\\\\\__csf/src",
+            "CKS database not found: P:\\\\\\__csf/data/cks.db",
             "No module named 'csf.cks.unified'",
             "CKS initialization failed",
         ]
@@ -405,7 +405,7 @@ class TestGenericAnalysisProceeds:
         """
         # Arrange
         CKS_AVAILABLE = False
-        cks_error_msg = "CKS source path not found: P:/__csf/src"
+        cks_error_msg = "CKS source path not found: P:\\\\\\__csf/src"
 
         # Act - simulate analysis proceeding
         analysis_complete = False

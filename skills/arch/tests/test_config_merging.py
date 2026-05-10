@@ -13,7 +13,7 @@ This correctly handles partial merging:
 This addresses TEST-001: Missing partial config merging test.
 These tests verify that the partial merge logic works as intended.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_config_merging.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_merging.py -v
 """
 
 import json

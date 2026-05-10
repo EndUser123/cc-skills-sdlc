@@ -40,15 +40,15 @@ def test_resolve_prompt_template_rejects_unresolved_dispatch_tokens() -> None:
     with pytest.raises(ValueError, match="unresolved dispatch token"):
         adversarial_review.resolve_prompt_template(
             "Write findings to <findings_path> for {sanitized_plan_name}",
-            plan_path="P:/plans/example.md",
-            findings_dir="P:/.claude/plans/adversarial/example/console_test",
-            findings_path="P:/.claude/plans/adversarial/example/console_test/testing-findings.json",
+            plan_path="P:\\\\\\plans/example.md",
+            findings_dir="P:\\\\\\.claude/plans/adversarial/example/console_test",
+            findings_path="P:\\\\\\.claude/plans/adversarial/example/console_test/testing-findings.json",
         )
 
 
 def test_reference_prompt_contract_uses_explicit_findings_paths() -> None:
     reference = Path(
-        "P:/packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md"
+        "P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md"
     ).read_text(encoding="utf-8")
 
     assert "{sanitized_plan_name}" not in reference
@@ -147,25 +147,25 @@ def test_validate_findings_file_rejects_stale_and_mismatched_payloads(
 ) -> None:
     findings_file = tmp_path / "testing-findings.json"
     findings_file.write_text(
-        json.dumps({"plan_path": "P:/wrong-plan.md", "findings": []}),
+        json.dumps({"plan_path": "P:\\\\\\wrong-plan.md", "findings": []}),
         encoding="utf-8",
     )
 
     mismatch = adversarial_review.validate_findings_file(
         findings_file,
-        plan_path="P:/expected-plan.md",
+        plan_path="P:\\\\\\expected-plan.md",
     )
     assert mismatch["valid"] is False
     assert mismatch["reason"] == "plan_path_mismatch"
 
     findings_file.write_text(
-        json.dumps({"plan_path": "P:/expected-plan.md", "findings": []}),
+        json.dumps({"plan_path": "P:\\\\\\expected-plan.md", "findings": []}),
         encoding="utf-8",
     )
     os.utime(findings_file, (0, 0))
     stale = adversarial_review.validate_findings_file(
         findings_file,
-        plan_path="P:/expected-plan.md",
+        plan_path="P:\\\\\\expected-plan.md",
         max_age_seconds=0,
         now=1_000_000.0,
     )

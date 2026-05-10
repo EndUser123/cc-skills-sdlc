@@ -19,7 +19,7 @@ def _detect_terminal_id() -> str:
 
 def _get_event_log_path() -> Path:
     """Return the terminal-scoped event log path."""
-    state_dir = Path("P:/.claude/state")
+    state_dir = Path("P:\\\\\\.claude/state")
     terminal_id = _detect_terminal_id()
     return state_dir / f"contract_events_{terminal_id}.jsonl"
 

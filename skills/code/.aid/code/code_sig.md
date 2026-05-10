@@ -14,7 +14,7 @@ corresponding `_full.md` file.
 
 ## SIGNATURE TOC
 
-### P:\packages\cc-skills-sdlc\skills\code\resources\validate_docs.py
+### $CLAUDE_PLUGIN_ROOT/skills\code\resources\validate_docs.py
 ```python
 class DocumentationValidator
 __init__(self, docs_dir)
@@ -38,7 +38,7 @@ code/ (1 files)
 
 | File | Description |
 |------|-------------|
-| `P:\packages\cc-skills-sdlc\skills\code\resources\validate_docs.py` | validate docs |
+| `$CLAUDE_PLUGIN_ROOT/skills\code\resources\validate_docs.py` | validate docs |
 
 ---
 

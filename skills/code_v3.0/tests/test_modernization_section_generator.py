@@ -4,7 +4,7 @@
 This test suite verifies the ModernizationSectionGenerator class which formats
 modernization findings into markdown sections for plan.md.
 
-Run with: pytest P:/.claude/skills/code/tests/test_modernization_section_generator.py -v
+Run with: pytest P:\\\\\\.claude/skills/code/tests/test_modernization_section_generator.py -v
 """
 
 import sys

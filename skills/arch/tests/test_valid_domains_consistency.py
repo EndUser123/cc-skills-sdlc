@@ -5,7 +5,7 @@ These tests verify that VALID_DOMAINS is defined identically across both modules
 to prevent validation failures due to configuration inconsistencies.
 
 Quality Issue: QUAL-002
-Run with: pytest P:/.claude/skills/arch/tests/test_valid_domains_consistency.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_valid_domains_consistency.py -v
 """
 
 import sys

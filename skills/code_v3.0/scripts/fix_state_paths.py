@@ -3,7 +3,7 @@
 Fix Git Bash paths in state JSON files.
 
 Scans state directory for JSON files containing Git Bash paths (/p/...)
-and normalizes them to Windows native format (P:\\...).
+and normalizes them to Windows native format (P:\\\\\\\...).
 
 Functions:
     detect_git_bash_paths: Recursively find Git Bash paths in JSON data
@@ -77,7 +77,7 @@ def normalize_git_bash_path(path: str) -> str:
         path: Git Bash path string (e.g., /p/.claude/skills/code)
 
     Returns:
-        Normalized Windows path (e.g., P:\\.claude\\skills\\code)
+        Normalized Windows path (e.g., P:\\\\\\\.claude\\skills\\code)
     """
     if path is None:
         return None
@@ -90,7 +90,7 @@ def normalize_git_bash_path(path: str) -> str:
         return path
 
     # Convert Git Bash path to Windows format
-    # Extract drive letter and convert /p/... to P:\...
+    # Extract drive letter and convert /p/... to P:\\\\\\...
     drive_letter = path[1].upper()
     rest = path[2:]
     result = f"{drive_letter}:{rest}"

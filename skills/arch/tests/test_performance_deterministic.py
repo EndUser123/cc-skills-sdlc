@@ -13,7 +13,7 @@ SOLUTION: This test file uses a deterministic approach:
 2. Verifies caching behavior via cache_info() statistics
 3. Tests cache_hit behavior deterministically (not timing-dependent)
 
-Run with: pytest P:/.claude/skills/arch/tests/test_performance_deterministic.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_performance_deterministic.py -v
 """
 
 import pytest

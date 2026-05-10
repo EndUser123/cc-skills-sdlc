@@ -1,6 +1,6 @@
 """Tests for config module (load_arch_config and ArchConfig).
 
-Run with: pytest P:/packages/arch/skill/tests/test_config.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_config.py -v
 """
 
 import json

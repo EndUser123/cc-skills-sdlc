@@ -260,12 +260,12 @@ assert second_load_time < first_load_time  # Can fail due to system load
 **Category:** Test Reliability
 **Status:** FIXED
 
-**Issue:** Regex `r"P:/"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
+**Issue:** Regex `r"P:\\\\\\"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
 
 **Evidence:**
 ```python
 # Line 52: Brittle regex pattern
-assert not re.search(r"P:/", content)  # Only matches string "P:/"
+assert not re.search(r"P:\\\\\\", content)  # Only matches string "P:\\\\\\"
 ```
 
 **Resolution:**
@@ -453,8 +453,8 @@ for key, value in config.items():
 
 - Validation Command: `/v /arch system(s)`
 - TDD Workflow: `/tdd` (Test-Driven Development)
-- Test Command: `pytest P:/.claude/skills/arch/tests/ -v`
-- Coverage Command: `pytest P:/.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
+- Test Command: `pytest P:\\\\\\.claude/skills/arch/tests/ -v`
+- Coverage Command: `pytest P:\\\\\\.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
 
 ---
 

@@ -1,6 +1,6 @@
 # /build Troubleshooting
 
-## Path Translation Error (`P:\` vs `/mnt/p/`)
+## Path Translation Error (`P:\\\\\\` vs `/mnt/p/`)
 
 Symptoms:
 - Verifier cannot find files that builder just modified.

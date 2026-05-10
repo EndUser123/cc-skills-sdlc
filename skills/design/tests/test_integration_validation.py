@@ -2,7 +2,7 @@
 Integration tests for validate_templates.py.
 
 These tests verify end-to-end validation workflow using real template files.
-Run with: pytest P:/.claude/skills/arch/tests/test_integration_validation.py -v -m integration
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_integration_validation.py -v -m integration
 """
 
 import pytest

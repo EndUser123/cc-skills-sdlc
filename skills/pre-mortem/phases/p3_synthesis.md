@@ -6,9 +6,9 @@ Produce a refined version of the critique incorporating specialist findings + me
 
 Read these files:
 
-**Original Work:** `cat "P:/{session_dir}/work.md"`
-**Phase 1 Specialist Findings:** `cat "P:/{session_dir}/p1_findings.md"`
-**Phase 2 Meta-Critique:** `cat "P:/{session_dir}/p2.md"`
+**Original Work:** `cat "P:\\\\\\{session_dir}/work.md"`
+**Phase 1 Specialist Findings:** `cat "P:\\\\\\{session_dir}/p1_findings.md"`
+**Phase 2 Meta-Critique:** `cat "P:\\\\\\{session_dir}/p2.md"`
 
 ## Verification Step (MANDATORY) — P1 #5
 

@@ -116,6 +116,7 @@ If the above script prints a path, return ONLY that path.
 Do NOT assume or infer the plan content. Read the file at <plan_path> first.
 
 1. Review the plan at <plan_path> for pure logic errors, race conditions, and off-by-one bugs.
+   - **Diagnostic Metric: Contradiction Detection**: Explicitly scan for conflicts between prose behavior, keys, schema snippets, and contract sections (e.g., plan says "X" but schema says "Y").
    - For stateful/history/provider/multi-terminal plans, explicitly compare prose behavior against keys, schema snippets, and contract sections.
    - Flag contradictory ordering rules, dedupe rules, or identity semantics as logic findings.
 2. Use the Write tool to save findings to: <findings_path>
@@ -333,6 +334,7 @@ If the above script prints a path, return ONLY that path.
    - SKIP any file whose plan_path field does not match <plan_path>
 2. Perform meta-analysis of consensus, blind spots, calibration for the plan at <plan_path>
    - Specifically look for consensus gaps around identity model, ordering, dedupe, invalidation, event source-of-truth, and isolation boundaries.
+   - **Diagnostic Metric: Cognitive Load Assessment**: Evaluate the plan's overall complexity based on findings (e.g., are there too many unrelated tasks or conflicting constraints that increase the risk of LLM drift during execution?).
 3. Use the Write tool to save findings to: <findings_path>
 
    MANDATORY JSON SCHEMA -- top-level keys MUST be exactly these:
@@ -465,7 +467,7 @@ If the above script prints a path, return ONLY that path.
 ### Dispatch via /ai-cli
 
 ```bash
-python "P:/packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an adversarial plan reviewer. Review the plan at the provided context file for: 1) How would this plan fail under concurrent load or edge-case inputs? 2) What is the weakest assumption? 3) What contracts or schemas are implied but not defined? 4) What failure modes are most likely? Output findings as a JSON object with this exact schema: {\"plan_path\": \"<plan_path>\", \"agent\": \"deepseek-v3.2-adversarial\", \"model\": \"deepseek-v3.2\", \"findings\": [{\"severity\": \"HIGH|MEDIUM|LOW\", \"category\": \"string\", \"description\": \"string\", \"line_ref\": \"optional\"}], \"timestamp\": \"ISO8601\"}" --context "<plan_path>" --opencode-only --opencode-model chutes/deepseek-ai/DeepSeek-V3-0324-TEE --output-format json --no-critic --timeout 120
+python "P:\\\\\\packages/ai-cli/skills/ai-cli/ai_cli.py" "You are an adversarial plan reviewer. Review the plan at the provided context file for: 1) How would this plan fail under concurrent load or edge-case inputs? 2) What is the weakest assumption? 3) What contracts or schemas are implied but not defined? 4) What failure modes are most likely? Output findings as a JSON object with this exact schema: {\"plan_path\": \"<plan_path>\", \"agent\": \"deepseek-v3.2-adversarial\", \"model\": \"deepseek-v3.2\", \"findings\": [{\"severity\": \"HIGH|MEDIUM|LOW\", \"category\": \"string\", \"description\": \"string\", \"line_ref\": \"optional\"}], \"timestamp\": \"ISO8601\"}" --context "<plan_path>" --opencode-only --opencode-model chutes/deepseek-ai/DeepSeek-V3-0324-TEE --output-format json --no-critic --timeout 120
 ```
 
 ### Transform output to canonical findings path

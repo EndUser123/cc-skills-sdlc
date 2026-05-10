@@ -3,7 +3,7 @@
 Cross-platform path resolution utilities for the arch skill.
 
 This module provides cross-platform path resolution functions that work
-correctly across Windows (P:/), Linux (/home/user), and Mac (/Users/user).
+correctly across Windows (P:\\\\\\), Linux (/home/user), and Mac (/Users/user).
 
 Functions:
     resolve_cks_db_path(): Returns cross-platform path to CKS database
@@ -13,7 +13,7 @@ Example:
     >>> from pathlib import Path
     >>> cks_path = resolve_cks_db_path()
     >>> print(cks_path)
-    P:/__csf/data/cks.db  # On Windows
+    P:\\\\\\__csf/data/cks.db  # On Windows
     >>> template = resolve_template_path("fast")
     >>> print(template)
     /.claude/skills/arch/resources/fast.md
@@ -69,7 +69,7 @@ def resolve_cks_db_path() -> Path:
     This function returns the absolute path to the CKS database (cks.db)
     based on the current operating system platform. The path is constructed
     as follows:
-    - Windows: P:/__csf/data/cks.db
+    - Windows: P:\\\\\\__csf/data/cks.db
     - Linux: /home/user/__csf/data/cks.db
     - Mac: /Users/user/__csf/data/cks.db
     - Other (fallback): __csf/data/cks.db (relative path)
@@ -85,7 +85,7 @@ def resolve_cks_db_path() -> Path:
         >>> from pathlib import Path
         >>> cks_path = resolve_cks_db_path()
         >>> print(cks_path)
-        P:/__csf/data/cks.db
+        P:\\\\\\__csf/data/cks.db
         >>> print(cks_path.is_absolute())
         True
         >>> print(cks_path.name)
@@ -93,14 +93,14 @@ def resolve_cks_db_path() -> Path:
 
     Note:
         The path is resolved at runtime based on the detected platform.
-        On Windows, this uses the P:/ drive. On Unix-like systems (Linux/Mac),
+        On Windows, this uses the P:\\\\\\ drive. On Unix-like systems (Linux/Mac),
         it uses the standard user home directory structure.
     """
     detected_platform = _detect_platform()
 
     if detected_platform == "Windows":
-        # Windows: P:/ drive
-        cks_path = Path("P:/__csf/data/cks.db")
+        # Windows: P:\\\\\\ drive
+        cks_path = Path("P:\\\\\\__csf/data/cks.db")
     elif detected_platform == "Linux":
         # Linux: /home/user
         cks_path = Path("/home/user/__csf/data/cks.db")

@@ -3,18 +3,18 @@
 Failing tests for hardcoded path replacement in arch skill templates.
 
 These tests verify that templates (fast.md, deep.md) use cross-platform
-path resolution functions instead of hardcoded P:/ paths.
+path resolution functions instead of hardcoded P:\\\\\\ paths.
 
 Test scenarios:
 1. test_replace_p_drive_with_platform_detection - fast.md should use cross_platform_paths.resolve_cks_db_path()
 2. test_deep_md_uses_cross_platform_paths - deep.md should use cross_platform_paths
-3. test_no_hardcoded_p_colon_slash - No "P:/" strings in templates after replacement
+3. test_no_hardcoded_p_colon_slash - No "P:\\\\\\" strings in templates after replacement
 4. test_template_uses_forward_slashes - Template paths always use / not \
 
-Run with: pytest P:/.claude/skills/arch/tests/test_harcoded_paths.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_harcoded_paths.py -v
 
 NOTE: These tests are written to FAIL in the RED phase of TDD.
-The templates currently contain hardcoded "P:/" paths that need to be
+The templates currently contain hardcoded "P:\\\\\\" paths that need to be
 replaced with cross-platform path resolution function calls.
 """
 
@@ -25,10 +25,10 @@ import re
 
 class TestReplacePDriveWithPlatformDetection:
     """
-    Tests for P:/ drive replacement with platform detection.
+    Tests for P:\\\\\\ drive replacement with platform detection.
 
     These tests verify that fast.md uses cross_platform_paths.resolve_cks_db_path()
-    instead of hardcoded "P:/" paths.
+    instead of hardcoded "P:\\\\\\" paths.
     """
 
     @pytest.fixture
@@ -74,15 +74,15 @@ class TestReplacePDriveWithPlatformDetection:
 
         Given: The fast.md template file
         When: Searching for hardcoded CKS.db path patterns
-        Then: Should NOT find patterns like "P:/__csf/data/cks.db"
+        Then: Should NOT find patterns like "P:\\\\\\__csf/data/cks.db"
 
         This test FAILS because fast.md currently contains hardcoded CKS.db paths.
         """
         # Act - Search for common hardcoded CKS path patterns
         hardcoded_patterns = [
-            r"P:/__csf/data/cks\.db",
-            r"P:/.cks\.db",
-            r"P:\\__csf\\data\\cks\.db",
+            r"P:\\\\\\__csf/data/cks\.db",
+            r"P:\\\\\\.cks\.db",
+            r"P:\\\\\\\__csf\\data\\cks\.db",
         ]
 
         found_patterns = []
@@ -103,7 +103,7 @@ class TestDeepMdUsesCrossPlatformPaths:
     Tests for deep.md cross-platform path usage.
 
     These tests verify that deep.md uses cross_platform_paths
-    instead of hardcoded "P:/" paths.
+    instead of hardcoded "P:\\\\\\" paths.
     """
 
     @pytest.fixture
@@ -154,14 +154,14 @@ class TestDeepMdUsesCrossPlatformPaths:
         """
         # Act - Search for hardcoded shared_frameworks path
         hardcoded_patterns = [
-            r"P:/\.claude/skills/arch/resources/shared_frameworks\.md",
+            r"P:\\\\\\\.claude/skills/arch/resources/shared_frameworks\.md",
             r"\.claude/skills/arch/resources/shared_frameworks\.md",
             r"shared_frameworks\.md",  # Should use resolve_template_path() instead
         ]
 
         # Allow the reference in the "Reference:" line but check for direct path usage
         # The pattern below matches direct path usage (not in "Reference:" comments)
-        direct_path_pattern = r"(?!.*Reference:).*P:/.*shared_frameworks"
+        direct_path_pattern = r"(?!.*Reference:).*P:\\\\\\.*shared_frameworks"
 
         has_direct_hardcoded_path = re.search(
             direct_path_pattern, deep_md_content, re.MULTILINE
@@ -202,10 +202,10 @@ def _remove_code_blocks(content: str) -> str:
 
 class TestNoHardcodedPSlash:
     """
-    Tests for absence of hardcoded "P:/" strings in templates.
+    Tests for absence of hardcoded "P:\\\\\\" strings in templates.
 
     These tests verify that all template files have been updated
-    to remove hardcoded "P:/" path strings.
+    to remove hardcoded "P:\\\\\\" path strings.
 
     Note: Code blocks (fenced with ```) are excluded from validation
     since they contain documentation examples, not actual paths.
@@ -228,28 +228,28 @@ class TestNoHardcodedPSlash:
         self, all_template_contents: dict[str, str]
     ):
         """
-        Test that no templates contain hardcoded "P:/" strings in actual infrastructure paths.
+        Test that no templates contain hardcoded "P:\\\\\\" strings in actual infrastructure paths.
 
         Given: All template files in resources directory
-        When: Searching for hardcoded "P:/" strings (excluding code blocks)
-        Then: Should NOT find any "P:/" strings
+        When: Searching for hardcoded "P:\\\\\\" strings (excluding code blocks)
+        Then: Should NOT find any "P:\\\\\\" strings
 
         Note: Code blocks (```...```) are excluded since they contain documentation
         examples, not actual infrastructure paths.
         """
-        # Act - Find all templates with hardcoded P:/ paths (excluding code blocks)
+        # Act - Find all templates with hardcoded P:\\\\\\ paths (excluding code blocks)
         templates_with_hardcoded_paths = {}
         for template_name, content in all_template_contents.items():
             # Remove code blocks before checking for hardcoded paths
             content_without_code = _remove_code_blocks(content)
-            if "P:/" in content_without_code:
+            if "P:\\\\\\" in content_without_code:
                 # Count occurrences
-                count = content_without_code.count("P:/")
+                count = content_without_code.count("P:\\\\\\")
                 templates_with_hardcoded_paths[template_name] = count
 
         # Assert
         assert len(templates_with_hardcoded_paths) == 0, (
-            f"No templates should contain hardcoded 'P:/' strings (outside code blocks). "
+            f"No templates should contain hardcoded 'P:\\\\\\' strings (outside code blocks). "
             f"Found hardcoded paths in: {templates_with_hardcoded_paths}. "
             f"Code examples in fenced blocks are excluded from validation."
         )
@@ -258,12 +258,12 @@ class TestNoHardcodedPSlash:
         self, all_template_contents: dict[str, str]
     ):
         """
-        Test that fast.md and deep.md specifically have no hardcoded P:/ paths
+        Test that fast.md and deep.md specifically have no hardcoded P:\\\\\\ paths
         in actual infrastructure paths.
 
         Given: fast.md and deep.md template files
-        When: Checking for hardcoded "P:/" strings (excluding code blocks)
-        Then: Should NOT find any "P:/" strings
+        When: Checking for hardcoded "P:\\\\\\" strings (excluding code blocks)
+        Then: Should NOT find any "P:\\\\\\" strings
 
         Note: Code blocks (```...```) are excluded since they contain documentation
         examples, not actual infrastructure paths.
@@ -277,13 +277,13 @@ class TestNoHardcodedPSlash:
                 content = all_template_contents[template_name]
                 # Remove code blocks before checking for hardcoded paths
                 content_without_code = _remove_code_blocks(content)
-                if "P:/" in content_without_code:
-                    count = content_without_code.count("P:/")
+                if "P:\\\\\\" in content_without_code:
+                    count = content_without_code.count("P:\\\\\\")
                     failing_templates.append(f"{template_name} ({count} occurrences)")
 
         # Assert
         assert len(failing_templates) == 0, (
-            f"fast.md and deep.md should NOT contain hardcoded 'P:/' strings (outside code blocks). "
+            f"fast.md and deep.md should NOT contain hardcoded 'P:\\\\\\' strings (outside code blocks). "
             f"Found hardcoded paths in: {failing_templates}. "
             f"Code examples in fenced blocks are excluded from validation."
         )

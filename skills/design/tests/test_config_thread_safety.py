@@ -2,7 +2,7 @@
 Test for thread safety in load_arch_config() function.
 
 These tests CAPTURE CURRENT BEHAVIOR before refactoring.
-Run with: pytest P:/packages/arch/skill/tests/test_config_thread_safety.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_config_thread_safety.py -v
 
 Purpose: Verify that load_arch_config() is thread-safe when called concurrently.
 Issue: The current _config_cache dict has no thread safety, leading to potential

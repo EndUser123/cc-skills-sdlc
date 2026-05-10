@@ -103,8 +103,8 @@ To verify lean principles are applied:
 ## Files Created/Modified This Session
 
 **Created:**
-- `P:\.claude\skills\arch\test_lean_integration.md` - Test verification document
-- `P:\.claude\skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
+- `$CLAUDE_ROOT/skills\arch\test_lean_integration.md` - Test verification document
+- `$CLAUDE_ROOT/skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
 
 **Modified:**
 - `C:\Users\brsth\.claude\projects\P--\memory\learning_patterns.md` - Added anti-pattern documentation

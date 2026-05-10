@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-STATE_DIR = Path(r"P:\.claude\state")
+STATE_DIR = Path(r"$CLAUDE_ROOT/state")
 STATE_TTL_SECONDS = 2 * 3600  # 2 hours
 
 

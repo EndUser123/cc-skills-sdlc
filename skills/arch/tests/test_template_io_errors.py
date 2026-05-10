@@ -7,7 +7,7 @@ and provides helpful error messages for different failure scenarios.
 Target: validate_template() in routing.py (lines 476-486)
 Issue: Has exception handling but no tests for I/O error scenarios
 
-Run with: pytest P:/.claude/skills/arch/tests/test_template_io_errors.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_template_io_errors.py -v
 """
 
 import sys

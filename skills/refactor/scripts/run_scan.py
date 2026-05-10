@@ -22,7 +22,7 @@ for pkg, fs in sorted(by_pkg.items(), key=lambda x: max(f['complexity'] for f in
     print(f"  {pkg}: {len(fs)} findings, worst CC={top['complexity']} ({top['description']})")
 
 # Save full results
-artifacts = Path('P:/Users/brsth/.claude/.artifacts/default/refactor')
+artifacts = Path('P:\\\\\\Users/brsth/.claude/.artifacts/default/refactor')
 artifacts.mkdir(parents=True, exist_ok=True)
 artifacts.joinpath('scan_results.json').write_text(json.dumps(findings, indent=2))
 print(f'\nFull results: {artifacts}/scan_results.json')

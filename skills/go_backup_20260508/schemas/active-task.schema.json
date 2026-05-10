@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/go/active-task.schema.json",
+  "title": "GoActiveTask",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "terminal_id",
+    "selected_at",
+    "task"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "terminal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "objective",
+        "status",
+        "priority",
+        "scope_in",
+        "scope_out",
+        "forbidden_files",
+        "acceptance_criteria",
+        "verification_commands"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ready", "queued", "approved", "selected", "completed", "blocked"]
+        },
+        "priority": {
+          "type": "string",
+          "pattern": "^P[0-9]+$"
+        },
+        "scope_in": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "scope_out": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "forbidden_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "verification_commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "estimated_complexity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Task complexity estimate. If 'high', /go must confirm before dispatching to /code."
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Task IDs that must be completed before this task can be dispatched. /go validates all dependencies are completed before routing."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

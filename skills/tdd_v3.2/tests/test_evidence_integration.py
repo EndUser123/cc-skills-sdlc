@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))  # P:\.claude\skills\tdd
-sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))  # P:\.claude\skills\tdd\hooks
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "code"))  # P:\.claude\skills\code
+sys.path.insert(0, str(Path(__file__).parent.parent))  # $CLAUDE_ROOT/skills\tdd
+sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))  # $CLAUDE_ROOT/skills\tdd\hooks
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "code"))  # $CLAUDE_ROOT/skills\code
 
 
 class TestTDDEvidenceIntegration:

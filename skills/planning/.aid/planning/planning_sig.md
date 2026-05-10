@@ -14,7 +14,7 @@ corresponding `_full.md` file.
 
 ## SIGNATURE TOC
 
-### P:\packages\cc-skills-sdlc\skills\planning\__lib\adversarial_review.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\__lib\adversarial_review.py
 ```python
 class AdversarialReviewContext
 as_dict(self) -> dict[str, Any]
@@ -34,7 +34,7 @@ validate_findings_file(findings_path: str | Path)
 collect_findings_status(context: AdversarialReviewContext)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\__lib\arch_handoff_state.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\__lib\arch_handoff_state.py
 ```python
 _utc_now() -> datetime
 _utc_now_iso() -> str
@@ -69,7 +69,7 @@ find_pending_arch_handoff_receipt(plan_path: str)
 mark_arch_handoff_consumed(plan_path: str)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\__lib\auto_fix.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\__lib\auto_fix.py
 ```python
 extract_sections(plan: str) -> dict[str, tuple[str, int, int]]
 normalize_headers(plan: str) -> tuple[str, list[str]]
@@ -83,7 +83,7 @@ fix_plan(plan_path: str, new_status: str | None, source_path: str | None, unreso
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\__lib\auto_verify.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\__lib\auto_verify.py
 ```python
 extract_section_content(plan: str, section_name: str) -> str
 is_stateful_plan(plan: str) -> bool
@@ -171,7 +171,7 @@ cleanup_plan_artifacts(plans_dir: str | Path | None, retention_seconds: int)
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\tests\test_adversarial_review.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_adversarial_review.py
 ```python
 test_prepare_adversarial_review_context_creates_terminal_scoped_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 test_resolve_prompt_template_rejects_unresolved_dispatch_tokens() -> None
@@ -182,13 +182,13 @@ test_collect_findings_status_rejects_wrong_path_even_if_stale_root_file_exists(t
 test_validate_findings_file_rejects_stale_and_mismatched_payloads(tmp_path: Path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_fix.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_fix.py
 ```python
 test_auto_fix_does_not_reorder_sections_by_default(tmp_path: Path) -> None
 test_auto_fix_reorders_sections_only_when_requested(tmp_path: Path) -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_fix_v2.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_fix_v2.py
 ```python
 class TestNormalizeHeaders
 test_double_space_after_header_normalized(self) -> None
@@ -220,7 +220,7 @@ test_add_missing_sections_does_not_exist(self) -> None
 test_no_placeholder_constants(self) -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_verify_v2.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_verify_v2.py
 ```python
 class TestPlaceholderDetection
 test_placeholder_detected(self, placeholder: str) -> None
@@ -293,7 +293,7 @@ test_undefined_helper_reference_is_flagged(self, tmp_path: Path) -> None
 test_assumption_schema_contradiction_is_flagged(self, tmp_path: Path) -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\planning\tests\test_planning_integration_v2.py
+### $CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_planning_integration_v2.py
 ```python
 class TestStrictReadinessGate
 test_placeholder_blocks_implementation_ready(self, tmp_path: Path) -> None
@@ -353,15 +353,15 @@ planning/ (9 files)
 
 | File | Description |
 |------|-------------|
-| `P:\packages\cc-skills-sdlc\skills\planning\__lib\adversarial_review.py` | adversarial review |
-| `P:\packages\cc-skills-sdlc\skills\planning\__lib\arch_handoff_state.py` | arch handoff state |
-| `P:\packages\cc-skills-sdlc\skills\planning\__lib\auto_fix.py` | auto fix |
-| `P:\packages\cc-skills-sdlc\skills\planning\__lib\auto_verify.py` | auto verify |
-| `P:\packages\cc-skills-sdlc\skills\planning\tests\test_adversarial_review.py` | test adversarial review |
-| `P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_fix.py` | test auto fix |
-| `P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_fix_v2.py` | test auto fix v2 |
-| `P:\packages\cc-skills-sdlc\skills\planning\tests\test_auto_verify_v2.py` | test auto verify v2 |
-| `P:\packages\cc-skills-sdlc\skills\planning\tests\test_planning_integration_v2.py` | test planning integration v2 |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\__lib\adversarial_review.py` | adversarial review |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\__lib\arch_handoff_state.py` | arch handoff state |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\__lib\auto_fix.py` | auto fix |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\__lib\auto_verify.py` | auto verify |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_adversarial_review.py` | test adversarial review |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_fix.py` | test auto fix |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_fix_v2.py` | test auto fix v2 |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_auto_verify_v2.py` | test auto verify v2 |
+| `$CLAUDE_PLUGIN_ROOT/skills\planning\tests\test_planning_integration_v2.py` | test planning integration v2 |
 
 ---
 
@@ -392,8 +392,8 @@ planning/ (9 files)
 ## Background
 
 Current adversarial dispatch is defined in:
-- `P:/packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
-- `P:/packages/cc-skills-sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
+- `P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
+- `P:\\\\\\packages/cc-skills-sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
 
 The 5 phase-1 agents are Claude subagents (e.g., `adversarial-compliance`). The critic is a meta-agent that reviews phase-1 findings. Both phases write findings to disk under `<findings_dir>` with idempotency checks.
 
@@ -476,7 +476,7 @@ Fallback if OpenCode unavailable: skip slot 5 (log warning), proceed with 4 Clau
 ### TASK-003: Define DeepSeek findings schema
 - Write `references/deepseek-adversarial-schema.json` with the findings schema above
 - Confirm schema is compatible with what the critic subagent reads
-- **Output**: Schema file at `P:/packages/cc-skills-sdlc/skills/planning/references/deepseek-adversarial-schema.json`
+- **Output**: Schema file at `P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/deepseek-adversarial-schema.json`
 
 ### TASK-004: Add DeepSeek dispatch to adversarial-agent-prompts.md
 - Append a new section "## Slot 5: DeepSeek V3.2 Adversarial" to `references/adversarial-agent-prompts.md`
@@ -540,8 +540,8 @@ Fallback if OpenCode unavailable: skip slot 5 (log warning), proceed with 4 Clau
 ## Background
 
 Current adversarial dispatch is defined in:
-- `P:/packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
-- `P:/packages/cc-skills-sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
+- `P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md` — dispatch prompts for 5+1 agents
+- `P:\\\\\\packages/cc-skills-sdlc/skills/planning/SKILL.md:35` — `adversarial_review` workflow step
 
 The 5 phase-1 agents are Claude subagents (e.g., `adversarial-compliance`). The critic is a meta-agent that reviews phase-1 findings. Both phases write findings to disk under `<findings_dir>` with idempotency checks.
 
@@ -624,7 +624,7 @@ Fallback if OpenCode unavailable: skip slot 5 (log warning), proceed with 4 Clau
 ### TASK-003: Define DeepSeek findings schema
 - Write `references/deepseek-adversarial-schema.json` with the findings schema above
 - Confirm schema is compatible with what the critic subagent reads
-- **Output**: Schema file at `P:/packages/cc-skills-sdlc/skills/planning/references/deepseek-adversarial-schema.json`
+- **Output**: Schema file at `P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/deepseek-adversarial-schema.json`
 
 ### TASK-004: Add DeepSeek dispatch to adversarial-agent-prompts.md
 - Append a new section "## Slot 5: DeepSeek V3.2 Adversarial" to `references/adversarial-agent-prompts.md`
@@ -712,7 +712,7 @@ workflow_steps:
       After adversarial_review completes, call cleanup_plan_artifacts() from __lib/auto_verify.py.
       Removes *.review.findings.json, *.review.summary.md, *.review.result.json files
       older than 7 days (604800s). Concurrent-session safe (atomic unlink).
-      Run: python -c "from pathlib import Path,sys;sys.path.insert(0,str(Path('P:/.claude/skills/planning/__lib')));from auto_verify import cleanup_plan_artifacts;print(cleanup_plan_artifacts())"
+      Run: python -c "from pathlib import Path,sys;sys.path.insert(0,str(Path('P:\\\\\\.claude/skills/planning/__lib')));from auto_verify import cleanup_plan_artifacts;print(cleanup_plan_artifacts())"
 
 hooks: {}
 
@@ -846,11 +846,11 @@ Use `trace` when the plan depends on `/design` packets, prior blocker closure, o
 Use `challenge` whenever the plan is layered, stateful, hook-driven, or overlap-sensitive.
 Use `graduate` when the same class of plan defect appears repeatedly across reviews or verifier failures.
 
-Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
+Reference: `P:\\\\\\.claude/skills/__lib/sdlc_internal_modes.md`
 
 ## Strategic Reasoning
 
-This skill uses strategic reasoning patterns from `P:/.claude/skills/__lib/strategic_reasoning.md`:
+This skill uses strategic reasoning patterns from `P:\\\\\\.claude/skills/__lib/strategic_reasoning.md`:
 
 - **GoT+ToT**: For constraint analysis and branching scenario exploration when plan has competing alternatives or unresolved blockers
 - **Strategic Questioning**: For blind-spot detection before accepting plans as implementation-ready
@@ -1162,16 +1162,16 @@ Ask for a **task decomposition**, NOT a full v2 plan. External models produce st
 Write the source material to a temp file, then dispatch via `/ai-pcli`:
 
 ```bash
-python "P:\.claude\skills\ai-cli\ai_cli.py" \
+python "$CLAUDE_ROOT/skills\ai-cli\ai_cli.py" \
   "Given the following source material, produce a task decomposition for an implementation plan. \
    For each task: name it, describe the goal, list touched files/components, assign a confidence badge \
    (HIGH/MED/LOW), and identify the single biggest risk. Also list the 3 most important design decisions \
    and any assumptions that could be wrong." \
-  --context "P:/packages/cc-skills-sdlc/skills/planning/references/plan-shape-template.md,<source_material_temp_file>" \
+  --context "P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/plan-shape-template.md,<source_material_temp_file>" \
   --output-format json --no-critic --summary --prompt-toolkit
 ```
 
-- Models come from the active recipe (`P:/.claude/ai-pcli-recipe.json`), not hardcoded flags
+- Models come from the active recipe (`P:\\\\\\.claude/ai-pcli-recipe.json`), not hardcoded flags
 - `--prompt-toolkit` activates AutomaticEnhancementSystem for higher-quality query framing
 - `--no-critic` skips the post-run critic subagent (not needed for decomposition)
 - `--summary` keeps output concise
@@ -1293,7 +1293,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 python -c "
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r'P:/packages/cc-skills-sdlc/skills/planning/__lib')))
+sys.path.insert(0, str(Path(r'P:\\\\\\packages/cc-skills-sdlc/skills/planning/__lib')))
 from adversarial_review import prepare_adversarial_review_context
 
 context = prepare_adversarial_review_context(sys.argv[1])
@@ -1334,7 +1334,7 @@ The 5 phase-1 agents are: `adversarial-compliance`, `adversarial-logic`, `advers
 
 **IMPORTANT — File naming**: The reference prompts write to `{agent}-findings.json` (e.g., `compliance-findings.json`, `logic-findings.json`). Do NOT use `adversarial-{agent}.json` naming.
 **IMPORTANT — Path safety**: Never dispatch a prompt that still contains `{sanitized_plan_name}`. That means Step 4a output was not consumed, and agents may write into the shared root or stale plan directory.
-**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:/.claude/plans/adversarial/*.json` outputs as valid idempotent results.
+**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:\\\\\\.claude/plans/adversarial/*.json` outputs as valid idempotent results.
 
 **Phase 1 Slot 5 — External LLM (conditional)**:
 
@@ -1664,7 +1664,7 @@ workflow_steps:
       After adversarial_review completes, call cleanup_plan_artifacts() from __lib/auto_verify.py.
       Removes *.review.findings.json, *.review.summary.md, *.review.result.json files
       older than 7 days (604800s). Concurrent-session safe (atomic unlink).
-      Run: python -c "from pathlib import Path,sys;sys.path.insert(0,str(Path('P:/.claude/skills/planning/__lib')));from auto_verify import cleanup_plan_artifacts;print(cleanup_plan_artifacts())"
+      Run: python -c "from pathlib import Path,sys;sys.path.insert(0,str(Path('P:\\\\\\.claude/skills/planning/__lib')));from auto_verify import cleanup_plan_artifacts;print(cleanup_plan_artifacts())"
 
 hooks: {}
 
@@ -1798,11 +1798,11 @@ Use `trace` when the plan depends on `/design` packets, prior blocker closure, o
 Use `challenge` whenever the plan is layered, stateful, hook-driven, or overlap-sensitive.
 Use `graduate` when the same class of plan defect appears repeatedly across reviews or verifier failures.
 
-Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
+Reference: `P:\\\\\\.claude/skills/__lib/sdlc_internal_modes.md`
 
 ## Strategic Reasoning
 
-This skill uses strategic reasoning patterns from `P:/.claude/skills/__lib/strategic_reasoning.md`:
+This skill uses strategic reasoning patterns from `P:\\\\\\.claude/skills/__lib/strategic_reasoning.md`:
 
 - **GoT+ToT**: For constraint analysis and branching scenario exploration when plan has competing alternatives or unresolved blockers
 - **Strategic Questioning**: For blind-spot detection before accepting plans as implementation-ready
@@ -2114,16 +2114,16 @@ Ask for a **task decomposition**, NOT a full v2 plan. External models produce st
 Write the source material to a temp file, then dispatch via `/ai-pcli`:
 
 ```bash
-python "P:\.claude\skills\ai-cli\ai_cli.py" \
+python "$CLAUDE_ROOT/skills\ai-cli\ai_cli.py" \
   "Given the following source material, produce a task decomposition for an implementation plan. \
    For each task: name it, describe the goal, list touched files/components, assign a confidence badge \
    (HIGH/MED/LOW), and identify the single biggest risk. Also list the 3 most important design decisions \
    and any assumptions that could be wrong." \
-  --context "P:/packages/cc-skills-sdlc/skills/planning/references/plan-shape-template.md,<source_material_temp_file>" \
+  --context "P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/plan-shape-template.md,<source_material_temp_file>" \
   --output-format json --no-critic --summary --prompt-toolkit
 ```
 
-- Models come from the active recipe (`P:/.claude/ai-pcli-recipe.json`), not hardcoded flags
+- Models come from the active recipe (`P:\\\\\\.claude/ai-pcli-recipe.json`), not hardcoded flags
 - `--prompt-toolkit` activates AutomaticEnhancementSystem for higher-quality query framing
 - `--no-critic` skips the post-run critic subagent (not needed for decomposition)
 - `--summary` keeps output concise
@@ -2245,7 +2245,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 python -c "
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r'P:/packages/cc-skills-sdlc/skills/planning/__lib')))
+sys.path.insert(0, str(Path(r'P:\\\\\\packages/cc-skills-sdlc/skills/planning/__lib')))
 from adversarial_review import prepare_adversarial_review_context
 
 context = prepare_adversarial_review_context(sys.argv[1])
@@ -2286,7 +2286,7 @@ The 5 phase-1 agents are: `adversarial-compliance`, `adversarial-logic`, `advers
 
 **IMPORTANT — File naming**: The reference prompts write to `{agent}-findings.json` (e.g., `compliance-findings.json`, `logic-findings.json`). Do NOT use `adversarial-{agent}.json` naming.
 **IMPORTANT — Path safety**: Never dispatch a prompt that still contains `{sanitized_plan_name}`. That means Step 4a output was not consumed, and agents may write into the shared root or stale plan directory.
-**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:/.claude/plans/adversarial/*.json` outputs as valid idempotent results.
+**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:\\\\\\.claude/plans/adversarial/*.json` outputs as valid idempotent results.
 
 **Phase 1 Slot 5 — External LLM (conditional)**:
 

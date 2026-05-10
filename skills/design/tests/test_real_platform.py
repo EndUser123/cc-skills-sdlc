@@ -7,7 +7,7 @@ on the ACTUAL platform detected via platform.system().
 
 This addresses TEST-009: Missing cross-platform execution test.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_real_platform.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_real_platform.py -v
 
 NOTE: This is the RED phase - tests are written to FAIL initially to
 verify the expected behavior before implementation.
@@ -123,16 +123,16 @@ class TestRealPlatformPathBehavior:
         system_platform = platform.system()
 
         # Act - Create various path types and observe behavior
-        p_drive_path = Path("P:/__csf/data/cks.db")
+        p_drive_path = Path("P:\\\\\\__csf/data/cks.db")
         posix_path = Path("/home/user/__csf/data/cks.db")
         relative_path = Path("relative/path/file.txt")
 
         # Assert - Document behavior on this platform
         # This test characterizes actual behavior rather than prescribing it
         if detected_platform == "Windows":
-            # On Windows, P:/ should be absolute
+            # On Windows, P:\\\\\\ should be absolute
             assert p_drive_path.is_absolute(), (
-                f"On {detected_platform}, P:/ paths should be absolute: {p_drive_path}"
+                f"On {detected_platform}, P:\\\\\\ paths should be absolute: {p_drive_path}"
             )
             # Path string representation on Windows may use backslashes
             # but the path object should still recognize it as absolute
@@ -233,7 +233,7 @@ class TestRealPlatformCrossPlatformFunctions:
         result_str = str(result)
 
         if detected_platform == "Windows":
-            # Windows should use P:/ drive
+            # Windows should use P:\\\\\\ drive
             assert result_str.startswith("P:"), (
                 f"On {detected_platform}, path should start with P:: {result_str}"
             )
@@ -365,7 +365,7 @@ class TestRealPlatformIntegration:
         # Document platform-specific behavior
         if detected_platform == "Windows":
             assert str(cks_path).startswith("P:"), (
-                f"On Windows, CKS path should use P:/ drive: {cks_path}"
+                f"On Windows, CKS path should use P:\\\\\\ drive: {cks_path}"
             )
         elif detected_platform == "Linux":
             assert str(cks_path).startswith("/home/user"), (
@@ -439,7 +439,7 @@ RED PHASE NOTES:
 - They address TEST-009: Missing cross-platform execution test
 
 EXPECTED TEST RESULTS:
-- On Windows: Tests should pass (P:/ paths, Windows detection)
+- On Windows: Tests should pass (P:\\\\\\ paths, Windows detection)
 - On Linux: Tests should pass (/home/user paths, Linux detection)
 - On Mac: Tests should pass (/Users/user paths, Darwin detection)
 - On other platforms: Tests may pass with "Unknown" detection

@@ -112,7 +112,7 @@ On SUCCESS:
 You MUST complete this step before stopping. No exceptions.
 
 1. Run each command from the `verification.commands` frontmatter.
-2. Write results to artifact: `P:/.claude/.artifacts/{terminal_id}/tdd/verification.json`.
+2. Write results to artifact: `P:\\\\\\.claude/.artifacts/{terminal_id}/tdd/verification.json`.
 3. Paste each tool's output verbatim.
 4. For each command: PASS or FAIL with one sentence.
 

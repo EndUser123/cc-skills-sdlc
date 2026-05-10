@@ -34,7 +34,7 @@ When you modify files in a directory, **BEFORE claiming completion**:
 ### 4. Example Pattern
 
 ```
-Modified: P:/.claude/hooks/StopHook_reality_check.py
-  -> Auto-Check: P:/.claude/hooks/README.md, P:/.claude/hooks/ARCHITECTURE.md
+Modified: P:\\\\\\.claude/hooks/StopHook_reality_check.py
+  -> Auto-Check: P:\\\\\\.claude/hooks/README.md, P:\\\\\\.claude/hooks/ARCHITECTURE.md
   -> Action: Add new hook to catalog and architecture map
 ```

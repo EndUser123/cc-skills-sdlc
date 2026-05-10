@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-results = json.loads(Path('P:/Users/brsth/.claude/.artifacts/default/refactor/scan_results.json').read_text())
+results = json.loads(Path('P:\\\\\\Users/brsth/.claude/.artifacts/default/refactor/scan_results.json').read_text())
 
 # Filter to cc-skills-sdlc only
 cc_sdlc = [f for f in results if 'cc-skills-sdlc' in f['file_path']]

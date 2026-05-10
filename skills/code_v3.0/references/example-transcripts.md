@@ -20,7 +20,7 @@ Output format:
 
 `Current task: AT-006 daemon integration`
 
-`Why stopped: verifier attempted /mnt/p/... but runtime is windows (P:\...)`
+`Why stopped: verifier attempted /mnt/p/... but runtime is windows (P:\\\\\\...)`
 
 `Needs decision: should I re-run verification using windows path mode now?`
 

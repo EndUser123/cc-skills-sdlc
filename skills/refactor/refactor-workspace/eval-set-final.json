@@ -16,7 +16,7 @@
     "should_trigger": true
   },
   {
-    "query": "We have old Python code using requests.Session() and datetime.utcnow() scattered across P:/packages/cc-skills-sdlc/. Modernize it to httpx and timezone-aware datetimes.",
+    "query": "We have old Python code using requests.Session() and datetime.utcnow() scattered across P:\\\\\\packages/cc-skills-sdlc/. Modernize it to httpx and timezone-aware datetimes.",
     "should_trigger": true
   },
   {

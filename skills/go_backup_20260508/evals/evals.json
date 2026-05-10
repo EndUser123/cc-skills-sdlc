@@ -1,0 +1,21 @@
+[
+  {"id": 1, "query": "do the next task", "should_trigger": true},
+  {"id": 2, "query": "pick the next item from the queue", "should_trigger": true},
+  {"id": 3, "query": "run /go", "should_trigger": true},
+  {"id": 4, "query": "execute the planned changes", "should_trigger": true},
+  {"id": 6, "query": "continue working on tasks", "should_trigger": true},
+  {"id": 7, "query": "process the next item in tasks.json", "should_trigger": true},
+  {"id": 8, "query": "work through the queued tasks", "should_trigger": true},
+  {"id": 9, "query": "start the next planned task", "should_trigger": true},
+  {"id": 10, "query": "go", "should_trigger": true},
+  {"id": 11, "query": "how do I route a task to /planning?", "should_trigger": false},
+  {"id": 12, "query": "design an ADR for the auth layer", "should_trigger": false},
+  {"id": 13, "query": "what should go in the architecture decision record?", "should_trigger": false},
+  {"id": 14, "query": "refactor the Context7 resolver to reduce duplication", "should_trigger": false},
+  {"id": 15, "query": "clean up the duplicate path normalization helpers", "should_trigger": false},
+  {"id": 16, "query": "create a plan for breaking up the monolith", "should_trigger": false},
+  {"id": 17, "query": "break this feature into executable tasks", "should_trigger": false},
+  {"id": 18, "query": "sequence the implementation steps", "should_trigger": false},
+  {"id": 19, "query": "should I use /planning or /code for this?", "should_trigger": false},
+  {"id": 20, "query": "what's the difference between /go and /go_2.0?", "should_trigger": false}
+]

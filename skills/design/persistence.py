@@ -179,7 +179,7 @@ def _ingest_into_cks(
                 "Architecture decision was saved to file, but not added to CKS database.\n"
                 "Future /arch queries won't benefit from this decision in semantic search.\n"
                 "To enable CKS integration:\n"
-                "  1. Verify CKS database exists at: P:/__csf/data/cks.db"
+                "  1. Verify CKS database exists at: P:\\\\\\__csf/data/cks.db"
             )
             return
 
@@ -219,7 +219,7 @@ def _ingest_into_cks(
             "Architecture decision was saved to file, but not added to CKS database.\n"
             "Future /arch queries won't benefit from this decision in semantic search.\n"
             "To enable CKS integration:\n"
-            "  1. Verify CKS database exists at: P:/__csf/data/cks.db\n"
+            "  1. Verify CKS database exists at: P:\\\\\\__csf/data/cks.db\n"
             "  2. Ensure write permissions to the database file"
         )
 

@@ -199,8 +199,8 @@ def main():
     print()
 
     # Load all /uci runs
-    print("Loading /uci runs from P:/.claude/state/uci/...")
-    collector = UCIRunCollector(log_dir="P:/.claude/state/uci")
+    print("Loading /uci runs from P:\\\\\\.claude/state/uci/...")
+    collector = UCIRunCollector(log_dir="P:\\\\\\.claude/state/uci")
     runs = collector.load_from_logs()
 
     if not runs:

@@ -45,6 +45,8 @@ aid <path> --ai-action prompt-for-bug-hunting
 | Untested claim | "Probably caused by X" | Show test output |
 | Missing conclusion | Tests but no winner | State confirmed hypothesis |
 | Premature fix | "Let's try X" before tests | Complete protocol first |
+| **Semantic Ambiguity** | Vague terms ("better", "maybe") | Use precise technical signals |
+| **Contradiction** | Evidence conflicts with H | Re-evaluate H or evidence |
 
 ---
 **Version**: 1.0.0

@@ -73,7 +73,7 @@ Testing/TRACE finds fewer bugs (structural issues caught earlier)
 
 ### Integration Point
 
-**File**: `P:\.claude\skills\code\SKILL.md`
+**File**: `$CLAUDE_ROOT/skills\code\SKILL.md`
 **Section**: Phase 4: PLAN — Design Solution
 **Insert location**: After line 351 (after pre-mortem step), before line 357 (Exit criteria)
 
@@ -230,7 +230,7 @@ Testing/TRACE finds fewer bugs (structural issues caught earlier)
 
 ## References
 
-- **GAV Phase 2 bugs**: `P:\.claude\hooks\plan_gav_phase2_drift_detection.md`
-- **TRACE methodology**: `P:\.claude\skills\trace\templates\TRACE_METHODOLOGY.md`
-- **Current /code skill**: `P:\.claude\skills\code\SKILL.md`
-- **Feature flow**: `P:\.claude\skills\code\flows\feature.md`
+- **GAV Phase 2 bugs**: `$CLAUDE_ROOT/hooks\plan_gav_phase2_drift_detection.md`
+- **TRACE methodology**: `$CLAUDE_ROOT/skills\trace\templates\TRACE_METHODOLOGY.md`
+- **Current /code skill**: `$CLAUDE_ROOT/skills\code\SKILL.md`
+- **Feature flow**: `$CLAUDE_ROOT/skills\code\flows\feature.md`

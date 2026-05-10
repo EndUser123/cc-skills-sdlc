@@ -49,10 +49,17 @@ def extract_errors(output: str) -> list:
     error_indicators = ["error:", "failed", "exception", "traceback", "error in", "syntax error"]
     return [line for line in output.split("\n") if any(e in line.lower() for e in error_indicators)]
 
+def run(input_data: dict) -> dict | None:
+    """In-process hook logic."""
+    result = validate_tool_output(input_data)
+    return result if result else None
+
+
 def main():
     input_data = json.loads(sys.stdin.read())
-    result = validate_tool_output(input_data)
-    print(json.dumps(result))
+    result = run(input_data)
+    if result:
+        print(json.dumps(result))
     sys.exit(0)
 
 if __name__ == "__main__":

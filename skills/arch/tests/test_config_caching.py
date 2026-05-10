@@ -2,7 +2,7 @@
 Test for PERF-004: load_arch_config() caching in config.py
 
 These tests CAPTURE CURRENT BEHAVIOR before refactoring.
-Run with: pytest P:/.claude/skills/arch/tests/test_config_caching.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_caching.py -v
 
 Purpose: Verify that load_arch_config() implements caching to minimize
 file system checks. Currently, the function checks file existence on

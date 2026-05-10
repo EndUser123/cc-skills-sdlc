@@ -8,7 +8,7 @@ Security Fix: The function now uses two-layer validation:
 1. Restrictive regex r"template=([a-zA-Z0-9-]+)" - only alphanumeric + dash
 2. Allowlist validation - checks if template in VALID_TEMPLATES
 
-Run with: pytest P:/.claude/skills/arch/tests/test_template_override_security.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_template_override_security.py -v
 """
 
 import sys

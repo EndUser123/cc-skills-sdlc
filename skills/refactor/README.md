@@ -24,7 +24,7 @@ Transform large-scale refactoring from a risky manual process into a safe, autom
 ```bash
 # Create junction (Windows - no admin required)
 # Run from the skills parent directory
-mklink /J "P:\.claude\skills\refactor" "P:\packages\cc-skills-sdlc\skills\refactor"
+mklink /J "$CLAUDE_ROOT/skills\refactor" "$CLAUDE_PLUGIN_ROOT/skills\refactor"
 
 # Or create symlink (macOS/Linux)
 ln -s "$(pwd)" ~/.claude/skills/refactor
@@ -48,12 +48,12 @@ The skill is accessed via `/refactor` in Claude Code.
 # IMPORTANT: Sanitize the junction name to remove problematic characters
 $junctionName = "refactor" -replace '[@?*:<>|+]', ''
 
-New-Item -ItemType Junction -Path "P:\.claude\skills\$junctionName" -Target "P:\packages\cc-skills-sdlc\skills\refactor"
+New-Item -ItemType Junction -Path "$CLAUDE_ROOT/skills\$junctionName" -Target "$CLAUDE_PLUGIN_ROOT/skills\refactor"
 ```
 
 **Key points:**
-- ✅ Edit in `P:/packages/cc-skills-sdlc/skills/refactor/`, changes work immediately
-- ✅ No reinstallation required - skills auto-discover from `P:/.claude/skills/`
+- ✅ Edit in `P:\\\\\\packages/cc-skills-sdlc/skills/refactor/`, changes work immediately
+- ✅ No reinstallation required - skills auto-discover from `P:\\\\\\.claude/skills/`
 - ✅ Perfect for active development
 
 #### 2. HOOKS (Dev Deployment - Hook Files Only)
@@ -62,9 +62,9 @@ New-Item -ItemType Junction -Path "P:\.claude\skills\$junctionName" -Target "P:\
 
 **Setup:**
 ```powershell
-# Symlink individual hook files to P:/.claude/hooks/
-cd P:/.claude/hooks
-cmd /c "mklink HookName.py P:/packages/cc-skills-sdlc/skills/refactor/scripts/hooks/HookName.py"
+# Symlink individual hook files to P:\\\\\\.claude/hooks/
+cd P:\\\\\\.claude/hooks
+cmd /c "mklink HookName.py P:\\\\\\packages/cc-skills-sdlc/skills/refactor/scripts/hooks/HookName.py"
 ```
 
 #### 3. PLUGINS (End User Deployment)
@@ -74,7 +74,7 @@ cmd /c "mklink HookName.py P:/packages/cc-skills-sdlc/skills/refactor/scripts/ho
 **Setup:**
 ```bash
 # End users install via /plugin command
-/plugin P:/packages/cc-skills-sdlc/skills/refactor
+/plugin P:\\\\\\packages/cc-skills-sdlc/skills/refactor
 ```
 
 ## 🏗️ Architecture
@@ -152,7 +152,7 @@ Invoke the refactor skill from Claude Code:
 /refactor --files src/**/*.py
 
 # Enable incremental mode
-/refactor --incremental --state-file P:/.claude/state/refactor/refactor_<terminal_id>.json
+/refactor --incremental --state-file P:\\\\\\.claude/state/refactor/refactor_<terminal_id>.json
 
 # Custom complexity threshold
 /refactor --cc-threshold 20

@@ -16,7 +16,7 @@ _ENFORCE = _ROOT / "enforce"
 if str(_ENFORCE) not in sys.path:
     sys.path.insert(0, str(_ENFORCE))
 
-skill_guard_path = Path("P:/packages/skill-guard")
+skill_guard_path = Path("P:\\\\\\packages/skill-guard")
 if str(skill_guard_path) not in sys.path:
     sys.path.insert(0, str(skill_guard_path))
 
@@ -85,6 +85,7 @@ def main() -> None:
     skill_id = "code_v4.0"
     try:
         input_data = json.loads(sys.stdin.read())
+        session_id = input_data.get("session_id")
         tool_name = input_data.get("tool_name", "")
         tool_input = input_data.get("tool_input", {})
         tool_result = input_data.get("result", {})
@@ -99,14 +100,15 @@ def main() -> None:
         if tool_name == "Bash":
             cmd = tool_input.get("command", "")
             if _is_full_suite(cmd):
-                write_phase_marker(skill_id, "full_test_suite", {"pytest_exit": exit_code})
+                write_phase_marker(skill_id, "full_test_suite", {"pytest_exit": exit_code}, session_id=session_id)
             elif _is_smoke(cmd):
-                write_phase_marker(skill_id, "smoke_validation", {"pytest_exit": exit_code})
+                write_phase_marker(skill_id, "smoke_validation", {"pytest_exit": exit_code}, session_id=session_id)
             audit_exit = _audit_exit_from_cmd(cmd, stdout, stderr, exit_code)
             if audit_exit is not None:
                 write_phase_marker(
                     skill_id, "audit_quality_checks",
                     {"tool_exit": audit_exit, "tool": cmd.split()[0] if cmd else "unknown"},
+                    session_id=session_id
                 )
 
         print(json.dumps({"continue": True}))

@@ -5,7 +5,7 @@ This test verifies that config tests work correctly when multiple terminals
 run tests simultaneously. This is critical because the codebase runs multiple
 terminals simultaneously (per CLAUDE.md constraints).
 
-Run with: pytest P:/packages/arch/skill/tests/test_multi_terminal_isolation.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_multi_terminal_isolation.py -v
 
 Purpose: Verify environment variable isolation between concurrent terminals.
 Issue: ARCH_* environment variables may leak between terminals causing test failures.

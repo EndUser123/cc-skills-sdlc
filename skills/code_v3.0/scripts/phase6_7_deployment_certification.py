@@ -28,14 +28,14 @@ def run_deployment_readiness_checks():
     # Check 1: All Phase 1 & 2 skills have passing tests
     print("\nCheck 1: Test Suite Validation...")
     skills_to_verify = [
-        ("P:/.claude/skills/code", "code"),
-        ("P:/.claude/skills/arch", "arch"),
-        ("P:/.claude/skills/s", "s"),
-        ("P:/.claude/skills/plan-workflow", "plan-workflow"),
-        ("P:/.claude/skills/p", "p"),
-        ("P:/.claude/skills/q", "q"),
-        ("P:/.claude/skills/r", "r"),
-        ("P:/.claude/skills/t", "t"),
+        ("P:\\\\\\.claude/skills/code", "code"),
+        ("P:\\\\\\.claude/skills/arch", "arch"),
+        ("P:\\\\\\.claude/skills/s", "s"),
+        ("P:\\\\\\.claude/skills/plan-workflow", "plan-workflow"),
+        ("P:\\\\\\.claude/skills/p", "p"),
+        ("P:\\\\\\.claude/skills/q", "q"),
+        ("P:\\\\\\.claude/skills/r", "r"),
+        ("P:\\\\\\.claude/skills/t", "t"),
     ]
 
     all_passed = True
@@ -64,8 +64,8 @@ def run_deployment_readiness_checks():
 
     # Check 2: Utils modules are present and functional
     print("\nCheck 2: Utils Modules Verification...")
-    got_planner = Path("P:/.claude/skills/code/utils/got_planner.py")
-    tot_tracer = Path("P:/.claude/skills/code/utils/tot_tracer.py")
+    got_planner = Path("P:\\\\\\.claude/skills/code/utils/got_planner.py")
+    tot_tracer = Path("P:\\\\\\.claude/skills/code/utils/tot_tracer.py")
 
     utils_present = got_planner.exists() and tot_tracer.exists()
     if utils_present:
@@ -87,7 +87,7 @@ def run_deployment_readiness_checks():
 
     # Check 3: Documentation is complete
     print("\nCheck 3: Documentation Completeness...")
-    doc_file = Path("P:/.claude/skills/code/docs/got_tot_integration_documentation.md")
+    doc_file = Path("P:\\\\\\.claude/skills/code/docs/got_tot_integration_documentation.md")
     doc_complete = doc_file.exists()
 
     if doc_complete:
@@ -107,10 +107,10 @@ def run_deployment_readiness_checks():
     print("\nCheck 5: Rollback Planning...")
     rollback_plan = """
     Rollback Strategy:
-    1. Revert utils module changes: git checkout HEAD -- P:/.claude/skills/code/utils/
-    2. Remove test files: rm P:/.claude/skills/*/tests/test_opt_out_flags.py
-    3. Remove documentation: rm P:/.claude/skills/code/docs/got_tot_integration_documentation.md
-    4. Reset SKILL.md changes: git checkout HEAD -- P:/.claude/skills/*/SKILL.md
+    1. Revert utils module changes: git checkout HEAD -- P:\\\\\\.claude/skills/code/utils/
+    2. Remove test files: rm P:\\\\\\.claude/skills/*/tests/test_opt_out_flags.py
+    3. Remove documentation: rm P:\\\\\\.claude/skills/code/docs/got_tot_integration_documentation.md
+    4. Reset SKILL.md changes: git checkout HEAD -- P:\\\\\\.claude/skills/*/SKILL.md
     """
     print("  ✅ Rollback plan documented")
     checks.append(("Rollback Plan", True))

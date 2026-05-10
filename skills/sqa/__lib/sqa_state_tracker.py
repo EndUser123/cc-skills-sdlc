@@ -5,7 +5,7 @@ State is written after each layer completion and read by the Stop hook gate.
 
 State file format:
 {
-  "target": "P:/path/to/target",
+  "target": "P:\\\\\\path/to/target",
   "session_id": "uuid",
   "halt_on": "HIGH",
   "layers": {

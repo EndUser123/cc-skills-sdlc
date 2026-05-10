@@ -45,7 +45,7 @@ skills/
 - **Input**: Unstructured YAML findings (category, severity, context, lesson, application)
 - **Processing**: Map categories to /r's finding types (PATTERN, REFACTOR, DEBT, DOC, OPT)
 - **Output**: Structured findings with CKS-compliant metadata
-- **Integration Point**: `P:\__csf\src\core\retrospective_common.py:319-349` (store_to_cks function)
+- **Integration Point**: `$__CSF_ROOT/src\core\retrospective_common.py:319-349` (store_to_cks function)
 
 **Enhancement #3: /pre-mortem Objective Risk**
 - **Input**: Subjective L×I scores (1-9 range, threshold ≥6)

@@ -59,7 +59,7 @@ Tests are located in `tests/`:
 
 Run tests with:
 ```bash
-cd P:/.claude/skills/t
+cd P:\\\\\\.claude/skills/t
 python -m pytest tests/ -v
 ```
 

@@ -3,13 +3,13 @@
 Cross-platform CKS.db path resolution tests.
 
 Test scenarios:
-1. Windows P:/ paths resolve correctly
+1. Windows P:\\\\\\ paths resolve correctly
 2. Linux /home/user paths resolve correctly
 3. Mac /Users/user paths resolve correctly
 4. Path.is_absolute() works across platforms
 5. Template paths use forward slashes consistently
 
-Run with: pytest P:/.claude/skills/arch/tests/test_cross_platform.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_cross_platform.py -v
 """
 
 import pytest
@@ -27,23 +27,23 @@ class TestCrossPlatformPathResolution:
     """
 
     # -------------------------------------------------------------------------
-    # Test Scenario 1: Windows P:/ paths resolve correctly
+    # Test Scenario 1: Windows P:\\\\\\ paths resolve correctly
     # -------------------------------------------------------------------------
 
     def test_windows_p_drive_path_is_absolute(self):
         """
-        Test that Windows P:/ drive paths are recognized as absolute.
+        Test that Windows P:\\\\\\ drive paths are recognized as absolute.
 
-        Given: A Windows P:/ drive path (e.g., P:/__csf/data/cks.db)
+        Given: A Windows P:\\\\\\ drive path (e.g., P:\\\\\\__csf/data/cks.db)
         When: Checking if the path is absolute
         Then: Path.is_absolute() should return True
         """
         # Arrange
-        p_drive_path = Path("P:/__csf/data/cks.db")
+        p_drive_path = Path("P:\\\\\\__csf/data/cks.db")
 
         # Act & Assert
         assert p_drive_path.is_absolute(), (
-            f"Windows P:/ drive path should be absolute: {p_drive_path}"
+            f"Windows P:\\\\\\ drive path should be absolute: {p_drive_path}"
         )
         assert str(p_drive_path).startswith("P:"), (
             f"Path should preserve drive letter: {p_drive_path}"
@@ -51,39 +51,39 @@ class TestCrossPlatformPathResolution:
 
     def test_windows_p_drive_path_components(self):
         """
-        Test that Windows P:/ drive paths are parsed correctly.
+        Test that Windows P:\\\\\\ drive paths are parsed correctly.
 
-        Given: A Windows P:/ drive path with multiple components
+        Given: A Windows P:\\\\\\ drive path with multiple components
         When: Accessing path components
         Then: All components should be accessible and correct
         """
         # Arrange
-        p_drive_path = Path("P:/__csf/data/cks.db")
+        p_drive_path = Path("P:\\\\\\__csf/data/cks.db")
 
         # Act & Assert
         parts = p_drive_path.parts
-        assert parts[0] == "P:\\", f"Drive should be first part: {parts[0]}"
+        assert parts[0] == "P:\\\\\\\", f"Drive should be first part: {parts[0]}"
         assert "__csf" in parts, f"__csf should be in path: {parts}"
         assert "data" in parts, f"data should be in path: {parts}"
         assert "cks.db" in parts, f"cks.db should be in path: {parts}"
 
     def test_windows_p_drive_path_parent_resolution(self):
         """
-        Test that parent directory resolution works on P:/ paths.
+        Test that parent directory resolution works on P:\\\\\\ paths.
 
-        Given: A Windows P:/ drive path
+        Given: A Windows P:\\\\\\ drive path
         When: Accessing parent directories
         Then: Parent paths should resolve correctly
         """
         # Arrange
-        p_drive_path = Path("P:/__csf/data/cks.db")
+        p_drive_path = Path("P:\\\\\\__csf/data/cks.db")
 
         # Act & Assert
-        assert p_drive_path.parent == Path("P:/__csf/data"), (
-            f"Parent should be P:/__csf/data: {p_drive_path.parent}"
+        assert p_drive_path.parent == Path("P:\\\\\\__csf/data"), (
+            f"Parent should be P:\\\\\\__csf/data: {p_drive_path.parent}"
         )
-        assert p_drive_path.parent.parent == Path("P:/__csf"), (
-            f"Grandparent should be P:/__csf: {p_drive_path.parent.parent}"
+        assert p_drive_path.parent.parent == Path("P:\\\\\\__csf"), (
+            f"Grandparent should be P:\\\\\\__csf: {p_drive_path.parent.parent}"
         )
 
     # -------------------------------------------------------------------------
@@ -186,7 +186,7 @@ class TestCrossPlatformPathResolution:
         """
         # Arrange & Act & Assert
         assert PureWindowsPath("C:/Windows").is_absolute()
-        assert PureWindowsPath("P:/__csf/data").is_absolute()
+        assert PureWindowsPath("P:\\\\\\__csf/data").is_absolute()
         assert PureWindowsPath(r"\\server\share").is_absolute()
         assert not PureWindowsPath("relative/path").is_absolute()
         assert not PureWindowsPath("../parent").is_absolute()
@@ -426,7 +426,7 @@ def test_get_cks_db_path_placeholder():
     Expected behavior:
     1. Accept optional base_path parameter
     2. Return absolute Path to CKS.db
-    3. Work across Windows (P:/), Linux (/home/user), Mac (/Users/user)
+    3. Work across Windows (P:\\\\\\), Linux (/home/user), Mac (/Users/user)
     4. Handle relative paths correctly
     """
     # Arrange

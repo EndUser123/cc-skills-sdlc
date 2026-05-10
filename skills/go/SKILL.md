@@ -32,7 +32,7 @@ hooks:
 
 **Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `__lib/sdlc_schemas.py`.
 
-**MANDATORY SEQUENCE:** Worktree Check → Task Selection → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
+**MANDATORY SEQUENCE:** Worktree Check → Task Selection → Classify → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
 
 **State root:** `.claude/.artifacts/{TERMINAL_ID}/go/`
 
@@ -43,12 +43,13 @@ hooks:
 
 1. Enforce worktree + branch preconditions (auto-create if on main)
 2. Acquire a task from one of three input sources
-3. Route to the correct SDLC skill based on task type and diff
-4. Run verification commands from the task contract
-5. Run `/simplify` if code changed
-6. Run 7-pass review at the appropriate depth
-7. Generate local PR artifacts
-8. Emit the correct completion token
+3. Classify task complexity → select model via Bifrost
+4. Route to the correct SDLC skill based on task type and diff
+5. Run verification commands from the task contract
+6. Run `/simplify` if code changed
+7. Run 7-pass review at the appropriate depth
+8. Generate local PR artifacts
+9. Emit the correct completion token
 
 **What /go Must NOT Do:**
 - Replace `/code` TDD workflow
@@ -191,6 +192,27 @@ STATUS=$?
 [ "$STATUS" -ne 0 ] && exit 1
 touch "$GO_STATE_DIR/.task-selected_$RUN_ID"
 ```
+
+---
+
+## STEP 1.5: Classify Complexity
+
+Read `active-task_{RUN_ID}.json` and classify complexity. Select model for Bifrost routing.
+
+```bash
+python ".claude/skills/go/scripts/classify_complexity.py"
+STATUS=$?
+[ "$STATUS" -ne 0 ] && exit 1
+```
+
+Output: `model-selection_{RUN_ID}.json` with `{tier, model, confidence, signals}`.
+
+| Tier | Model | Task types |
+|------|-------|------------|
+| T1-T3 | `M27` | implementation, refactor, config |
+| T4 | `GLM-5.1` | design, planning |
+
+Override: `GO_MODEL_OVERRIDE` env var bypasses classification.
 
 ---
 

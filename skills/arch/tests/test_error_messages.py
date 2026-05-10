@@ -7,7 +7,7 @@ These tests verify that error messages are:
 - Include lists of valid options where applicable
 - User-friendly and not cryptic
 
-Run with: pytest P:/.claude/skills/arch/tests/test_error_messages.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_error_messages.py -v
 """
 
 import json

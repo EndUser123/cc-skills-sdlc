@@ -133,7 +133,7 @@ Agent(subagent_type="pr-review-toolkit:silent-failure-hunter", description="Erro
 4. Only proceed to SHIP after TRACE passes
 
 **See `/trace` skill for**:
-- Full TRACE methodology: `P:/.claude/skills/trace/templates/TRACE_METHODOLOGY.md`
-- Code TRACE templates: `P:/.claude/skills/trace/templates/code/TRACE_TEMPLATES.md`
-- TRACE checklist: `P:/.claude/skills/trace/templates/code/TRACE_CHECKLIST.md`
-- Real-world case studies: `P:/.claude/skills/trace/templates/code/TRACE_CASE_STUDIES.md`
+- Full TRACE methodology: `P:\\\\\\.claude/skills/trace/templates/TRACE_METHODOLOGY.md`
+- Code TRACE templates: `P:\\\\\\.claude/skills/trace/templates/code/TRACE_TEMPLATES.md`
+- TRACE checklist: `P:\\\\\\.claude/skills/trace/templates/code/TRACE_CHECKLIST.md`
+- Real-world case studies: `P:\\\\\\.claude/skills/trace/templates/code/TRACE_CASE_STUDIES.md`

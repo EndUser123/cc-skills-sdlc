@@ -579,7 +579,7 @@ def _extract_file_paths_from_path(executed_path: str) -> list[str]:
 def _get_file_mtime(file_path: str) -> float | None:
     p: Path = Path(file_path)
     if not p.is_absolute():
-        p = Path("P:/") / file_path
+        p = Path("P:\\\\\\") / file_path
     try:
         if p.exists():
             return p.stat().st_mtime
@@ -754,7 +754,7 @@ def _validate_artifact_paths_exist(sections: dict) -> list[str]:
             continue
         p = Path(path_str)
         if not p.is_absolute():
-            p = Path("P:/") / path_str
+            p = Path("P:\\\\\\") / path_str
         if not p.exists():
             block_reasons.append(f"missing-artifact:{path_str}")
 

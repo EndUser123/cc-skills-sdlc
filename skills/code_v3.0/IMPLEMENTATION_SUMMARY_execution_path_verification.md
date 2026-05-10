@@ -10,7 +10,7 @@
 
 ### 1. Created Implementation Plan
 
-**File**: `P:\.claude\skills\code\plan_execution_path_verification.md`
+**File**: `$CLAUDE_ROOT/skills\code\plan_execution_path_verification.md`
 
 Comprehensive plan document covering:
 - Overview of the problem (planning misses execution path bugs)
@@ -26,7 +26,7 @@ Comprehensive plan document covering:
 
 ### 2. Updated /code Skill SKILL.md
 
-**File**: `P:\.claude\skills\code\SKILL.md`
+**File**: `$CLAUDE_ROOT/skills\code\SKILL.md`
 **Version**: Bumped from 2.18.0 → 2.19.0
 
 **Changes**:
@@ -46,7 +46,7 @@ Comprehensive plan document covering:
 
 ### 3. Created Reference Example
 
-**File**: `P:\.claude\skills\code\references\execution_path_verification_example.md`
+**File**: `$CLAUDE_ROOT/skills\code\references\execution_path_verification_example.md`
 
 Real-world example showing how verification would have caught GAV Phase 2 bugs:
 - Background: Two structural bugs found after implementation

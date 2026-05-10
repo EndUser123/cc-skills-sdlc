@@ -39,14 +39,14 @@ def test_all_phase1_and_phase2_skills():
     print("=" * 70)
 
     skills = [
-        ("P:/.claude/skills/code", "code"),
-        ("P:/.claude/skills/arch", "arch"),
-        ("P:/.claude/skills/s", "s"),
-        ("P:/.claude/skills/plan-workflow", "plan-workflow"),
-        ("P:/.claude/skills/p", "p"),
-        ("P:/.claude/skills/q", "q"),
-        ("P:/.claude/skills/r", "r"),
-        ("P:/.claude/skills/t", "t"),
+        ("P:\\\\\\.claude/skills/code", "code"),
+        ("P:\\\\\\.claude/skills/arch", "arch"),
+        ("P:\\\\\\.claude/skills/s", "s"),
+        ("P:\\\\\\.claude/skills/plan-workflow", "plan-workflow"),
+        ("P:\\\\\\.claude/skills/p", "p"),
+        ("P:\\\\\\.claude/skills/q", "q"),
+        ("P:\\\\\\.claude/skills/r", "r"),
+        ("P:\\\\\\.claude/skills/t", "t"),
     ]
 
     results = []

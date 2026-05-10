@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Workspace state path for /code skill evidence
-_DEFAULT_EVIDENCE_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "P:/")) / ".claude" / "state"
+_DEFAULT_EVIDENCE_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "P:\\\\\\")) / ".claude" / "state"
 
 
 class EvidenceManager:

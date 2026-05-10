@@ -11,7 +11,7 @@ This test file tests REAL ImportError handling by:
 2. Testing that arch skill gracefully handles missing CKS
 3. Verifying fallback to generic analysis without mocking
 
-Run with: pytest P:/.claude/skills/arch/tests/test_cks_real_fallback.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_cks_real_fallback.py -v
 """
 
 import pytest
@@ -286,8 +286,8 @@ class TestCKSAvailableBehavior:
 
         # Assert - Characterize current behavior per platform
         if platform == "Windows":
-            assert "P:/" in path_str or path_str.startswith("P:\\"), (
-                f"Windows path should contain P:/, got {path_str}"
+            assert "P:\\\\\\" in path_str or path_str.startswith("P:\\\\\\\"), (
+                f"Windows path should contain P:\\\\\\, got {path_str}"
             )
         elif platform == "Linux":
             assert "/home/" in path_str or "__csf" in path_str, (

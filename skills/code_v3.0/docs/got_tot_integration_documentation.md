@@ -114,7 +114,7 @@ export SKILL_NO_TOT=true
 
 ### GoT Implementation
 
-**Utils Module:** `P:/.claude/skills/code/utils/got_planner.py`
+**Utils Module:** `P:\\\\\\.claude/skills/code/utils/got_planner.py`
 
 **Key Classes:**
 - `GotPlanner`: Extracts nodes from plan Architecture sections
@@ -131,7 +131,7 @@ export SKILL_NO_TOT=true
 
 ### ToT Implementation
 
-**Utils Module:** `P:/.claude/skills/code/utils/tot_tracer.py`
+**Utils Module:** `P:\\\\\\.claude/skills/code/utils/tot_tracer.py`
 
 **Key Classes:**
 - `BranchGenerator`: Generates branching reasoning paths
@@ -185,8 +185,8 @@ All enhancements have comprehensive test coverage:
 
 - **GoT Research:** "Graph-of-Thought: Solving Elaborate Problems with Large Language Models" (2023)
 - **ToT Research:** "Tree-of-Thought: Deliberate Problem Solving with Large Language Models" (2023)
-- **Implementation:** `P:/.claude/skills/code/utils/got_planner.py` and `tot_tracer.py`
-- **Tests:** `P:/.claude/skills/code/tests/test_opt_out_flags.py`
+- **Implementation:** `P:\\\\\\.claude/skills/code/utils/got_planner.py` and `tot_tracer.py`
+- **Tests:** `P:\\\\\\.claude/skills/code/tests/test_opt_out_flags.py`
 
 ## Version History
 

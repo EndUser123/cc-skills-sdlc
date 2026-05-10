@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 # Add hooks __lib to path for imports
-hooks_lib = Path("P:/.claude/hooks/__lib")
+hooks_lib = Path("P:\\\\\\.claude/hooks/__lib")
 if hooks_lib.exists():
     sys.path.insert(0, str(hooks_lib))
 

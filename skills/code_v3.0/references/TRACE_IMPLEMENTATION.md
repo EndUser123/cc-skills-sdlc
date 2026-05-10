@@ -12,7 +12,7 @@ Enhanced the `/code` skill with a comprehensive TRACE phase based on industry be
 
 ### 1. ✅ TRACE Phase Templates (`TRACE_TEMPLATES.md`)
 
-**Location**: `P:\.claude\skills\code\references\TRACE_TEMPLATES.md`
+**Location**: `$CLAUDE_ROOT/skills\code\references\TRACE_TEMPLATES.md`
 
 **Content**: Structured trace table templates for common code patterns:
 - Template 1: File I/O with Locking
@@ -33,7 +33,7 @@ Enhanced the `/code` skill with a comprehensive TRACE phase based on industry be
 
 ### 2. ✅ Static Analysis Integration (`/code` skill v2.9.0)
 
-**Location**: `P:\.claude\skills\code\SKILL.md` (Phase 3.4)
+**Location**: `$CLAUDE_ROOT/skills\code\SKILL.md` (Phase 3.4)
 
 **What Changed**: Added Phase 3.4 (STATIC ANALYSIS) before Phase 3.5 (TRACE)
 
@@ -56,7 +56,7 @@ Enhanced the `/code` skill with a comprehensive TRACE phase based on industry be
 
 ### 3. ✅ Comprehensive TRACE Checklist (`TRACE_CHECKLIST.md`)
 
-**Location**: `P:\.claude\skills\code\references\TRACE_CHECKLIST.md`
+**Location**: `$CLAUDE_ROOT/skills\code\references\TRACE_CHECKLIST.md`
 
 **Content**: 9 categories of checks with priority levels (P0-P3):
 
@@ -98,7 +98,7 @@ Enhanced the `/code` skill with a comprehensive TRACE phase based on industry be
 
 ### 4. ✅ Real-World Case Studies (`TRACE_CASE_STUDIES.md`)
 
-**Location**: `P:\.claude\skills\code\references\TRACE_CASE_STUDIES.md`
+**Location**: `$CLAUDE_ROOT/skills\code\references\TRACE_CASE_STUDIES.md`
 
 **Content**: Detailed analysis of 2 bugs found during handoff system code review:
 
@@ -263,7 +263,7 @@ BOOTSTRAP → ALIGN → DESIGN → BUILD → STATIC ANALYSIS → TRACE → SHIP
 ## File Structure
 
 ```
-P:\.claude\skills\code\
+$CLAUDE_ROOT/skills\code\
 ├── SKILL.md (v2.9.0)
 │   ├── Phase 3.4: STATIC ANALYSIS ← NEW
 │   └── Phase 3.5: TRACE ← ENHANCED

@@ -4,7 +4,7 @@ Test suite for load_arch_config() type validation.
 These tests verify that config values are validated for correct TYPE,
 not just valid domain values. This is TEST-014: Missing invalid type test.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_config_types.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_types.py -v
 """
 
 import json

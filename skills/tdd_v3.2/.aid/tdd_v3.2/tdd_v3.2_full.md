@@ -18,14 +18,14 @@ the APPENDIX only when you need the implementation details.
 
 ## SIGNATURE TOC
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\gap_loader.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\gap_loader.py
 ```python
 _get_terminal_id() -> str
 load_test_gaps(project_root: Path | str) -> dict | None
 format_gap_summary(gap_data: dict) -> str
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\generate_context.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\generate_context.py
 ```python
 _clean_stale_runs() -> None
 _get_active_run() -> str | None
@@ -37,7 +37,7 @@ _get_workspace_summary(root_dir: str, max_depth: int) -> str
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\run_phase.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\run_phase.py
 ```python
 _resolve_state_root() -> Path
 _now_iso() -> str
@@ -45,7 +45,7 @@ _sha256_file(path: Path) -> str
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\session_models.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\session_models.py
 ```python
 now_iso() -> str
 class SessionState
@@ -58,12 +58,12 @@ class TddEvidence
 paths_must_look_like_test_files(cls, v: List[str]) -> List[str]
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\test_task_021_verification.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\test_task_021_verification.py
 ```python
 test_evidence_manager_integration()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\conftest.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\conftest.py
 ```python
 mock_time()
 class TimeController
@@ -79,7 +79,7 @@ mock_sleep(seconds)
 fast_datetime()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_integration.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_integration.py
 ```python
 class TestTDDEvidenceIntegration
 test_tdd_hook_imports_evidence_manager(self)
@@ -91,7 +91,7 @@ test_feature_flag_enables_evidence_recording(self)
 test_evidence_cleanup_after_7_days(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_tracking.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_tracking.py
 ```python
 class TestEvidenceTrackingModule
 test_generate_evidence_artifact_function_exists(self)
@@ -115,7 +115,7 @@ test_cleanup_old_evidence_keeps_recent_artifacts(self)
 test_cleanup_old_evidence_handles_empty_directory(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_time_mocking.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_time_mocking.py
 ```python
 class TestTimeMockingFixture
 test_mock_time_fixture_exists(self, mock_time)
@@ -126,7 +126,7 @@ class TestSuitePerformance
 test_fast_test_suite_completion(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\validate_tdd.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\validate_tdd.py
 ```python
 _sha256_file(path: Path) -> str
 _output_shows_failure(text: str) -> bool
@@ -148,22 +148,22 @@ load_and_verify(ref_path: str, phase: str) -> bool
 
 | File | Description |
 |------|-------------|
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\gap_loader.py` | gap loader |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\generate_context.py` | generate context |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\run_phase.py` | run phase |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\session_models.py` | session models |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\test_task_021_verification.py` | test task 021 verification |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\conftest.py` | conftest |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_integration.py` | test evidence integration |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_tracking.py` | test evidence tracking |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_time_mocking.py` | test time mocking |
-| `P:\packages\cc-skills-sdlc\skills\tdd_v3.2\validate_tdd.py` | validate tdd |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\gap_loader.py` | gap loader |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\generate_context.py` | generate context |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\run_phase.py` | run phase |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\session_models.py` | session models |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\test_task_021_verification.py` | test task 021 verification |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\conftest.py` | conftest |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_integration.py` | test evidence integration |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_tracking.py` | test evidence tracking |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_time_mocking.py` | test time mocking |
+| `$CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\validate_tdd.py` | validate tdd |
 
 ---
 
 ## APPENDIX: FULL IMPLEMENTATIONS
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\gap_loader.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\gap_loader.py
 ```python
 #!/usr/bin/env python3
 """Test gap loader for /tdd integration.
@@ -305,7 +305,7 @@ if __name__ == "__main__":
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\generate_context.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\generate_context.py
 ```python
 """
 Context generator for /tdd v3.2.
@@ -556,7 +556,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\run_phase.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\run_phase.py
 ```python
 """
 Wrapper for RED / GREEN / REFACTOR test execution.
@@ -579,7 +579,7 @@ from session_models import SessionState, PhaseReceipt  # type: ignore
 def _resolve_state_root() -> Path:
     """Resolve STATE_ROOT, routing workspace root to .claude/.claude-state/tdd/.
 
-    When cwd is the workspace root (P:\\), .claude/ exists and is the canonical
+    When cwd is the workspace root (P:\\\\\\\), .claude/ exists and is the canonical
     home for Claude Code state. This prevents dot-directories at workspace root.
     """
     cwd = Path(os.getcwd()).resolve()
@@ -749,7 +749,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\session_models.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\session_models.py
 ```python
 """
 Session, receipt, and evidence models for TDD v3.2.
@@ -894,7 +894,7 @@ class TddEvidence(BaseModel):
         return v
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\test_task_021_verification.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\test_task_021_verification.py
 ```python
 #!/usr/bin/env python3
 """Quick verification test for TASK-021 EvidenceManager integration."""
@@ -1012,7 +1012,7 @@ if __name__ == "__main__":
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\conftest.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\conftest.py
 ```python
 #!/usr/bin/env python3
 """Pytest configuration and fixtures for TDD tests."""
@@ -1158,7 +1158,7 @@ def fast_datetime():
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_integration.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_integration.py
 ```python
 #!/usr/bin/env python3
 """Tests for TDD evidence tracking integration - RED phase (failing tests)."""
@@ -1171,9 +1171,9 @@ from pathlib import Path
 import pytest
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))  # P:\.claude\skills\tdd
-sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))  # P:\.claude\skills\tdd\hooks
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "code"))  # P:\.claude\skills\code
+sys.path.insert(0, str(Path(__file__).parent.parent))  # $CLAUDE_ROOT/skills\tdd
+sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))  # $CLAUDE_ROOT/skills\tdd\hooks
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "code"))  # $CLAUDE_ROOT/skills\code
 
 
 class TestTDDEvidenceIntegration:
@@ -1286,7 +1286,7 @@ if __name__ == "__main__":
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_evidence_tracking.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_evidence_tracking.py
 ```python
 #!/usr/bin/env python3
 """Tests for TDD Evidence Tracking - RED phase (failing tests)."""
@@ -1560,7 +1560,7 @@ if __name__ == "__main__":
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\tests\test_time_mocking.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\tests\test_time_mocking.py
 ```python
 #!/usr/bin/env python3
 """Tests for time mocking functionality - GREEN phase (passing tests)."""
@@ -1631,7 +1631,7 @@ class TestSuitePerformance:
 
 ```
 
-### P:\packages\cc-skills-sdlc\skills\tdd_v3.2\validate_tdd.py
+### $CLAUDE_PLUGIN_ROOT/skills\tdd_v3.2\validate_tdd.py
 ```python
 """
 TDD validator v3.2 — receipt-based.
@@ -2237,7 +2237,7 @@ You MUST complete this step before stopping. No exceptions.
 Do NOT write a freeform summary. Instead:
 
 1. Run each command from the `verification.commands` frontmatter
-2. Write results to artifact: `P:/.claude/.artifacts/{terminal_id}/tdd/verification.json`
+2. Write results to artifact: `P:\\\\\\.claude/.artifacts/{terminal_id}/tdd/verification.json`
 3. Paste each tool's output verbatim
 4. For each command: PASS or FAIL with one sentence
 
@@ -2466,7 +2466,7 @@ You MUST complete this step before stopping. No exceptions.
 Do NOT write a freeform summary. Instead:
 
 1. Run each command from the `verification.commands` frontmatter
-2. Write results to artifact: `P:/.claude/.artifacts/{terminal_id}/tdd/verification.json`
+2. Write results to artifact: `P:\\\\\\.claude/.artifacts/{terminal_id}/tdd/verification.json`
 3. Paste each tool's output verbatim
 4. For each command: PASS or FAIL with one sentence
 
@@ -2653,7 +2653,7 @@ Three interconnected issues with TDD enforcement:
 
 ### Step 1: Add hooks to SKILL.md frontmatter [R:1]
 
-**File:** `P:/.claude/skills/tdd/SKILL.md`
+**File:** `P:\\\\\\.claude/skills/tdd/SKILL.md`
 
 Add `hooks:` section to YAML frontmatter (after line 15, before `---` closing):
 
@@ -2677,19 +2677,19 @@ hooks:
 
 ### Step 2: Create skill hook directory and files
 
-**Create directory:** `P:/.claude/skills/tdd/hooks/`
+**Create directory:** `P:\\\\\\.claude/skills/tdd/hooks/`
 
-#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P:/.claude/hooks/pretooluse_tdd_gate.py`
+#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py`
 
 Changes from original:
 - Remove `@lru_cache` on `is_tdd_exempt()` (line 30) — prevents stale exemption decisions
 - In `get_tdd_state_for_file()`: read state with NO cache (direct file read every time)
-- Add `sys.path.insert(0, str(Path("P:/.claude/hooks")))` to access `tdd_core`
+- Add `sys.path.insert(0, str(Path("P:\\\\\\.claude/hooks")))` to access `tdd_core`
 - Use `terminal_detection.detect_terminal_id()` for state path resolution
 
 #### 2b: `PostToolUse_tdd_state.py` — New standalone hook with complete main()
 
-The standalone `P:/.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
+The standalone `P:\\\\\\.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
 - Reads hook input from stdin (tool_name, tool_input, tool_response)
 - Dispatches to existing `handle_test_file_write()`, `handle_test_run()`, `handle_impl_file_write()` functions (imported from original module)
 - Outputs JSON result to stdout
@@ -2701,7 +2701,7 @@ The standalone `P:/.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main
 
 ### Step 3: Fix state management in `tdd_core.py` [R:2]
 
-**File:** `P:/.claude/hooks/tdd_core.py`
+**File:** `P:\\\\\\.claude/hooks/tdd_core.py`
 
 #### 3a: Remove in-memory cache
 
@@ -2728,7 +2728,7 @@ def _resolve_state_file(self, test_file: str | None) -> Path:
     terminal_id = detect_terminal_id()
 
     # Terminal-isolated state directory
-    state_dir = Path("P:/.claude/state/tdd") / terminal_id
+    state_dir = Path("P:\\\\\\.claude/state/tdd") / terminal_id
     state_dir.mkdir(parents=True, exist_ok=True)
 
     if test_file:
@@ -2741,7 +2741,7 @@ Drop `cwd` from hash — terminal_id provides isolation instead.
 
 Update `STATE_DIR` references:
 - `_ensure_state_dir()` — use dynamic path
-- `cleanup_expired_states()` — scan all terminal dirs under `P:/.claude/state/tdd/`
+- `cleanup_expired_states()` — scan all terminal dirs under `P:\\\\\\.claude/state/tdd/`
 - Debug/audit log paths — keep in shared location or move to terminal dir
 
 #### 3c: Update callers of STATE_DIR
@@ -2753,23 +2753,23 @@ Functions that reference the old `STATE_DIR` constant:
 
 ### Step 4: Update settings.json global hook to use fixed tdd_core [R:1]
 
-**File:** `P:/.claude/settings.json`
+**File:** `P:\\\\\\.claude/settings.json`
 
 KEEP the `pretooluse_tdd_gate.py` entry in settings.json (lines 156-163) — but update the command path to point to the NEW version in the skill hooks directory:
 
 ```json
 {
   "type": "command",
-  "command": "python P:/.claude/hooks/__lib/hook_runner.py P:/.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
+  "command": "python P:\\\\\\.claude/hooks/__lib/hook_runner.py P:\\\\\\.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
   "timeout": 3
 }
 ```
 
-This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P:/.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
+This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
 
 ### Step 5: Remove TDDStateHook from PostToolUse router [R:1]
 
-**File:** `P:/.claude/hooks/posttooluse/__init__.py`
+**File:** `P:\\\\\\.claude/hooks/posttooluse/__init__.py`
 
 REMOVE `TDDStateHook` registration (line 82) and its import (line 37).
 
@@ -2881,18 +2881,18 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 1. **Move plan to target directory:**
    ```bash
-   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P:/.claude/skills/tdd/"
+   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P:\\\\\\.claude/skills/tdd/"
    ```
 
 2. **Create/update README.md with plan link:**
    ```bash
-   # Add to P:/.claude/skills/tdd/README.md:
+   # Add to P:\\\\\\.claude/skills/tdd/README.md:
    # **Plan:** [plan-20250205-tdd-migration.md](twinkly-soaring-sunbeam.md)
    ```
 
 3. **Run /r for deterministic pre-mortem validation:**
    ```
-   /r "validate plan P:/.claude/skills/tdd/twinkly-soaring-sunbeam.md"
+   /r "validate plan P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md"
    ```
 
 4. **Adversarial review:**
@@ -2902,31 +2902,31 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 5. **Implement Step 1 (SKILL.md hooks frontmatter):** [R:1]
    ```bash
-   # Edit P:/.claude/skills/tdd/SKILL.md
+   # Edit P:\\\\\\.claude/skills/tdd/SKILL.md
    # Add hooks: section after line 15
    ```
 
 6. **Implement Step 2 (Create skill hooks):** [R:1]
    ```bash
-   mkdir -p P:/.claude/skills/tdd/hooks
+   mkdir -p P:\\\\\\.claude/skills/tdd/hooks
    # Create PreToolUse_tdd_gate.py, PostToolUse_tdd_state.py, SessionEnd_tdd_cleanup.py
    ```
 
 7. **Implement Step 3 (Fix tdd_core.py):** [R:2]
    ```bash
-   # Edit P:/.claude/hooks/tdd_core.py
+   # Edit P:\\\\\\.claude/hooks/tdd_core.py
    # Remove cache (lines 407-496), add terminal isolation to _resolve_state_file()
    ```
 
 8. **Implement Step 4 (Update settings.json):** [R:1]
    ```bash
-   # Edit P:/.claude/settings.json
+   # Edit P:\\\\\\.claude/settings.json
    # Update pretooluse_tdd_gate.py path to skill hooks version
    ```
 
 9. **Implement Step 5 (Remove TDDStateHook from router):** [R:1]
    ```bash
-   # Edit P:/.claude/hooks/posttooluse/__init__.py
+   # Edit P:\\\\\\.claude/hooks/posttooluse/__init__.py
    # Remove import line 37 and registration line 82
    ```
 
@@ -2939,7 +2939,7 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 11. **Finalize plan:**
     ```
-    /finalize P:/.claude/skills/tdd/twinkly-soaring-sunbeam.md
+    /finalize P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md
     ```
 
 ```
@@ -3093,7 +3093,7 @@ Three interconnected issues with TDD enforcement:
 
 ### Step 1: Add hooks to SKILL.md frontmatter [R:1]
 
-**File:** `P:/.claude/skills/tdd/SKILL.md`
+**File:** `P:\\\\\\.claude/skills/tdd/SKILL.md`
 
 Add `hooks:` section to YAML frontmatter (after line 15, before `---` closing):
 
@@ -3117,19 +3117,19 @@ hooks:
 
 ### Step 2: Create skill hook directory and files
 
-**Create directory:** `P:/.claude/skills/tdd/hooks/`
+**Create directory:** `P:\\\\\\.claude/skills/tdd/hooks/`
 
-#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P:/.claude/hooks/pretooluse_tdd_gate.py`
+#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py`
 
 Changes from original:
 - Remove `@lru_cache` on `is_tdd_exempt()` (line 30) — prevents stale exemption decisions
 - In `get_tdd_state_for_file()`: read state with NO cache (direct file read every time)
-- Add `sys.path.insert(0, str(Path("P:/.claude/hooks")))` to access `tdd_core`
+- Add `sys.path.insert(0, str(Path("P:\\\\\\.claude/hooks")))` to access `tdd_core`
 - Use `terminal_detection.detect_terminal_id()` for state path resolution
 
 #### 2b: `PostToolUse_tdd_state.py` — New standalone hook with complete main()
 
-The standalone `P:/.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
+The standalone `P:\\\\\\.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
 - Reads hook input from stdin (tool_name, tool_input, tool_response)
 - Dispatches to existing `handle_test_file_write()`, `handle_test_run()`, `handle_impl_file_write()` functions (imported from original module)
 - Outputs JSON result to stdout
@@ -3141,7 +3141,7 @@ The standalone `P:/.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main
 
 ### Step 3: Fix state management in `tdd_core.py` [R:2]
 
-**File:** `P:/.claude/hooks/tdd_core.py`
+**File:** `P:\\\\\\.claude/hooks/tdd_core.py`
 
 #### 3a: Remove in-memory cache
 
@@ -3168,7 +3168,7 @@ def _resolve_state_file(self, test_file: str | None) -> Path:
     terminal_id = detect_terminal_id()
 
     # Terminal-isolated state directory
-    state_dir = Path("P:/.claude/state/tdd") / terminal_id
+    state_dir = Path("P:\\\\\\.claude/state/tdd") / terminal_id
     state_dir.mkdir(parents=True, exist_ok=True)
 
     if test_file:
@@ -3181,7 +3181,7 @@ Drop `cwd` from hash — terminal_id provides isolation instead.
 
 Update `STATE_DIR` references:
 - `_ensure_state_dir()` — use dynamic path
-- `cleanup_expired_states()` — scan all terminal dirs under `P:/.claude/state/tdd/`
+- `cleanup_expired_states()` — scan all terminal dirs under `P:\\\\\\.claude/state/tdd/`
 - Debug/audit log paths — keep in shared location or move to terminal dir
 
 #### 3c: Update callers of STATE_DIR
@@ -3193,23 +3193,23 @@ Functions that reference the old `STATE_DIR` constant:
 
 ### Step 4: Update settings.json global hook to use fixed tdd_core [R:1]
 
-**File:** `P:/.claude/settings.json`
+**File:** `P:\\\\\\.claude/settings.json`
 
 KEEP the `pretooluse_tdd_gate.py` entry in settings.json (lines 156-163) — but update the command path to point to the NEW version in the skill hooks directory:
 
 ```json
 {
   "type": "command",
-  "command": "python P:/.claude/hooks/__lib/hook_runner.py P:/.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
+  "command": "python P:\\\\\\.claude/hooks/__lib/hook_runner.py P:\\\\\\.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
   "timeout": 3
 }
 ```
 
-This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P:/.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
+This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
 
 ### Step 5: Remove TDDStateHook from PostToolUse router [R:1]
 
-**File:** `P:/.claude/hooks/posttooluse/__init__.py`
+**File:** `P:\\\\\\.claude/hooks/posttooluse/__init__.py`
 
 REMOVE `TDDStateHook` registration (line 82) and its import (line 37).
 
@@ -3321,18 +3321,18 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 1. **Move plan to target directory:**
    ```bash
-   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P:/.claude/skills/tdd/"
+   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P:\\\\\\.claude/skills/tdd/"
    ```
 
 2. **Create/update README.md with plan link:**
    ```bash
-   # Add to P:/.claude/skills/tdd/README.md:
+   # Add to P:\\\\\\.claude/skills/tdd/README.md:
    # **Plan:** [plan-20250205-tdd-migration.md](twinkly-soaring-sunbeam.md)
    ```
 
 3. **Run /r for deterministic pre-mortem validation:**
    ```
-   /r "validate plan P:/.claude/skills/tdd/twinkly-soaring-sunbeam.md"
+   /r "validate plan P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md"
    ```
 
 4. **Adversarial review:**
@@ -3342,31 +3342,31 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 5. **Implement Step 1 (SKILL.md hooks frontmatter):** [R:1]
    ```bash
-   # Edit P:/.claude/skills/tdd/SKILL.md
+   # Edit P:\\\\\\.claude/skills/tdd/SKILL.md
    # Add hooks: section after line 15
    ```
 
 6. **Implement Step 2 (Create skill hooks):** [R:1]
    ```bash
-   mkdir -p P:/.claude/skills/tdd/hooks
+   mkdir -p P:\\\\\\.claude/skills/tdd/hooks
    # Create PreToolUse_tdd_gate.py, PostToolUse_tdd_state.py, SessionEnd_tdd_cleanup.py
    ```
 
 7. **Implement Step 3 (Fix tdd_core.py):** [R:2]
    ```bash
-   # Edit P:/.claude/hooks/tdd_core.py
+   # Edit P:\\\\\\.claude/hooks/tdd_core.py
    # Remove cache (lines 407-496), add terminal isolation to _resolve_state_file()
    ```
 
 8. **Implement Step 4 (Update settings.json):** [R:1]
    ```bash
-   # Edit P:/.claude/settings.json
+   # Edit P:\\\\\\.claude/settings.json
    # Update pretooluse_tdd_gate.py path to skill hooks version
    ```
 
 9. **Implement Step 5 (Remove TDDStateHook from router):** [R:1]
    ```bash
-   # Edit P:/.claude/hooks/posttooluse/__init__.py
+   # Edit P:\\\\\\.claude/hooks/posttooluse/__init__.py
    # Remove import line 37 and registration line 82
    ```
 
@@ -3379,7 +3379,7 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 11. **Finalize plan:**
     ```
-    /finalize P:/.claude/skills/tdd/twinkly-soaring-sunbeam.md
+    /finalize P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md
     ```
 
 ```

@@ -40,7 +40,7 @@ Generate one self-contained Markdown document with:
 - Focus on WHAT EXISTS, not what should be
 
 ### Technical Context
-- Output directory: `P:\__csf\.staging\` (Windows path)
+- Output directory: `$__CSF_ROOT/.staging\` (Windows path)
 - Size-based routing: <10 files (single agent), 10-50 files (2 agents), 50+ files (4 agents)
 - Parallel agents: Explorer, Core Reader, Config Reader, Dependency Scanner
 
@@ -305,7 +305,7 @@ Output a SINGLE Markdown file named: `review_bundle_[system_name]_[date].md`
 - Do NOT claim bundle created without Write tool verification
 
 ### Configuration
-- `REVIEW_BUNDLE_OUTPUT_DIR`: Default `P:\__csf\.staging\`
+- `REVIEW_BUNDLE_OUTPUT_DIR`: Default `$__CSF_ROOT/.staging\`
 - `REVIEW_BUNDLE_FORCE_SERIAL`: Force single-agent mode
 - `REVIEW_BUNDLE_THRESHOLD_SMALL`: Files < N use single agent (default: 10)
 - `REVIEW_BUNDLE_THRESHOLD_LARGE`: Files >= N use 4 agents (default: 50)
@@ -327,12 +327,12 @@ This skill uses size-based routing to optimize for both small and large scopes:
 Ask user which system to bundle:
 ```
 Which system?
-1 - Hooks (P:\.claude\hooks\)
-2 - Skills (P:\.claude\skills\)
-3 - CSF Infrastructure (P:\__csf\)
-4 - CHS (P:\__csf\src\features\chs\)
-5 - CKS (P:\__csf\src\features\cks\)
-6 - TaskMaster (P:\__csf\src\features\taskmaster\)
+1 - Hooks ($CLAUDE_ROOT/hooks\)
+2 - Skills ($CLAUDE_ROOT/skills\)
+3 - CSF Infrastructure ($__CSF_ROOT/)
+4 - CHS ($__CSF_ROOT/src\features\chs\)
+5 - CKS ($__CSF_ROOT/src\features\cks\)
+6 - TaskMaster ($__CSF_ROOT/src\features\taskmaster\)
 7 - All (comprehensive)
 8 - Custom path
 ```
@@ -371,7 +371,7 @@ find "SCOPE_PATH" -type f \( -name "*.py" -o -name "*.md" -o -name "*.yaml" -o -
 
 ### Step 3: Generate Bundle
 
-Write `review_bundle_[name]_[date].md` to `P:\__csf\.staging\`.
+Write `review_bundle_[name]_[date].md` to `$__CSF_ROOT/.staging\`.
 
 ## Usage
 
@@ -382,6 +382,6 @@ Write `review_bundle_[name]_[date].md` to `P:\__csf\.staging\`.
 /review_bundle hooks --serial
 # Force single-agent mode
 
-/review_bundle P:\custom\path
+/review_bundle P:\\\\\\custom\path
 # Bundle custom directory
 ```

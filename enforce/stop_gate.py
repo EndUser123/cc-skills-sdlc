@@ -64,9 +64,9 @@ Each phase in the config is a dict with these fields:
 # Evidence checkers
 # ---------------------------------------------------------------------------
 
-def _check_ledger(skill_id: str, phase_name: str) -> bool:
+def _check_ledger(skill_id: str, phase_name: str, session_id: str | None = None) -> bool:
     from .phase_ledger import read_phase_ledger
-    ledger = read_phase_ledger(skill_id)
+    ledger = read_phase_ledger(skill_id, session_id)
     if ledger is None:
         return False
     entry = ledger.get("phases", {}).get(phase_name, {})
@@ -154,6 +154,7 @@ def evaluate_gates(
       exit 0 + ""       — clean
     """
     run_id = env.get("RUN_ID", env.get("CLAUDE_GO_RUN_ID", ""))
+    session_id = env.get("CLAUDE_SESSION_ID")
     terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
     fast_mode = env.get("CLAUDE_CODE_FAST_MODE", "").lower() in ("1", "true", "yes")
 
@@ -165,7 +166,7 @@ def evaluate_gates(
     # exists, the skill has never run — return exit 0 conservatively.
     # go_v3.0 hard gates use file_flag/json_file evidence, so they can fail properly.
     from .phase_ledger import read_phase_ledger
-    ledger = read_phase_ledger(skill_id)
+    ledger = read_phase_ledger(skill_id, session_id)
     any_hard_gate_uses_ledger = any(
         p["gate_type"] == "hard" and _evidence_type(p) == "ledger_only"
         for p in config
@@ -190,7 +191,7 @@ def evaluate_gates(
             has_any_evidence = True
             continue
 
-        passed = _evaluate_phase(skill_id, phase, run_id, terminal_id, env)
+        passed = _evaluate_phase(skill_id, phase, run_id, terminal_id, env, session_id)
 
         if not passed:
             if gate_type == "hard":
@@ -234,6 +235,7 @@ def _evaluate_phase(
     run_id: str,
     terminal_id: str,
     env: dict[str, str],
+    session_id: str | None = None,
 ) -> bool:
     evidence = phase.get("evidence", {})
 
@@ -245,7 +247,7 @@ def _evaluate_phase(
         ev_type = ev.get("type", "ledger_only")
 
         if ev_type == "ledger_only":
-            if _check_ledger(skill_id, phase["name"]):
+            if _check_ledger(skill_id, phase["name"], session_id):
                 return True
 
         elif ev_type == "file_flag":

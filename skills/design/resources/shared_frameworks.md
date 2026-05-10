@@ -472,7 +472,7 @@ This loads `python.md` as primary and injects `data-pipeline.md` domain concerns
 ### Storage Location
 
 ```
-P:/.claude/arch_decisions/
+P:\\\\\\.claude/arch_decisions/
 ├── YYYY-MM-DD_[template]_[slug].md    # Individual decisions
 └── index.jsonl                         # Machine-readable index
 ```

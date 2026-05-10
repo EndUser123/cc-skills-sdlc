@@ -15,12 +15,12 @@ class TestAgentRegistry:
 
     def test_agent_registry_exists(self):
         """Test that agent_registry.py module exists."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         assert registry.exists(), "agent_registry.py should exist"
 
     def test_agent_registry_has_mode_agents(self):
         """Test that agent registry defines MODE_AGENTS mapping."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have MODE_AGENTS constant
@@ -33,7 +33,7 @@ class TestAgentRegistry:
 
     def test_agent_registry_has_agent_registry(self):
         """Test that agent registry defines AGENT_REGISTRY mapping."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have AGENT_REGISTRY constant
@@ -41,7 +41,7 @@ class TestAgentRegistry:
 
     def test_agent_registry_exported(self):
         """Test that select_agents function is exported from __init__.py."""
-        init_file = Path("P:/.claude/skills/uci/lib/__init__.py")
+        init_file = Path("P:\\\\\\.claude/skills/uci/lib/__init__.py")
         content = init_file.read_text(encoding="utf-8")
 
         # Should export select_agents
@@ -53,7 +53,7 @@ class TestTriageMode:
 
     def test_triage_mode_has_logic_agent(self):
         """Test that triage mode includes logic agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include logic in triage mode
@@ -61,7 +61,7 @@ class TestTriageMode:
 
     def test_triage_mode_has_tests_agent(self):
         """Test that triage mode includes tests agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include tests in triage mode
@@ -69,7 +69,7 @@ class TestTriageMode:
 
     def test_triage_mode_has_security_agent(self):
         """Test that triage mode includes security agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include security in triage mode
@@ -81,7 +81,7 @@ class TestStandardMode:
 
     def test_standard_mode_has_performance_agent(self):
         """Test that standard mode includes performance agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include performance in standard mode
@@ -93,7 +93,7 @@ class TestDeepMode:
 
     def test_deep_mode_has_conventions_agent(self):
         """Test that deep mode includes conventions agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include conventions in deep mode
@@ -101,7 +101,7 @@ class TestDeepMode:
 
     def test_deep_mode_has_quality_agent(self):
         """Test that deep mode includes quality agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include quality in deep mode
@@ -109,7 +109,7 @@ class TestDeepMode:
 
     def test_deep_mode_has_compliance_agent(self):
         """Test that deep mode includes compliance agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include compliance in deep mode
@@ -117,7 +117,7 @@ class TestDeepMode:
 
     def test_deep_mode_has_qa_agent(self):
         """Test that deep mode includes qa agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include qa in deep mode
@@ -129,7 +129,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_simplification_agent(self):
         """Test that comprehensive mode includes simplification agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include simplification in comprehensive mode
@@ -137,7 +137,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_rca_agent(self):
         """Test that comprehensive mode includes rca agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include rca in comprehensive mode
@@ -145,7 +145,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_failure_modes_agent(self):
         """Test that comprehensive mode includes failure-modes agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include failure-modes in comprehensive mode
@@ -153,7 +153,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_deployment_safety_agent(self):
         """Test that comprehensive mode includes deployment-safety agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include deployment-safety in comprehensive mode
@@ -161,7 +161,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_python_modernization_agent(self):
         """Test that comprehensive mode includes python-modernization agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include python-modernization in comprehensive mode
@@ -169,7 +169,7 @@ class TestComprehensiveMode:
 
     def test_comprehensive_mode_has_test_quality_roi_agent(self):
         """Test that comprehensive mode includes test-quality-roi agent."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should include test-quality-roi in comprehensive mode
@@ -181,7 +181,7 @@ class TestAgentTierClassification:
 
     def test_core_tier_agents_exist(self):
         """Test that core tier agents are defined."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Core agents: logic, tests, security
@@ -192,7 +192,7 @@ class TestAgentTierClassification:
 
     def test_extended_tier_agents_exist(self):
         """Test that extended tier agents are defined."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Extended agents: performance, conventions, quality, compliance, qa
@@ -203,7 +203,7 @@ class TestAgentTierClassification:
 
     def test_comprehensive_tier_agents_exist(self):
         """Test that comprehensive tier agents are defined."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Comprehensive agents: simplification, rca, failure-modes, deployment-safety, python-modernization, test-quality-roi
@@ -225,7 +225,7 @@ class TestSubagentTypeMapping:
 
     def test_agent_registry_has_subagent_type(self):
         """Test that agents have subagent_type field."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Should have subagent_type field
@@ -233,7 +233,7 @@ class TestSubagentTypeMapping:
 
     def test_known_subagent_types_mapped(self):
         """Test that known subagent types are used."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Known subagent types from adversarial agents
@@ -257,7 +257,7 @@ class TestModeAgentCounts:
 
     def test_triage_mode_agent_count(self):
         """Test that triage mode has 3 agents."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Look for MODE_AGENTS["triage"] definition
@@ -267,7 +267,7 @@ class TestModeAgentCounts:
 
     def test_deep_mode_agent_count(self):
         """Test that deep mode has 8 agents."""
-        registry = Path("P:/.claude/skills/uci/lib/agent_registry.py")
+        registry = Path("P:\\\\\\.claude/skills/uci/lib/agent_registry.py")
         content = registry.read_text(encoding="utf-8")
 
         # Look for MODE_AGENTS["deep"] definition

@@ -72,8 +72,8 @@ Added first-command validator in `PreToolUse_skill_pattern_gate.py` that:
 
 | Skill | First Command Enforced |
 |-------|----------------------|
-| `git` | `python P:/.claude/skills/git/sync.py ...` |
-| `gto` | `python P:/.claude/skills/gto/gto_orchestrator.py ...` |
+| `git` | `python P:\\\\\\.claude/skills/git/sync.py ...` |
+| `gto` | `python P:\\\\\\.claude/skills/gto/gto_orchestrator.py ...` |
 | `yt-is` | `csf-source sync` |
 | `yt-nlm` | `nlm login --check` |
 | `yt-selenium` | `python -m csf.csf_selenium` |
@@ -89,9 +89,9 @@ Added first-command validator in `PreToolUse_skill_pattern_gate.py` that:
 ## Verification
 
 ```bash
-python -m pytest P:\packages\skill-guard\tests\test_PreToolUse_skill_pattern_gate.py \
-  P:\packages\skill-guard\tests\test_frontmatter_validation.py \
-  P:\packages\skill-guard\tests\test_tracker_fixes.py -q
+python -m pytest P:\\\\\\packages\skill-guard\tests\test_PreToolUse_skill_pattern_gate.py \
+  P:\\\\\\packages\skill-guard\tests\test_frontmatter_validation.py \
+  P:\\\\\\packages\skill-guard\tests\test_tracker_fixes.py -q
 # Result: 28 passed
 ```
 

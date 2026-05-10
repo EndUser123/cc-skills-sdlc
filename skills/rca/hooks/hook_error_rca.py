@@ -2,9 +2,9 @@
 """hook_error_rca.py - Enumerate and test hook registrations for RCA.
 
 Usage:
-    python P:/.claude/hooks/hook_error_rca.py enumerate PostToolUse --tool Task
-    python P:/.claude/hooks/hook_error_rca.py test PostToolUse --tool Task
-    python P:/.claude/hooks/hook_error_rca.py full PostToolUse --tool Task
+    python P:\\\\\\.claude/hooks/hook_error_rca.py enumerate PostToolUse --tool Task
+    python P:\\\\\\.claude/hooks/hook_error_rca.py test PostToolUse --tool Task
+    python P:\\\\\\.claude/hooks/hook_error_rca.py full PostToolUse --tool Task
 """
 
 from __future__ import annotations
@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 # Path getter functions (read env vars at runtime for testability)
 def get_settings_file() -> Path:
-    return Path(os.environ.get("CLAUDE_SETTINGS", "P:/.claude/settings.json"))
+    return Path(os.environ.get("CLAUDE_SETTINGS", "P:\\\\\\.claude/settings.json"))
 
 
 def get_hooks_dir() -> Path:
-    return Path(os.environ.get("CLAUDE_HOOKS_DIR", "P:/.claude/hooks"))
+    return Path(os.environ.get("CLAUDE_HOOKS_DIR", "P:\\\\\\.claude/hooks"))
 
 
 def validate_state_dir(state_dir: Path) -> Path:
@@ -39,7 +39,7 @@ def validate_state_dir(state_dir: Path) -> Path:
 
     Prevents arbitrary file write via CSF_STATE_DIR environment variable
     manipulation by validating the resolved path is within the expected
-    P:/.claude/state/ directory tree.
+    P:\\\\\\.claude/state/ directory tree.
 
     Args:
         state_dir: The state directory path to validate
@@ -49,18 +49,18 @@ def validate_state_dir(state_dir: Path) -> Path:
     """
     try:
         state_dir = state_dir.resolve()
-        allowed_base = Path("P:/.claude/state").resolve()
+        allowed_base = Path("P:\\\\\\.claude/state").resolve()
         # Use relative_to to check if state_dir is within allowed_base
         state_dir.relative_to(allowed_base)
         return state_dir
     except ValueError:
         # Security: path traversal attempt
         print(f"[SECURITY] Path traversal blocked: {state_dir}", file=sys.stderr)
-        return Path("P:/.claude/state/rca")
+        return Path("P:\\\\\\.claude/state/rca")
     except OSError as e:
         # I/O error during path resolution
         print(f"[WARNING] Cannot resolve path {state_dir}: {e}", file=sys.stderr)
-        return Path("P:/.claude/state/rca")
+        return Path("P:\\\\\\.claude/state/rca")
 
 
 def validate_hook_path(hook_path: Path, hooks_dir: Path) -> bool:
@@ -149,25 +149,25 @@ def validate_diagnostics_dir(diagnostics_dir: Path, hooks_dir: Path | None = Non
         return diagnostics_dir
     except ValueError:
         # Security: path traversal attempt
-        default_path = Path("P:/.claude/hooks/logs/diagnostics")
+        default_path = Path("P:\\\\\\.claude/hooks/logs/diagnostics")
         print(f"[SECURITY] Path traversal blocked: {diagnostics_dir}", file=sys.stderr)
         return default_path
     except OSError as e:
         # I/O error during path resolution
-        default_path = Path("P:/.claude/hooks/logs/diagnostics")
+        default_path = Path("P:\\\\\\.claude/hooks/logs/diagnostics")
         print(f"[WARNING] Cannot resolve path {diagnostics_dir}: {e}", file=sys.stderr)
         return default_path
 
 
 def get_state_dir() -> Path:
     """Get the state directory with path validation (SEC-003)."""
-    state_dir = Path(os.environ.get("CSF_STATE_DIR", "P:/.claude/state/rca"))
+    state_dir = Path(os.environ.get("CSF_STATE_DIR", "P:\\\\\\.claude/state/rca"))
     return validate_state_dir(state_dir)
 
 
 def get_cc_errors() -> Path:
     diagnostics_dir = Path(
-        os.environ.get("CC_DIAGNOSTICS_DIR", "P:/.claude/hooks/logs/diagnostics")
+        os.environ.get("CC_DIAGNOSTICS_DIR", "P:\\\\\\.claude/hooks/logs/diagnostics")
     )
     validated_dir = validate_diagnostics_dir(diagnostics_dir, get_hooks_dir())
     return validated_dir / "cc_errors.jsonl"
@@ -177,7 +177,7 @@ SPECIAL_MATCHER_PATTERNS = ("", ".*", "*")
 
 # SEC-001: Whitelist of allowed hook directories
 ALLOWED_HOOK_BASES = (
-    "P:/.claude/hooks",
+    "P:\\\\\\.claude/hooks",
     "/.claude/hooks",
     "/usr/local/lib/claude/hooks",
     # Add more allowed base paths as needed
@@ -269,7 +269,7 @@ def resolve_hook_file(command: str) -> Path | None:
     """Extract the actual .py file from a hook command string.
 
     Handles patterns observed in settings.json:
-    - hook_runner.py wrapper: python P:/.claude/hooks/__lib/hook_runner.py <actual>.py
+    - hook_runner.py wrapper: python P:\\\\\\.claude/hooks/__lib/hook_runner.py <actual>.py
     - direct python: python "<path>.py" or python <path>.py
     - uv run: uv run <path>.py
 

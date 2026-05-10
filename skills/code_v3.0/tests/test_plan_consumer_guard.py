@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path("P:/packages/contract-primitives/src")))
+sys.path.insert(0, str(Path("P:\\\\\\packages/contract-primitives/src")))
 
 from contract_primitives import discover_local_plan_path, validate_plan_for_execution
 

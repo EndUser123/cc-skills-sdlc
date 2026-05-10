@@ -34,10 +34,10 @@ Stops on first stable package, reports, then continues to the next.
 ## Usage
 
 ```bash
-/tilldone P:/packages --command "/gitready"                    # till-done
-/tilldone P:/packages --command "/gitready" --count 3          # 3 passes
-/tilldone P:/packages --command "/gitready" --dry-run          # preview targets
-/tilldone P:/packages --command "/gitready" -- --publish --finalize  # pass flags
+/tilldone P:\\\\\\packages --command "/gitready"                    # till-done
+/tilldone P:\\\\\\packages --command "/gitready" --count 3          # 3 passes
+/tilldone P:\\\\\\packages --command "/gitready" --dry-run          # preview targets
+/tilldone P:\\\\\\packages --command "/gitready" -- --publish --finalize  # pass flags
 ```
 
 ## Execution Steps
@@ -98,14 +98,14 @@ Parse all `- PHASE ... -- STATUS` lines. Compare dict of `{phase_name: status}` 
 
 ```bash
 # Polish all packages with gitready until phases settle
-/tilldone P:/packages --command "/gitready" -- --publish --finalize
+/tilldone P:\\\\\\packages --command "/gitready" -- --publish --finalize
 
 # Run exactly 3 passes on each package
-/tilldone P:/packages --command "/gitready" --count 3
+/tilldone P:\\\\\\packages --command "/gitready" --count 3
 
 # Preview what would run
-/tilldone P:/packages --command "/gitready" --dry-run
+/tilldone P:\\\\\\packages --command "/gitready" --dry-run
 
 # Run refactor on all packages
-/tilldone P:/worktrees --command "/refactor" --count 1
+/tilldone P:\\\\\\worktrees --command "/refactor" --count 1
 ```

@@ -7,7 +7,7 @@ These tests verify the behavior of load_arch_config() function which:
 3. Merges configurations with precedence: env vars > project config > user config
 4. Returns None when no config file exists
 
-Run with: pytest P:/.claude/skills/arch/tests/test_config_validation.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_config_validation.py -v
 """
 
 import json

@@ -4,7 +4,7 @@
 This test suite verifies the library scanning functionality which detects
 import statements from Python source code and parses dependency files.
 
-Run with: pytest P:/\\.claude/skills/code/tests/test_library_scanner.py -v
+Run with: pytest P:\\\\\\\\.claude/skills/code/tests/test_library_scanner.py -v
 """
 
 import sys

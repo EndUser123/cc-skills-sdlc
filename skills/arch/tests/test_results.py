@@ -1,6 +1,6 @@
 """Tests for ArchResult generic result type.
 
-Run with: pytest P:/packages/arch/skill/tests/test_results.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_results.py -v
 """
 
 import pytest

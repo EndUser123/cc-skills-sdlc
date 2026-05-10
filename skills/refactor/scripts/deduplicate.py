@@ -145,7 +145,7 @@ def deduplicate_and_save(
     """Convenience wrapper using standard artifacts path.
 
     Args:
-        artifacts_dir: Base .artifacts directory (e.g. P:/.claude/.artifacts/)
+        artifacts_dir: Base .artifacts directory (e.g. P:\\\\\\.claude/.artifacts/)
         target_name: Target identifier (e.g. "yt-is")
         terminal_id: Terminal ID for multi-terminal isolation. If None, resolves
             via canonical_terminal_id() (WT_SESSION → CLAUDE_TERMINAL_ID → ConEmu → hash).

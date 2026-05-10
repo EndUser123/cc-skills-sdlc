@@ -57,7 +57,7 @@ These are **PROHIBITED** patterns that indicate missing verification:
 **Required workflow:**
 
 1. **Identify the source** - What plan or chat history contains the requirements?
-   - Plan file: `P:/plans/plan-YYYYMMDD-name.md` or similar
+   - Plan file: `P:\\\\\\plans/plan-YYYYMMDD-name.md` or similar
    - Chat history: Current session or previous session reference
 
 2. **Extract requirements** - List all requirements from the source
@@ -128,7 +128,7 @@ find $(dirname $(dirname src/terminal_detection.py)) -name "plan-*.md"
 
 **Best practice:** When implementing from a plan, the plan file should be co-located with implementation:
 ```
-P:/__csf/src/daemons/
+P:\\\\\\__csf/src/daemons/
   README.md (links to plan)
   plan-20260130-session-continuity.md (this plan)
   terminal_detection.py (implementation)

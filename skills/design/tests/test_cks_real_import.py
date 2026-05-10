@@ -3,7 +3,7 @@
 These tests VERIFY that the arch skill has real CKS integration and
 ImportError handling implemented via TDD (TEST-ARCH-001).
 
-Run with: pytest P:/.claude/skills/arch/tests/test_cks_real_import.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_cks_real_import.py -v
 """
 
 import pytest

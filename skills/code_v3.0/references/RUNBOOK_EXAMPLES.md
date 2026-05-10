@@ -178,7 +178,7 @@ mv .claude/state/BUILD.json.stale .claude/state/BUILD.json
 ## Example 3: Using `/code --fix-paths` for Path Mismatch Issues
 
 ### Scenario
-After a git operation on Windows with Git Bash, your state files contain Git Bash paths like `/p/.claude/skills/code` but the system is running on Windows where paths should be `P:\.claude\skills\code`. Tests are failing because the path comparison doesn't work.
+After a git operation on Windows with Git Bash, your state files contain Git Bash paths like `/p/.claude/skills/code` but the system is running on Windows where paths should be `$CLAUDE_ROOT/skills\code`. Tests are failing because the path comparison doesn't work.
 
 ### Solution
 
@@ -220,10 +220,10 @@ Found: 5 Git Bash path(s) to normalize
 
 Would fix:
   state1.json: 2 paths
-    /p/src/test.py → P:\\src\\test.py
+    /p/src/test.py → P:\\\\\\\src\\test.py
     /c/Users/config.json → C:\\Users\\config.json
   subdir/state2.json: 3 paths
-    /p/.claude/skills/code → P:\\.claude\\skills\\code
+    /p/.claude/skills/code → P:\\\\\\\.claude\\skills\\code
     /d/data/file.txt → D:\\data\\file.txt
 
 No changes made (dry-run mode)
@@ -233,7 +233,7 @@ No changes made (dry-run mode)
 
 | Git Bash Path | Windows Native Path |
 |---------------|---------------------|
-| `/p/.claude/skills/code` | `P:\.claude\skills\code` |
+| `/p/.claude/skills/code` | `$CLAUDE_ROOT/skills\code` |
 | `/c/Users/test` | `C:\Users\test` |
 | `/d/src/test.py` | `D:\src\test.py` |
 | `/tmp/cache` | `/tmp/cache` (unchanged, not a Windows drive) |
@@ -469,7 +469,7 @@ ls scripts/status_report.py
 ls scripts/repair_markers.py
 ls scripts/fix_state_paths.py
 
-# Scripts should be in P:\.claude\skills\code\scripts\
+# Scripts should be in $CLAUDE_ROOT/skills\code\scripts\
 ```
 
 ### Permission Denied

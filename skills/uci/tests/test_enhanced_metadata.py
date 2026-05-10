@@ -15,12 +15,12 @@ class TestEnhancedMetadataClasses:
 
     def test_memory_integration_module_exists(self):
         """Test that memory_integration.py module exists."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         assert memory_module.exists(), "memory_integration.py should exist"
 
     def test_agent_consensus_class_exists(self):
         """Test that AgentConsensus dataclass exists."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have AgentConsensus dataclass
@@ -34,7 +34,7 @@ class TestEnhancedMetadataClasses:
 
     def test_cross_file_metadata_class_exists(self):
         """Test that CrossFileMetadata dataclass exists."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have CrossFileMetadata dataclass
@@ -48,7 +48,7 @@ class TestEnhancedMetadataClasses:
 
     def test_review_metadata_class_exists(self):
         """Test that ReviewMetadata dataclass exists."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have ReviewMetadata dataclass
@@ -67,7 +67,7 @@ class TestEnhancedMetadataClasses:
 
     def test_extract_review_metadata_method_exists(self):
         """Test that MemoryIntegration has extract_review_metadata method."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have extract_review_metadata method
@@ -75,7 +75,7 @@ class TestEnhancedMetadataClasses:
 
     def test_extract_agent_consensus_method_exists(self):
         """Test that MemoryIntegration has extract_agent_consensus method."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have extract_agent_consensus method
@@ -83,7 +83,7 @@ class TestEnhancedMetadataClasses:
 
     def test_prepare_storage_entry_accepts_enhanced_metadata(self):
         """Test that prepare_storage_entry accepts enhanced metadata parameters."""
-        memory_module = Path("P:/.claude/skills/uci/lib/memory_integration.py")
+        memory_module = Path("P:\\\\\\.claude/skills/uci/lib/memory_integration.py")
         content = memory_module.read_text(encoding="utf-8")
 
         # Should have prepare_storage_entry with enhanced metadata parameters
@@ -99,7 +99,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_orchestrator_imports_enhanced_classes(self):
         """Test that orchestrator.py imports the enhanced metadata classes."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should import all three enhanced metadata classes
@@ -109,7 +109,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_orchestrator_has_runtime_reference(self):
         """Test that orchestrator has runtime reference tuple to prevent linter removal."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have _MEMORY_CLASSES reference tuple
@@ -121,7 +121,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_signature_has_context_params(self):
         """Test that aggregate_findings has new context parameters."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have aggregate_findings method with new parameters
@@ -136,7 +136,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_extracts_review_metadata(self):
         """Test that aggregate_findings extracts review metadata."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should call extract_review_metadata
@@ -149,7 +149,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_extracts_agent_consensus(self):
         """Test that aggregate_findings extracts agent consensus."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should call extract_agent_consensus
@@ -159,7 +159,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_builds_cross_file_metadata(self):
         """Test that aggregate_findings builds cross-file metadata."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should build CrossFileMetadata from cross_file_stats
@@ -172,7 +172,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_calculates_storeable_count(self):
         """Test that aggregate_findings calculates storeable findings count."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should calculate storeable_count
@@ -185,7 +185,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_has_enhanced_metadata_tracking(self):
         """Test that aggregate_findings tracks enhanced metadata extraction."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should track which metadata types were extracted
@@ -197,7 +197,7 @@ class TestOrchestratorEnhancedIntegration:
 
     def test_aggregate_findings_format_storage_with_enhanced_metadata(self):
         """Test that aggregate_findings calls format_storage_prompt with enhanced metadata."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should call format_storage_prompt with enhanced metadata
@@ -213,7 +213,7 @@ class TestEnhancedMetadataErrorHandling:
 
     def test_extract_review_metadata_has_error_handling(self):
         """Test that review metadata extraction has error handling."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have try/except for extract_review_metadata
@@ -233,7 +233,7 @@ class TestEnhancedMetadataErrorHandling:
 
     def test_extract_agent_consensus_has_error_handling(self):
         """Test that agent consensus extraction has error handling."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have try/except for extract_agent_consensus
@@ -253,7 +253,7 @@ class TestEnhancedMetadataErrorHandling:
 
     def test_cross_file_metadata_has_error_handling(self):
         """Test that cross-file metadata construction has error handling."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have try/except for CrossFileMetadata construction
@@ -273,7 +273,7 @@ class TestEnhancedMetadataErrorHandling:
 
     def test_format_storage_prompt_has_error_handling(self):
         """Test that storage prompt formatting has error handling."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should have try/except for format_storage_prompt
@@ -297,7 +297,7 @@ class TestStoreableCountCalculation:
 
     def test_storeable_count_filters_by_severity(self):
         """Test that storeable_count filters by severity."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should check severity against blocker/high/critical
@@ -307,7 +307,7 @@ class TestStoreableCountCalculation:
 
     def test_storeable_count_filters_by_confidence(self):
         """Test that storeable_count filters by confidence."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should check confidence >= 80
@@ -316,7 +316,7 @@ class TestStoreableCountCalculation:
 
     def test_storeable_count_requires_location(self):
         """Test that storeable_count requires location evidence."""
-        orchestrator = Path("P:/.claude/skills/uci/lib/orchestrator.py")
+        orchestrator = Path("P:\\\\\\.claude/skills/uci/lib/orchestrator.py")
         content = orchestrator.read_text(encoding="utf-8")
 
         # Should check for ":" in location (file:line format)

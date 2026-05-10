@@ -7,7 +7,7 @@ This test suite verifies the Context7 client wrapper which provides:
 - Rate limit handling with exponential backoff
 - Result caching to avoid duplicate queries
 
-Run with: pytest P:/.claude/skills/code/tests/test_context7_client.py -v
+Run with: pytest P:\\\\\\.claude/skills/code/tests/test_context7_client.py -v
 """
 
 import sys

@@ -17,10 +17,10 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # State directory for TDD state files (configurable via env var for testing)
-TDD_STATE_DIR = Path(os.environ.get("TDD_STATE_DIR", "P:/.claude/state/tdd"))
+TDD_STATE_DIR = Path(os.environ.get("TDD_STATE_DIR", "P:\\\\\\.claude/state/tdd"))
 
 # Evidence directory for Phase 3 TDD contracts (configurable via env var for testing)
-TDD_EVIDENCE_DIR = Path(os.environ.get("TDD_EVIDENCE_DIR", "P:/.claude/evidence/tdd95"))
+TDD_EVIDENCE_DIR = Path(os.environ.get("TDD_EVIDENCE_DIR", "P:\\\\\\.claude/evidence/tdd95"))
 
 
 def get_terminal_id() -> str:

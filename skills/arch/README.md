@@ -213,7 +213,7 @@ For architecturally significant changes, `/arch` now recommends a lightweight on
 - **Negative:** [Costs/risks with mitigations]
 ```
 
-**Location**: `P:/.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
+**Location**: `P:\\\\\\.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
 
 ### ARCHITECTURE.md Guidance
 

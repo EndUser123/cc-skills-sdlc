@@ -6,7 +6,7 @@ These tests are designed to FAIL initially with ModuleNotFoundError
 until the implementation script is created.
 
 Purpose: Test the script that normalizes Git Bash paths (/p/...) to Windows
-native paths (P:\\...) before running test/verification commands. This prevents
+native paths (P:\\\\\\\...) before running test/verification commands. This prevents
 path mismatch issues in multi-terminal environments.
 
 Author: Task 3.3: Path Normalization Integration
@@ -34,19 +34,19 @@ class TestNormalizeGitBashPathToWindows:
     """Test Git Bash path to Windows path normalization."""
 
     def test_normalize_git_bash_path_to_windows(self):
-        """Convert Git Bash /p/.claude/skills/code/tests/test_foo.py to Windows P:\\...
+        """Convert Git Bash /p/.claude/skills/code/tests/test_foo.py to Windows P:\\\\\\\...
 
         This test verifies that leading slash + drive letter pattern
-        (/p/...) is correctly converted to Windows native format (P:\\...).
+        (/p/...) is correctly converted to Windows native format (P:\\\\\\\...).
 
         Input: /p/.claude/skills/code/tests/test_foo.py
-        Expected: P:\\.claude\\skills\\code\\tests\\test_foo.py
+        Expected: P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py
         """
         input_path = "/p/.claude/skills/code/tests/test_foo.py"
         result = normalize_paths_before_run(input_path)
 
-        # Should convert /p/ to P:\
-        assert result.startswith("P:\\") or result.startswith("P:/"), \
+        # Should convert /p/ to P:\\\\\\
+        assert result.startswith("P:\\\\\\\") or result.startswith("P:\\\\\\"), \
             f"Expected Windows path starting with P:, got: {result}"
 
         # Should contain the full path components
@@ -65,15 +65,15 @@ class TestNormalizeAlreadyWindowsPath:
     """Test idempotency - Windows paths should remain unchanged."""
 
     def test_normalize_already_windows_path(self):
-        """Windows path P:\\.claude\\skills\\code\\tests\\test_foo.py should remain unchanged.
+        """Windows path P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py should remain unchanged.
 
         Idempotency check: Applying normalization twice should produce the same result.
         This prevents double-conversion issues.
 
-        Input: P:\\.claude\\skills\\code\\tests\\test_foo.py
+        Input: P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py
         Expected: Same path (no change)
         """
-        input_path = "P:\\.claude\\skills\\code\\tests\\test_foo.py"
+        input_path = "P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py"
 
         # First normalization
         result1 = normalize_paths_before_run(input_path)
@@ -133,7 +133,7 @@ class TestNormalizeCommandWithPaths:
         while preserving the command structure and other arguments.
 
         Input: pytest /p/.claude/skills/code/tests/test_foo.py -v
-        Expected: pytest P:\\.claude\\skills\\code\\tests\\test_foo.py -v
+        Expected: pytest P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py -v
         """
         input_cmd = "pytest /p/.claude/skills/code/tests/test_foo.py -v"
         result = normalize_paths_before_run(input_cmd)
@@ -156,7 +156,7 @@ class TestNormalizeCommandWithPaths:
         """Normalize paths in python command.
 
         Input: python -m pytest /p/project/tests/test_foo.py
-        Expected: python -m pytest P:\\project\\tests\\test_foo.py
+        Expected: python -m pytest P:\\\\\\\project\\tests\\test_foo.py
         """
         input_cmd = "python -m pytest /p/project/tests/test_foo.py"
         result = normalize_paths_before_run(input_cmd)
@@ -180,7 +180,7 @@ class TestNormalizeMultiplePathsInCommand:
         not just the first one.
 
         Input: pytest /p/src/test1.py /p/src/test2.py
-        Expected: pytest P:\\src\\test1.py P:\\src\\test2.py
+        Expected: pytest P:\\\\\\\src\\test1.py P:\\\\\\\src\\test2.py
         """
         input_cmd = "pytest /p/src/test1.py /p/src/test2.py"
         result = normalize_paths_before_run(input_cmd)
@@ -200,10 +200,10 @@ class TestNormalizeMultiplePathsInCommand:
     def test_normalize_mixed_path_formats(self):
         """Handle command with both Git Bash and Windows paths.
 
-        Input: pytest /p/src/test1.py P:\\src\\test2.py
+        Input: pytest /p/src/test1.py P:\\\\\\\src\\test2.py
         Expected: All paths in Windows format
         """
-        input_cmd = "pytest /p/src/test1.py P:\\src\\test2.py"
+        input_cmd = "pytest /p/src/test1.py P:\\\\\\\src\\test2.py"
         result = normalize_paths_before_run(input_cmd)
 
         # Should normalize the Git Bash path
@@ -223,7 +223,7 @@ class TestPathNormalizationLogging:
         """Verify that logging records path transformations.
 
         Should log each path transformation for observability and debugging.
-        Log format: "Normalized /p/... -> P:\\..."
+        Log format: "Normalized /p/... -> P:\\\\\\\..."
 
         Uses pytest's caplog fixture to capture log output.
         """
@@ -245,7 +245,7 @@ class TestPathNormalizationLogging:
     def test_path_normalization_logging_detail(self, caplog):
         """Verify detailed logging shows both source and target paths.
 
-        Should log: "Normalized /p/.claude/... -> P:\\.claude\\..."
+        Should log: "Normalized /p/.claude/... -> P:\\\\\\\.claude\\..."
         """
         with caplog.at_level(logging.DEBUG):
             input_path = "/p/.claude/skills/code/tests/test_foo.py"
@@ -364,7 +364,7 @@ class TestEdgeCases:
     def test_normalize_lowercase_drive_letter(self):
         """Ensure drive letter is uppercased in Windows format.
 
-        Input: /p/project should become P:\\project (uppercase P)
+        Input: /p/project should become P:\\\\\\\project (uppercase P)
         """
         input_path = "/p/project/tests/test_foo.py"
         result = normalize_paths_before_run(input_path)

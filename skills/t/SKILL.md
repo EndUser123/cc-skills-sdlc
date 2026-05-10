@@ -68,8 +68,8 @@ Adaptive testing command that automatically determines test scope and strictness
 
 > See `references/python-regex.md` for Python regex best practices when writing test patterns.
 
-- **Codemap reuse**: Leverages `P:\__csf\src\commands\cb\enhance_command.py::create_codemap()` for dependency analysis
-- **Health check integration**: Reuses `P:\.claude\skills\test_health_check.py` utilities
+- **Codemap reuse**: Leverages `$__CSF_ROOT/src\commands\cb\enhance_command.py::create_codemap()` for dependency analysis
+- **Health check integration**: Reuses `$CLAUDE_ROOT/skills\test_health_check.py` utilities
 - **Multi-terminal safe**: File-based locking with PID validation for concurrent sessions
 - **Test types**: Functional, unit, regression, integration, intelligent
 
@@ -169,7 +169,7 @@ For `/t` requests, execute this workflow:
 
 ```bash
 # Main entry point
-cd P:/.claude/skills/t && python __main__.py "target" --force-full
+cd P:\\\\\\.claude/skills/t && python __main__.py "target" --force-full
 
 # With context-aware routing
 python __main__.py  # Auto-detects from conversation
@@ -232,7 +232,7 @@ Tests are located in `tests/`:
 - `test_codemap_integration.py` - Codemap reuse tests
 
 ```bash
-cd P:/.claude/skills/t && python -m pytest tests/ -v
+cd P:\\\\\\.claude/skills/t && python -m pytest tests/ -v
 ```
 
 ## Success Criteria

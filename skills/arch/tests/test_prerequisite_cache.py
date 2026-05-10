@@ -9,7 +9,7 @@ pattern types creates duplicate cache entries.
 
 EXPECTED: After optimization, cache key should be text only.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_prerequisite_cache.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_prerequisite_cache.py -v
 
 TDD RED Phase: Tests FAIL because we expect optimized behavior.
 """

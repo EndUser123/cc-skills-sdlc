@@ -3,7 +3,7 @@
 These tests verify that the analyze() method returns a properly structured
 dictionary with all required keys and correct types.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_result_structure.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_result_structure.py -v
 
 TEST-004: Missing dict structure validation in test_prerequisite_gates.py
 

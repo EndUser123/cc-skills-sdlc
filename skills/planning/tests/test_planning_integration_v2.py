@@ -314,7 +314,7 @@ class TestArchHandoffResumePersistence:
 
     INITIAL_PLAN = """---
 status: draft
-source: P:/__csf/arch_decisions/ADR-20260407-example.md
+source: P:\\\\\\__csf/arch_decisions/ADR-20260407-example.md
 unresolved_blockers: 0
 ---
 
@@ -341,7 +341,7 @@ The plan currently assumes replay and handoff semantics but does not close ident
 
 ## Test Matrix
 
-pytest P:/packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py
+pytest P:\\\\\\packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py
 
 ## Contract Authority Reference
 
@@ -387,7 +387,7 @@ None.
 
 planning_handoff_packet:
   packet_version: "2"
-  source_adr: "P:/__csf/arch_decisions/ADR-20260407-example.md"
+  source_adr: "P:\\\\\\__csf/arch_decisions/ADR-20260407-example.md"
   plan_title: "Pending Arch Rewrite"
   goal: "Close the planning workflow without bouncing back into /arch after a packet has already been returned."
   implementation_changes:
@@ -403,7 +403,7 @@ Caller action: consume packet, rewrite plan, rerun auto_verify
 
     REWRITTEN_PLAN = """---
 status: draft
-source: P:/__csf/arch_decisions/ADR-20260407-example.md
+source: P:\\\\\\__csf/arch_decisions/ADR-20260407-example.md
 unresolved_blockers: 0
 ---
 
@@ -437,7 +437,7 @@ Keep artifact rewriting in one local planning path and keep behavior unchanged.
 
 ## Test Matrix
 
-pytest P:/packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py::TestArchHandoffResumePersistence::test_pending_arch_receipt_prevents_reinvocation_and_marks_consumed_after_rewrite
+pytest P:\\\\\\packages/cc-skills-sdlc/skills/planning/tests/test_planning_integration_v2.py::TestArchHandoffResumePersistence::test_pending_arch_receipt_prevents_reinvocation_and_marks_consumed_after_rewrite
 
 ## Contract Authority Reference
 

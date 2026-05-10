@@ -22,7 +22,7 @@ Checks performed:
     metadata to claim readiness
 
 Usage:
-    python P:/.claude/skills/planning/__lib/auto_verify.py <plan_path>
+    python P:\\\\\\.claude/skills/planning/__lib/auto_verify.py <plan_path>
 
 Output:
     <plan_path>.review.result.json with verification results
@@ -65,7 +65,7 @@ from contract_primitives import (
 # Configurable skill search paths for evidence resolution
 DEFAULT_SKILL_SEARCH_PATHS = [
     Path.home() / ".claude" / "skills",  # User-level skills
-    Path("P:/__csf") / ".claude" / "skills",  # Project P: drive skills (if exists)
+    Path("P:\\\\\\__csf") / ".claude" / "skills",  # Project P: drive skills (if exists)
     Path("C:/Users/brsth") / ".claude" / "skills",  # Project C: drive skills (if exists)
 ]
 
@@ -796,7 +796,7 @@ def _resolve_file_reference(raw_path: str, plan_path: str | None) -> list[Path]:
     if not normalized or "://" in normalized:
         return []
     # Strip line-range suffixes (e.g. :1040, :1040-1044, #L1040) before path resolution.
-    # On Windows, Path("P:/foo.py:1040-1044").exists() is False because the colon
+    # On Windows, Path("P:\\\\\\foo.py:1040-1044").exists() is False because the colon
     # makes the path invalid — we must strip the suffix first.
     normalized = re.sub(r"[:#]L?\d+(?:[-\d]*)?$", "", normalized)
     path = Path(normalized.replace("\\", "/"))
@@ -809,11 +809,11 @@ def _resolve_file_reference(raw_path: str, plan_path: str | None) -> list[Path]:
         candidates.append(Path.cwd() / path)
         # Also search the hooks directory for hook-related file references
         # (e.g. PreToolUse.py, PreToolUse_investigation_gate.py).
-        hooks_dir = Path(__import__('os').environ.get("CLAUDE_HOOKS_DIR", "P:/.claude/hooks"))
+        hooks_dir = Path(__import__('os').environ.get("CLAUDE_HOOKS_DIR", "P:\\\\\\.claude/hooks"))
         if hooks_dir.exists():
             candidates.append(hooks_dir / path)
         # Search P: drive for cross-drive compatibility (plan on C:, files on P:).
-        p_drive = Path("P:/")
+        p_drive = Path("P:\\\\\\")
         if p_drive.exists():
             candidates.append(p_drive / path)
             try:
@@ -3145,7 +3145,7 @@ def _candidate_review_summary_paths(plan_path: str) -> list[Path]:
     plan = Path(plan_path)
     candidates = [plan.with_suffix(".review.summary.md")]
 
-    plans_roots = [plan.parent, Path.home() / ".claude" / "plans", Path("P:/.claude/plans")]
+    plans_roots = [plan.parent, Path.home() / ".claude" / "plans", Path("P:\\\\\\.claude/plans")]
     for plans_dir in plans_roots:
         adversarial_dir = plans_dir / "adversarial"
         if adversarial_dir.exists():
@@ -3234,8 +3234,8 @@ def validate_adversarial_agents() -> dict[str, Any]:
         Path.cwd() / ".claude" / "agents",
         Path.home() / ".claude" / "agents",
     ]
-    # Also check P:\.claude\agents explicitly (P: drive is not home directory on Windows)
-    p_drive_claude = Path("P:/") / ".claude" / "agents"
+    # Also check $CLAUDE_ROOT/agents explicitly (P: drive is not home directory on Windows)
+    p_drive_claude = Path("P:\\\\\\") / ".claude" / "agents"
     if p_drive_claude.exists():
         agents_dirs.append(p_drive_claude)
     if claude_agents:
@@ -3660,7 +3660,7 @@ def verify_plan(plan_path: str | None = None, plan_content: str | None = None, m
     try:
         import sys as _sys
 
-        _gto_lib = Path("P:/.claude/skills")
+        _gto_lib = Path("P:\\\\\\.claude/skills")
         if str(_gto_lib) not in _sys.path:
             _sys.path.insert(0, str(_gto_lib))
         from gto.lib.skill_coverage_detector import _append_skill_coverage

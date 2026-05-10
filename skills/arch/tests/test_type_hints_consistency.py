@@ -3,7 +3,7 @@ Failing tests for type hint consistency in validate_templates.py (QUAL-002).
 
 These tests verify Python 3.9+ style type hints are used consistently.
 
-Run with: pytest P:/.claude/skills/arch/tests/test_type_hints_consistency.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_type_hints_consistency.py -v
 
 EXPECTED BEHAVIOR:
 - BEFORE refactoring: Tests FAIL (old-style typing imports present)

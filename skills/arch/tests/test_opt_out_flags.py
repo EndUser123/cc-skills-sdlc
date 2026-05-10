@@ -15,8 +15,8 @@ from pathlib import Path
 import sys
 
 # Add utils path to import GotPlanner and GotEdgeAnalyzer from /code
-# P:\.claude\skills\arch is a symlink to P:\packages\arch\skill
-# From P:\packages\arch\skill\tests\test_opt_out_flags.py, we go up 5 levels to P:\, then to .claude\skills\code\utils
+# $CLAUDE_ROOT/skills\arch is a symlink to P:\\\\\\packages\arch\skill
+# From P:\\\\\\packages\arch\skill\tests\test_opt_out_flags.py, we go up 5 levels to P:\\\\\\, then to .claude\skills\code\utils
 code_utils_path = str(Path(__file__).resolve().parent.parent.parent.parent.parent.parent / '.claude' / 'skills' / 'code' / 'utils')
 sys.path.insert(0, code_utils_path)
 from got_planner import GotPlanner, GotEdgeAnalyzer

@@ -12,7 +12,7 @@ from pathlib import Path
 
 # Environment-configurable paths
 CLAUDE_HOME = Path(os.environ.get("CLAUDE_HOME", Path.home() / ".claude"))
-CSF_SRC = os.environ.get("CSF_SRC", "P:/__csf/src")
+CSF_SRC = os.environ.get("CSF_SRC", "P:\\\\\\__csf/src")
 STATE_DIR = Path(os.environ.get("DEBUG_RCA_STATE_DIR", CLAUDE_HOME / "state" / "rca"))
 STATE_FILE = STATE_DIR / "rca_workflow.json"
 ARCHIVE_DIR = STATE_DIR / "archive"

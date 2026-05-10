@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Set
 from pathlib import Path as _Path
 import sys as _sys
 
-_gto_lib = _Path("P:/.claude/skills")
+_gto_lib = _Path("P:\\\\\\.claude/skills")
 if str(_gto_lib) not in _sys.path:
     _sys.path.insert(0, str(_gto_lib))
 from gto.lib.skill_coverage_detector import _append_skill_coverage

@@ -1,6 +1,6 @@
 """Tests for TemplateValidator with 3-stage fail-fast chain.
 
-Run with: pytest P:/packages/arch/skill/tests/test_validate.py -v
+Run with: pytest P:\\\\\\packages/arch/skill/tests/test_validate.py -v
 """
 
 import tempfile

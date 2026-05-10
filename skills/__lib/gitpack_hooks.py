@@ -7,18 +7,18 @@ from pathlib import Path
 from datetime import datetime
 
 TARGETS = [
-    ('skill-guard', 'P:/packages/skill-guard/src/skill_guard'),
-    ('sdlc/code_v3.0/hooks', 'P:/packages/cc-skills-sdlc/skills/code_v3.0/hooks'),
-    ('sdlc/rca/hooks', 'P:/packages/cc-skills-sdlc/skills/rca/hooks'),
-    ('sdlc/refactor/hooks', 'P:/packages/cc-skills-sdlc/skills/refactor/hooks'),
-    ('sdlc/design/hooks', 'P:/packages/cc-skills-sdlc/skills/design/hooks'),
-    ('sdlc/pre-mortem/hooks', 'P:/packages/cc-skills-sdlc/skills/pre-mortem/hooks'),
-    ('sdlc/hooks.json', 'P:/packages/cc-skills-sdlc/hooks'),
+    ('skill-guard', 'P:\\\\\\packages/skill-guard/src/skill_guard'),
+    ('sdlc/code_v3.0/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/code_v3.0/hooks'),
+    ('sdlc/rca/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/rca/hooks'),
+    ('sdlc/refactor/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/refactor/hooks'),
+    ('sdlc/design/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/design/hooks'),
+    ('sdlc/pre-mortem/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/pre-mortem/hooks'),
+    ('sdlc/hooks.json', 'P:\\\\\\packages/cc-skills-sdlc/hooks'),
 ]
 
 EXCLUDE_DIRS = {'__pycache__', '.git', '.venv', 'venv', 'site-packages', '.ruff_cache', '.mypy_cache', '.pytest_cache'}
 
-OUTPUT_DIR = Path('P:/.claude/.artifacts/')
+OUTPUT_DIR = Path('P:\\\\\\.claude/.artifacts/')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -144,7 +144,7 @@ def main():
                 except Exception as e:
                     content = f'[READ ERROR: {e}]'
 
-                f_rel = f.relative_to(Path('P:/packages'))
+                f_rel = f.relative_to(Path('P:\\\\\\packages'))
                 parts.append(f'### {f_rel}\n\n')
                 parts.append('```python\n' + content + '\n```\n\n')
 

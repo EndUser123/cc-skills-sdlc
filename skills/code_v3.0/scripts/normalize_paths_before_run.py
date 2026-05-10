@@ -2,7 +2,7 @@
 r"""
 Path normalization script for TRACE verification commands.
 
-Auto-normalizes Git Bash paths (/p/...) to Windows native (P:\...)
+Auto-normalizes Git Bash paths (/p/...) to Windows native (P:\\\\\\...)
 before running pytest/test commands to prevent path mismatch issues.
 
 Integrates with utils.normalize_paths.normalize_paths_in_command().
@@ -25,7 +25,7 @@ def normalize_paths_before_run(command: str) -> str:
 
     This function:
     1. Finds all Git Bash paths (/p/...) in the command
-    2. Converts them to Windows native format (P:\\...)
+    2. Converts them to Windows native format (P:\\\\\\\...)
     3. Logs each transformation for debugging
     4. Returns the normalized command
 
@@ -37,8 +37,8 @@ def normalize_paths_before_run(command: str) -> str:
 
     Example:
         >>> normalize_paths_before_run("pytest /p/.claude/skills/code/tests/test_foo.py -v")
-        "pytest P:\\.claude\\skills\\code\\tests\\test_foo.py -v"
-        # Log: "Normalized /p/.claude/skills/code/tests/test_foo.py -> P:\\.claude\\skills\\code\tests\test_foo.py"
+        "pytest P:\\\\\\\.claude\\skills\\code\\tests\\test_foo.py -v"
+        # Log: "Normalized /p/.claude/skills/code/tests/test_foo.py -> P:\\\\\\\.claude\\skills\\code\tests\test_foo.py"
     """
     if not command:
         return command

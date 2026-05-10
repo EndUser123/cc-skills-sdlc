@@ -2,8 +2,8 @@
 """
 Path normalization utility for /code skill (Windows-only).
 
-Ensures all paths use Windows native format (P:\\...) to prevent
-verification failures between Git Bash (/p/...) and PowerShell (P:\\...).
+Ensures all paths use Windows native format (P:\\\\\\\...) to prevent
+verification failures between Git Bash (/p/...) and PowerShell (P:\\\\\\\...).
 
 Author: /code skill improvement document
 Date: 2026-03-01
@@ -14,12 +14,12 @@ from pathlib import Path
 
 
 def normalize_path(path_str: str) -> str:
-    """Normalize any path format to Windows native (P:\\...).
+    """Normalize any path format to Windows native (P:\\\\\\\...).
 
     Handles:
-    - Git Bash style: /p/path/to/file -> P:/path/to/file
-    - Relative paths: ./file -> P:/project/file
-    - Forward slashes: P:/path/to/file -> P:\\path\\to\\file
+    - Git Bash style: /p/path/to/file -> P:\\\\\\path/to/file
+    - Relative paths: ./file -> P:\\\\\\project/file
+    - Forward slashes: P:\\\\\\path/to/file -> P:\\\\\\\path\\to\\file
 
     Args:
         path_str: Path string in any format.
@@ -33,7 +33,7 @@ def normalize_path(path_str: str) -> str:
     if not path_str:
         return path_str
 
-    # Handle Git Bash style: /p/path/to/file -> P:/path/to/file
+    # Handle Git Bash style: /p/path/to/file -> P:\\\\\\path/to/file
     if re.match(r'^/[a-z]/', path_str):
         drive_letter = path_str[1].upper()
         rest = path_str[2:]
@@ -53,7 +53,7 @@ def normalize_paths_in_command(command: str) -> str:
 
     Matches common path patterns:
     - Git Bash style: /p/path/to/file
-    - Windows style: P:\\path\\to\\file
+    - Windows style: P:\\\\\\\path\\to\\file
     - Relative paths: ./file or ../file
 
     Args:
@@ -66,7 +66,7 @@ def normalize_paths_in_command(command: str) -> str:
         return command
 
     # Match common path patterns
-    # Pattern matches: /p/... OR P:\... OR ./file OR ../file
+    # Pattern matches: /p/... OR P:\\\\\\... OR ./file OR ../file
     path_pattern = r'(?:/[a-z]/[\w/\-.]+|[A-Z]:[/\\][\w/\\\-.]+|\.\.?/[\w/\\\-.]+)'
 
     def replace_path(match):
@@ -106,7 +106,7 @@ def is_windows_path(path_str: str) -> bool:
         path_str: Path string to check.
 
     Returns:
-        True if path matches Windows format (P:\\... or P:/...), False otherwise.
+        True if path matches Windows format (P:\\\\\\\... or P:\\\\\\...), False otherwise.
     """
     return bool(re.match(r'^[A-Z]:', path_str))
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         # Demo mode
         test_paths = [
             "/p/project/src/auth.py",
-            "P:/project/src/auth.py",
+            "P:\\\\\\project/src/auth.py",
             "./tests/test_auth.py",
             "../config/settings.json"
         ]

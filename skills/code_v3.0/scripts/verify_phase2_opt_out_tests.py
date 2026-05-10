@@ -18,7 +18,7 @@ PHASE_2_SKILLS = [
 
 def run_tests(skill_name):
     """Run tests for a specific skill and return results."""
-    test_path = Path(f'P:/.claude/skills/{skill_name}/tests/test_opt_out_flags.py')
+    test_path = Path(f'P:\\\\\\.claude/skills/{skill_name}/tests/test_opt_out_flags.py')
 
     if not test_path.exists():
         return {
@@ -35,7 +35,7 @@ def run_tests(skill_name):
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=f'P:/.claude/skills/{skill_name}'
+            cwd=f'P:\\\\\\.claude/skills/{skill_name}'
         )
 
         # Parse output to count tests

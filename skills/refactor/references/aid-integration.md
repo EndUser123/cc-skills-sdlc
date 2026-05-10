@@ -32,7 +32,7 @@ result = integrator.analyze_refactoring(target_path)
 3. Validate AID suggestions against SoloDevConstitutionalFilter
 4. Incorporate AID rollback strategies into refactoring plan
 
-**Integration module**: `P:\.claude\skills\arch\aid_integration.py`
+**Integration module**: `$CLAUDE_ROOT/skills\arch\aid_integration.py`
 
 ## Architecture Alignment
 

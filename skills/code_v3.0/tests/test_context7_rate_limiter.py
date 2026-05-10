@@ -9,7 +9,7 @@ This test suite verifies the Context7 shared rate limiter which provides:
 - Graceful fallback to local version checking
 - Never blocks EXPLORE phase (always returns results, never raises)
 
-Run with: pytest P:/.claude/skills/code/tests/test_context7_rate_limiter.py -v
+Run with: pytest P:\\\\\\.claude/skills/code/tests/test_context7_rate_limiter.py -v
 """
 
 import sys

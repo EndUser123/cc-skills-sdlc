@@ -18,7 +18,7 @@ the APPENDIX only when you need the implementation details.
 
 ## SIGNATURE TOC
 
-### P:\packages\cc-skills-sdlc\skills\code\resources\validate_docs.py
+### $CLAUDE_PLUGIN_ROOT/skills\code\resources\validate_docs.py
 ```python
 class DocumentationValidator
 __init__(self, docs_dir)
@@ -35,13 +35,13 @@ validate(self)
 
 | File | Description |
 |------|-------------|
-| `P:\packages\cc-skills-sdlc\skills\code\resources\validate_docs.py` | validate docs |
+| `$CLAUDE_PLUGIN_ROOT/skills\code\resources\validate_docs.py` | validate docs |
 
 ---
 
 ## APPENDIX: FULL IMPLEMENTATIONS
 
-### P:\packages\cc-skills-sdlc\skills\code\resources\validate_docs.py
+### $CLAUDE_PLUGIN_ROOT/skills\code\resources\validate_docs.py
 ```python
 
 class DocumentationValidator:

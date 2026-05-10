@@ -77,7 +77,7 @@ The implementation is in `windows_ipc.py`:
 
 ## Reusing Existing Infrastructure
 
-**Critical Design Decision:** `/t` reuses the existing codemap system from `P:\__csf\src\commands\cb\enhance_command.py` instead of building dependency analysis from scratch.
+**Critical Design Decision:** `/t` reuses the existing codemap system from `$__CSF_ROOT/src\commands\cb\enhance_command.py` instead of building dependency analysis from scratch.
 
 **What this gives us:**
 - ✅ Pre-built dependency parser (python_imports, file_references, command_references)
@@ -262,7 +262,7 @@ sqlalchemy.exc.OperationalError: server closed the connection unexpectedly
 
 Run tests with:
 ```bash
-cd P:/.claude/skills/t
+cd P:\\\\\\.claude/skills/t
 python -m pytest tests/ -v
 
 # Run specific test file

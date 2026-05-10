@@ -34,17 +34,11 @@ def _required_phase() -> int:
     return 1
 
 
-def main() -> None:
-    try:
-        payload = json.loads(sys.stdin.read() or "{}")
-    except json.JSONDecodeError:
-        print(json.dumps({"decision": "approve", "reason": "Invalid hook payload"}))
-        sys.exit(0)
-
+def run(payload: dict) -> dict | None:
+    """In-process hook logic."""
     tool_name = payload.get("tool_name") or payload.get("name") or ""
     if tool_name not in {"Edit", "Write", "MultiEdit"}:
-        print(json.dumps({"decision": "approve", "reason": "Tool does not mutate files"}))
-        sys.exit(0)
+        return None
 
     tool_input = payload.get("tool_input") or {}
     file_path = (
@@ -54,8 +48,7 @@ def main() -> None:
         or ""
     )
     if file_path and _should_skip_for_path(file_path):
-        print(json.dumps({"decision": "approve", "reason": "Editing the source plan/ADR artifact"}))
-        sys.exit(0)
+        return None
 
     _add_import_paths()
     from contract_primitives import discover_local_plan_path, validate_plan_for_execution
@@ -63,15 +56,12 @@ def main() -> None:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     plan_path = discover_local_plan_path(project_dir=project_dir, cwd=os.getcwd())
     if not plan_path:
-        print(json.dumps({"decision": "approve", "reason": "No local plan artifact discovered"}))
-        sys.exit(0)
+        return None
 
-    # Ledger check: if contract precheck was already recorded, approve silently.
-    # If not, validate_plan_for_execution() is the authoritative gate;
-    # on allowed, write the ledger marker here (this is the phase write point).
     from code_phase_ledger import write_phase_marker, read_phase_ledger
 
-    ledger = read_phase_ledger()
+    session_id = payload.get("session_id")
+    ledger = read_phase_ledger(session_id=session_id)
     precheck_done = False
     if ledger:
         precheck_phase = ledger.get("phases", {}).get("consumer_contract_precheck", {})
@@ -91,38 +81,44 @@ def main() -> None:
                     "verify_status": result.verify_status,
                     "claimed_status": result.claimed_status,
                 },
+                session_id=session_id
             )
-        print(
-            json.dumps(
-                {
-                    "decision": "approve",
-                    "reason": result.reason,
-                    "context": {
-                        "plan_path": result.plan_path,
-                        "verify_status": result.verify_status,
-                        "claimed_status": result.claimed_status,
-                    },
-                }
-            )
-        )
+        return {
+            "decision": "approve",
+            "reason": result.reason,
+            "context": {
+                "plan_path": result.plan_path,
+                "verify_status": result.verify_status,
+                "claimed_status": result.claimed_status,
+            },
+        }
+
+    return {
+        "decision": "deny",
+        "reason": result.reason,
+        "context": {
+            "plan_path": result.plan_path,
+            "verify_status": result.verify_status,
+            "claimed_status": result.claimed_status,
+            "next_action": result.next_action,
+            "blocking_findings": result.blocking_findings,
+        },
+    }
+
+
+def main() -> None:
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        print(json.dumps({"decision": "approve", "reason": "Invalid hook payload"}))
         sys.exit(0)
 
-    print(
-        json.dumps(
-            {
-                "decision": "deny",
-                "reason": result.reason,
-                "context": {
-                    "plan_path": result.plan_path,
-                    "verify_status": result.verify_status,
-                    "claimed_status": result.claimed_status,
-                    "next_action": result.next_action,
-                    "blocking_findings": result.blocking_findings,
-                },
-            }
-        )
-    )
-    sys.exit(2)
+    result = run(payload)
+    if result:
+        print(json.dumps(result))
+        if result.get("decision") == "deny":
+            sys.exit(2)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

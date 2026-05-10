@@ -7,7 +7,7 @@ First, identify the current session uniquely:
 ```python
 from pathlib import Path
 import sys
-sys.path.insert(0, str(Path("P:/__csf/.staging")))
+sys.path.insert(0, str(Path("P:\\\\\\__csf/.staging")))
 
 # Generate session ID from worktree path
 SESSION_ID = Path.cwd().name  # e.g., "w1t1", "w2t3"

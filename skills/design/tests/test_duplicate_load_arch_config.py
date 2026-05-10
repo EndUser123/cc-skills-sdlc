@@ -2,7 +2,7 @@
 Test for QUAL-001: Duplicate load_arch_config in config.py and routing.py
 
 These tests CAPTURE CURRENT BEHAVIOR before refactoring.
-Run with: pytest P:/.claude/skills/arch/tests/test_duplicate_load_arch_config.py -v
+Run with: pytest P:\\\\\\.claude/skills/arch/tests/test_duplicate_load_arch_config.py -v
 
 Purpose: Verify that routing.load_arch_config imports from config.py
 instead of duplicating implementation (DRY principle violation).

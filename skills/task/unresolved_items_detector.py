@@ -47,7 +47,7 @@ class UnresolvedItemsDetector:
     def __init__(
         self,
         terminal_id: str,
-        csf_root: Path | str = Path("P:/__csf"),
+        csf_root: Path | str = Path("P:\\\\\\__csf"),
         max_age_days: int = DEFAULT_MAX_AGE_DAYS,
     ):
         """Initialize detector.

@@ -14,12 +14,12 @@ corresponding `_full.md` file.
 
 ## SIGNATURE TOC
 
-### P:\packages\cc-skills-sdlc\skills\design\__init__.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\__init__.py
 ```python
 # (no public definitions)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\aid_integration.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\aid_integration.py
 ```python
 class AIDAction
 class AIDConfig
@@ -40,7 +40,7 @@ generate_docs(self, target_path: str | Path, multi_file: bool) -> AIDResult
 create_aid_integrator(config: AIDConfig | None) -> AIDSkillIntegrator
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\aid_wrapper.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\aid_wrapper.py
 ```python
 class CodebaseAnalysis
 class APIExtract
@@ -71,7 +71,7 @@ dfs(node: str, path: list[str]) -> bool
 create_aid_integrator(config: dict[Any] | None) -> AidIntegrator
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\aid_wrapper_v2.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\aid_wrapper_v2.py
 ```python
 class AIDCompressionLevel
 class AIDAIAction
@@ -91,7 +91,7 @@ dfs(node: str, path: list[str]) -> bool
 create_aid_integrator(config: dict[Any] | None) -> AidIntegratorV2
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\arch_validate.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\arch_validate.py
 ```python
 class StageCheck
 class StageValidationResult
@@ -109,7 +109,7 @@ _run_stage_validation(text: str, contract_sensitive: bool)
 main(argv: list[str]) -> int
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\config.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\config.py
 ```python
 clear_config_cache() -> None
 _load_arch_config_impl(user_config_str: str | None, project_config_str: str | None, user_mtime: float, project_mtime: float, env_domain: str | None, env_output_size: str | None, env_evidence_level: str | None)
@@ -117,39 +117,39 @@ load_arch_config() -> dict[str, Any] | None
 _get_file_mtime(path: Path | None) -> float
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\cross_platform_paths.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\cross_platform_paths.py
 ```python
 _detect_platform() -> PlatformName
 resolve_cks_db_path() -> Path
 resolve_template_path(template_name: str) -> str
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\hooks\_shared_state.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\hooks\_shared_state.py
 ```python
 terminal_id() -> str
 state_dir(skill_root: Path) -> Path
 state_file(skill_root: Path) -> Path
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\hooks\stop_if_unverified.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\hooks\stop_if_unverified.py
 ```python
 _skill_root() -> Path
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\hooks\verify_claims.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\hooks\verify_claims.py
 ```python
 verify(run_id: str, domain: str, claims_count: int) -> str
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\path_detection.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\path_detection.py
 ```python
 detect_path_backslashes(path_str: str) -> bool
 extract_path_components(path_str: str) -> list
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\persistence.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\persistence.py
 ```python
 should_skip_persistence(query: str, output: str, skip_keywords: tuple[Any])
 generate_decision_filename(query: str, _template: str) -> str
@@ -167,13 +167,13 @@ log_decision_metrics(decision_id: str, query: str, pattern: str, high_stakes: bo
 log_candidate_metrics(decision_id: str, candidate_id: str, vs: dict[Any], critic: dict[Any] | None, selection: dict[Any] | None, log_file: Path | None)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\planning_handoff_validation.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\planning_handoff_validation.py
 ```python
 is_planning_bound_adr(text: str, handoff_packet_version: str | None) -> bool
 validate_planning_handoff_contract(text: str, packet: Any, handoff: Any)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\prerequisite_analyzer.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\prerequisite_analyzer.py
 ```python
 class AnalysisResult
 class PrerequisiteAnalyzer
@@ -188,14 +188,14 @@ _matches_any_cache_clear() -> None
 _matches_any_cache_info()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\resources\validate_docs.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\resources\validate_docs.py
 ```python
 class DocumentationValidator
 __init__(self, docs_dir)
 validate(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\results.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\results.py
 ```python
 class ArchResult
 is_complete(self) -> bool
@@ -205,7 +205,7 @@ unwrap_or(self, default: T) -> T
 unwrap_error(self) -> str
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\schemas.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\schemas.py
 ```python
 class Severity
 class ContractBoundary
@@ -222,18 +222,18 @@ to_dict(self) -> dict[str, Any]
 from_dict(cls, data: dict[Any]) -> DesignPayload
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\stages\__init__.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\stages\__init__.py
 ```python
 # (no public definitions)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\stages\stage_19_dispatch.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\stages\stage_19_dispatch.py
 ```python
 dispatch(adr_path: str) -> dict
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\test_aid_v2_integration.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\test_aid_v2_integration.py
 ```python
 test_aid_integrator_creation()
 test_basic_distillation()
@@ -242,30 +242,30 @@ test_dependency_analysis()
 main()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\test_aid_value.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\test_aid_value.py
 ```python
 # (no public definitions)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\test_debug.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\test_debug.py
 ```python
 concurrent_load()
 load_config()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\__init__.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\__init__.py
 ```python
 # (no public definitions)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\conftest.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\conftest.py
 ```python
 pytest_configure(config)
 clear_config_cache_between_tests()
 clear_config_cache()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_arch_validate_handoff.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_arch_validate_handoff.py
 ```python
 test_planning_bound_adr_requires_planning_handoff_packet(tmp_path: Path) -> None
 test_planning_bound_adr_with_handoff_packet_passes_handoff_check(tmp_path: Path) -> None
@@ -273,7 +273,7 @@ test_planning_bound_adr_without_instruction_or_return_to_caller_blocks(tmp_path:
 test_nested_planning_return_to_caller_satisfies_routing_contract(tmp_path: Path) -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_cks_fallback.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cks_fallback.py
 ```python
 class TestCKSModuleNotFound
 test_cks_module_not_found_sets_available_false(self)
@@ -298,7 +298,7 @@ test_analysis_falls_back_to_best_practices(self)
 test_no_exception_raised_when_cks_unavailable(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_cks_real_fallback.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cks_real_fallback.py
 ```python
 class TestRealCKSImportFailure
 test_cks_module_import_fails_when_module_not_in_sys_modules(self)
@@ -314,14 +314,14 @@ test_real_import_error_when_cks_not_installed(self)
 test_sys_modules_lookup_without_mocking(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_contracts_error_handling.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_contracts_error_handling.py
 ```python
 class TestLoadContractsFileNotFoundError
 test_load_contracts_missing_file_raises_error_with_helpful_message(self, tmp_path)
 test_load_contracts_missing_file_helpful_error_content(self, tmp_path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_cross_platform.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cross_platform.py
 ```python
 class TestCrossPlatformPathResolution
 test_windows_p_drive_path_is_absolute(self)
@@ -343,7 +343,7 @@ test_get_cks_db_path_placeholder()
 test_normalize_template_path_placeholder()
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_enhancement_integrity.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_enhancement_integrity.py
 ```python
 skill_content() -> str
 enhancements_content() -> str
@@ -372,7 +372,7 @@ test_all_anti_patterns_present(self, enhancement_sections: dict[Any]) -> None
 test_all_have_severity(self, enhancement_sections: dict[Any]) -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_error_messages.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_error_messages.py
 ```python
 class TestLoadArchConfigErrorMessages
 test_invalid_domain_error_message_contains_fix_guidance(self, mock_read, mock_exists)
@@ -380,7 +380,7 @@ test_invalid_domain_error_message_is_actionable(self, mock_read, mock_exists)
 test_missing_required_field_error_is_specific(self, mock_read, mock_exists)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_hooks.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_hooks.py
 ```python
 _run_verify(run_id: str, domain: str, claims: int) -> tuple[int, str, str]
 _run_stop(stdin_data: str) -> tuple[int, str, str]
@@ -407,12 +407,12 @@ test_full_verify_then_stop_flow(self)
 test_verify_then_stop_blocks_without_verify(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_integration_validation.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_integration_validation.py
 ```python
 test_validate_templates_end_to_end(tmp_path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_overlap_numeric_validation.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_overlap_numeric_validation.py
 ```python
 class TestOverlapNumericValidation
 test_check_duplicate_logic_returns_numeric_value(self)
@@ -426,7 +426,7 @@ test_check_duplicate_logic_returns_severity_indicator(self)
 test_warning_range_has_severity_warning(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_overlap_validation.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_overlap_validation.py
 ```python
 class TestOverlapPercentageParsingMISSING
 test_check_duplicate_logic_returns_numeric_overlap_parseable(self, capsys)
@@ -438,7 +438,7 @@ class TestMissingNumericValidationInExistingTests
 test_existing_test_only_checks_string_not_numeric(self, capsys)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_path_detection.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_path_detection.py
 ```python
 class TestDetectPathBackslashesUsingPath
 test_function_exists(self)
@@ -454,7 +454,7 @@ class TestPathDetectionModuleExists
 test_path_detection_module_exists(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_path_traversal.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_path_traversal.py
 ```python
 class TestPathTraversalVulnerability
 test_path_traversal_with_double_dot_attack(self)
@@ -478,7 +478,7 @@ test_windows_absolute_paths_should_be_rejected(self)
 test_valid_template_names_still_work(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_performance.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance.py
 ```python
 class TestTemplateContentCaching
 temp_template_file(self, tmp_path: Path) -> Path
@@ -493,7 +493,7 @@ test_cache_info_method_exists(self)
 test_cache_max_size_setting(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_performance_caching_real.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance_caching_real.py
 ```python
 class TestOriginalTestFlaw
 temp_template_file(self, tmp_path: Path) -> Path
@@ -509,7 +509,7 @@ test_flawed_approach_manual_counter(self, temp_template_file: Path)
 test_correct_approach_cache_info(self, temp_template_file: Path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_performance_deterministic.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance_deterministic.py
 ```python
 class TestFlakyTimingBehavior
 clear_cache_before_each_test(self)
@@ -523,7 +523,7 @@ test_cache_info_method_exists(self)
 test_cache_clear_method_works(self, temp_template_file: Path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_persistence.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_persistence.py
 ```python
 _make_cks_db(path: Path) -> None
 class TestFindCksDb
@@ -544,7 +544,7 @@ test_ingest_not_called_when_save_skipped(self, tmp_path)
 test_save_returns_filepath_despite_cks_down(self, tmp_path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_prerequisite_cache.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_prerequisite_cache.py
 ```python
 class TestCacheKeyOptimizationForEfficiency
 test_cache_size_reduced_with_text_only_key(self)
@@ -567,7 +567,7 @@ test_cache_size_is_bounded(self)
 test_different_inputs_create_different_cache_entries(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_prerequisite_gates.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_prerequisite_gates.py
 ```python
 skip_if_not_implemented()
 class TestOptimizationQueriesDoNotTriggerPrerequisiteGates
@@ -589,7 +589,7 @@ test_case_insensitive_pattern_matching(self)
 test_whitespace_handling(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_real_platform.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_real_platform.py
 ```python
 class TestRealPlatformDetection
 test_detect_platform_returns_valid_value(self)
@@ -607,7 +607,7 @@ test_full_workflow_on_real_platform(self)
 test_platform_consistency(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_result_structure.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_result_structure.py
 ```python
 _broken_analyze(query: str) -> dict
 _wrong_type_analyze(query: str) -> dict
@@ -625,7 +625,7 @@ test_fails_when_key_has_wrong_type(self)
 test_fails_when_extra_keys_present(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_type_hints_consistency.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_type_hints_consistency.py
 ```python
 class TestTypeHintConsistency
 module_path(self) -> Path
@@ -638,7 +638,7 @@ test_tuple_syntax_uses_lowercase(self, module_source: str)
 test_necessary_typing_imports_remain(self, module_ast: ast.Module)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_validate.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate.py
 ```python
 class TestTemplateValidatorInit
 test_default_resources_dir(self)
@@ -667,7 +667,7 @@ class TestStandaloneFunction
 test_wrapper_returns_arch_result(self)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_validate_design.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate_design.py
 ```python
 _terminal_id() -> str
 _state_dir() -> Path
@@ -711,7 +711,7 @@ test_usage_error_on_missing_args(self)
 test_adr_saved_on_success(self, tmp_path)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\tests\test_validate_templates.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate_templates.py
 ```python
 class TestPrintStatus
 test_print_status_pass_outputs_green_checkmark(self, capsys)
@@ -748,7 +748,7 @@ test_validate_all_checks_all_templates(self, mock_print, mock_load, mock_contrac
 test_validate_all_reports_missing_templates(self, mock_print, mock_load, mock_contracts)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\validate.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\validate.py
 ```python
 class ArchResult
 is_complete(self) -> bool
@@ -764,7 +764,7 @@ validate_templates(self, template_names: list[str] | None) -> ArchResult[list[st
 validate_templates(template_names: list[str] | None)
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\validate_design.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\validate_design.py
 ```python
 _terminal_id() -> str
 _state_dir() -> Path
@@ -779,7 +779,7 @@ validate(draft_path: str, mode: str, run_id: str) -> bool
 main() -> None
 ```
 
-### P:\packages\cc-skills-sdlc\skills\design\validate_templates.py
+### $CLAUDE_PLUGIN_ROOT/skills\design\validate_templates.py
 ```python
 class ValidationResult
 print_status(message: str, status: str) -> None
@@ -872,58 +872,58 @@ design/ (52 files)
 
 | File | Description |
 |------|-------------|
-| `P:\packages\cc-skills-sdlc\skills\design\__init__.py` | Package: design |
-| `P:\packages\cc-skills-sdlc\skills\design\aid_integration.py` | aid integration |
-| `P:\packages\cc-skills-sdlc\skills\design\aid_wrapper.py` | aid wrapper |
-| `P:\packages\cc-skills-sdlc\skills\design\aid_wrapper_v2.py` | aid wrapper v2 |
-| `P:\packages\cc-skills-sdlc\skills\design\arch_validate.py` | arch validate |
-| `P:\packages\cc-skills-sdlc\skills\design\config.py` | config |
-| `P:\packages\cc-skills-sdlc\skills\design\cross_platform_paths.py` | cross platform paths |
-| `P:\packages\cc-skills-sdlc\skills\design\hooks\_shared_state.py` |  shared state |
-| `P:\packages\cc-skills-sdlc\skills\design\hooks\stop_if_unverified.py` | stop if unverified |
-| `P:\packages\cc-skills-sdlc\skills\design\hooks\verify_claims.py` | verify claims |
-| `P:\packages\cc-skills-sdlc\skills\design\path_detection.py` | path detection |
-| `P:\packages\cc-skills-sdlc\skills\design\persistence.py` | persistence |
-| `P:\packages\cc-skills-sdlc\skills\design\planning_handoff_validation.py` | planning handoff validation |
-| `P:\packages\cc-skills-sdlc\skills\design\prerequisite_analyzer.py` | prerequisite analyzer |
-| `P:\packages\cc-skills-sdlc\skills\design\resources\validate_docs.py` | validate docs |
-| `P:\packages\cc-skills-sdlc\skills\design\results.py` | results |
-| `P:\packages\cc-skills-sdlc\skills\design\schemas.py` | schemas |
-| `P:\packages\cc-skills-sdlc\skills\design\stages\__init__.py` | Package: stages |
-| `P:\packages\cc-skills-sdlc\skills\design\stages\stage_19_dispatch.py` | stage 19 dispatch |
-| `P:\packages\cc-skills-sdlc\skills\design\test_aid_v2_integration.py` | test aid v2 integration |
-| `P:\packages\cc-skills-sdlc\skills\design\test_aid_value.py` | test aid value |
-| `P:\packages\cc-skills-sdlc\skills\design\test_debug.py` | test debug |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\__init__.py` | Package: tests |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\conftest.py` | conftest |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_arch_validate_handoff.py` | test arch validate handoff |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_cks_fallback.py` | test cks fallback |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_cks_real_fallback.py` | test cks real fallback |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_contracts_error_handling.py` | test contracts error handling |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_cross_platform.py` | test cross platform |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_enhancement_integrity.py` | test enhancement integrity |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_error_messages.py` | test error messages |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_hooks.py` | test hooks |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_integration_validation.py` | test integration validation |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_overlap_numeric_validation.py` | test overlap numeric validation |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_overlap_validation.py` | test overlap validation |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_path_detection.py` | test path detection |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_path_traversal.py` | test path traversal |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_performance.py` | test performance |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_performance_caching_real.py` | test performance caching real |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_performance_deterministic.py` | test performance deterministic |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_persistence.py` | test persistence |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_prerequisite_cache.py` | test prerequisite cache |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_prerequisite_gates.py` | test prerequisite gates |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_real_platform.py` | test real platform |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_result_structure.py` | test result structure |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_type_hints_consistency.py` | test type hints consistency |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_validate.py` | test validate |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_validate_design.py` | test validate design |
-| `P:\packages\cc-skills-sdlc\skills\design\tests\test_validate_templates.py` | test validate templates |
-| `P:\packages\cc-skills-sdlc\skills\design\validate.py` | validate |
-| `P:\packages\cc-skills-sdlc\skills\design\validate_design.py` | validate design |
-| `P:\packages\cc-skills-sdlc\skills\design\validate_templates.py` | validate templates |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\__init__.py` | Package: design |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\aid_integration.py` | aid integration |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\aid_wrapper.py` | aid wrapper |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\aid_wrapper_v2.py` | aid wrapper v2 |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\arch_validate.py` | arch validate |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\config.py` | config |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\cross_platform_paths.py` | cross platform paths |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\hooks\_shared_state.py` |  shared state |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\hooks\stop_if_unverified.py` | stop if unverified |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\hooks\verify_claims.py` | verify claims |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\path_detection.py` | path detection |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\persistence.py` | persistence |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\planning_handoff_validation.py` | planning handoff validation |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\prerequisite_analyzer.py` | prerequisite analyzer |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\resources\validate_docs.py` | validate docs |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\results.py` | results |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\schemas.py` | schemas |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\stages\__init__.py` | Package: stages |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\stages\stage_19_dispatch.py` | stage 19 dispatch |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\test_aid_v2_integration.py` | test aid v2 integration |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\test_aid_value.py` | test aid value |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\test_debug.py` | test debug |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\__init__.py` | Package: tests |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\conftest.py` | conftest |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_arch_validate_handoff.py` | test arch validate handoff |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cks_fallback.py` | test cks fallback |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cks_real_fallback.py` | test cks real fallback |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_contracts_error_handling.py` | test contracts error handling |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_cross_platform.py` | test cross platform |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_enhancement_integrity.py` | test enhancement integrity |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_error_messages.py` | test error messages |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_hooks.py` | test hooks |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_integration_validation.py` | test integration validation |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_overlap_numeric_validation.py` | test overlap numeric validation |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_overlap_validation.py` | test overlap validation |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_path_detection.py` | test path detection |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_path_traversal.py` | test path traversal |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance.py` | test performance |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance_caching_real.py` | test performance caching real |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_performance_deterministic.py` | test performance deterministic |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_persistence.py` | test persistence |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_prerequisite_cache.py` | test prerequisite cache |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_prerequisite_gates.py` | test prerequisite gates |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_real_platform.py` | test real platform |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_result_structure.py` | test result structure |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_type_hints_consistency.py` | test type hints consistency |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate.py` | test validate |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate_design.py` | test validate design |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\tests\test_validate_templates.py` | test validate templates |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\validate.py` | validate |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\validate_design.py` | validate design |
+| `$CLAUDE_PLUGIN_ROOT/skills\design\validate_templates.py` | validate templates |
 
 ---
 
@@ -1193,12 +1193,12 @@ assert second_load_time < first_load_time  # Can fail due to system load
 **Category:** Test Reliability
 **Status:** FIXED
 
-**Issue:** Regex `r"P:/"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
+**Issue:** Regex `r"P:\\\\\\"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
 
 **Evidence:**
 ```python
 # Line 52: Brittle regex pattern
-assert not re.search(r"P:/", content)  # Only matches string "P:/"
+assert not re.search(r"P:\\\\\\", content)  # Only matches string "P:\\\\\\"
 ```
 
 **Resolution:**
@@ -1386,8 +1386,8 @@ for key, value in config.items():
 
 - Validation Command: `/v /arch system(s)`
 - TDD Workflow: `/tdd` (Test-Driven Development)
-- Test Command: `pytest P:/.claude/skills/arch/tests/ -v`
-- Coverage Command: `pytest P:/.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
+- Test Command: `pytest P:\\\\\\.claude/skills/arch/tests/ -v`
+- Coverage Command: `pytest P:\\\\\\.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
 
 ---
 
@@ -1662,12 +1662,12 @@ assert second_load_time < first_load_time  # Can fail due to system load
 **Category:** Test Reliability
 **Status:** FIXED
 
-**Issue:** Regex `r"P:/"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
+**Issue:** Regex `r"P:\\\\\\"` in `test_harcoded_paths.py` is brittle and doesn't verify Path objects
 
 **Evidence:**
 ```python
 # Line 52: Brittle regex pattern
-assert not re.search(r"P:/", content)  # Only matches string "P:/"
+assert not re.search(r"P:\\\\\\", content)  # Only matches string "P:\\\\\\"
 ```
 
 **Resolution:**
@@ -1855,8 +1855,8 @@ for key, value in config.items():
 
 - Validation Command: `/v /arch system(s)`
 - TDD Workflow: `/tdd` (Test-Driven Development)
-- Test Command: `pytest P:/.claude/skills/arch/tests/ -v`
-- Coverage Command: `pytest P:/.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
+- Test Command: `pytest P:\\\\\\.claude/skills/arch/tests/ -v`
+- Coverage Command: `pytest P:\\\\\\.claude/skills/arch/tests/ --cov=. --cov-report=term-missing`
 
 ---
 
@@ -2174,8 +2174,8 @@ To verify lean principles are applied:
 ## Files Created/Modified This Session
 
 **Created:**
-- `P:\.claude\skills\arch\test_lean_integration.md` - Test verification document
-- `P:\.claude\skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
+- `$CLAUDE_ROOT/skills\arch\test_lean_integration.md` - Test verification document
+- `$CLAUDE_ROOT/skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
 
 **Modified:**
 - `C:\Users\brsth\.claude\projects\P--\memory\learning_patterns.md` - Added anti-pattern documentation
@@ -2295,8 +2295,8 @@ To verify lean principles are applied:
 ## Files Created/Modified This Session
 
 **Created:**
-- `P:\.claude\skills\arch\test_lean_integration.md` - Test verification document
-- `P:\.claude\skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
+- `$CLAUDE_ROOT/skills\arch\test_lean_integration.md` - Test verification document
+- `$CLAUDE_ROOT/skills\arch\GTO_EXECUTION_SUMMARY.md` - This file
 
 **Modified:**
 - `C:\Users\brsth\.claude\projects\P--\memory\learning_patterns.md` - Added anti-pattern documentation
@@ -3038,7 +3038,7 @@ For architecturally significant changes, `/arch` now recommends a lightweight on
 - **Negative:** [Costs/risks with mitigations]
 ```
 
-**Location**: `P:/.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
+**Location**: `P:\\\\\\.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
 
 ### ARCHITECTURE.md Guidance
 
@@ -3356,7 +3356,7 @@ For architecturally significant changes, `/arch` now recommends a lightweight on
 - **Negative:** [Costs/risks with mitigations]
 ```
 
-**Location**: `P:/.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
+**Location**: `P:\\\\\\.claude/arch_decisions/ADR-YYYYMMDD-[slug].md`
 
 ### ARCHITECTURE.md Guidance
 
@@ -3690,7 +3690,7 @@ Use `challenge` whenever the architecture introduces a new boundary, state mecha
 For contract-sensitive designs, the `challenge` pass can be strengthened by dispatching to `/ai-pcli` for independent adversarial review across multiple models. This catches blind spots that a single model's context bias may miss.
 
 ```bash
-python "P:/.claude/skills/ai-pcli/ai_cli.py" "You are an architecture challenger. The following is a proposed architecture design. Find the strongest counter-arguments, contradictory evidence, simpler alternatives, and downstream ownership conflicts. Focus on: 1) What existing mechanism already overlaps with this proposal? 2) What boundary remains unclosed? 3) What fallback behavior is undefined? 4) What is the simplest alternative that achieves the same goal? Output: {challenges: [{challenge, evidence, severity, alternative}], strongest_challenge, recommendation}" --context "<adr_path>" --diff --no-critic --timeout 180
+python "P:\\\\\\.claude/skills/ai-pcli/ai_cli.py" "You are an architecture challenger. The following is a proposed architecture design. Find the strongest counter-arguments, contradictory evidence, simpler alternatives, and downstream ownership conflicts. Focus on: 1) What existing mechanism already overlaps with this proposal? 2) What boundary remains unclosed? 3) What fallback behavior is undefined? 4) What is the simplest alternative that achieves the same goal? Output: {challenges: [{challenge, evidence, severity, alternative}], strongest_challenge, recommendation}" --context "<adr_path>" --diff --no-critic --timeout 180
 ```
 
 The `--diff` flag surfaces where models disagree on the design's weaknesses — disagreement flags genuine uncertainty, agreement across models flags a confirmed defect.
@@ -3699,11 +3699,11 @@ The `--diff` flag surfaces where models disagree on the design's weaknesses — 
 
 **When to skip**: lightweight architecture notes, non-contract-sensitive queries, or designs that don't introduce new boundaries.
 
-Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
+Reference: `P:\\\\\\.claude/skills/__lib/sdlc_internal_modes.md`
 
 ## Strategic Reasoning
 
-This skill uses strategic reasoning patterns from `P:/.claude/skills/__lib/strategic_reasoning.md`:
+This skill uses strategic reasoning patterns from `P:\\\\\\.claude/skills/__lib/strategic_reasoning.md`:
 
 - **GoT+ToT**: For constraint analysis and branching scenario exploration on architecture alternatives (enabled by default v2.5)
 - **Strategic Questioning**: For blind-spot detection before emitting Contract Authority Packets or ADRs
@@ -4227,7 +4227,7 @@ Minimum shape:
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/design_decisions/ADR-001-example.md"
+  source_adr: "P:\\\\\\packages/example/design_decisions/ADR-001-example.md"
   plan_title: "Example implementation"
   goal: "What the implementation must achieve."
   current_state_with_evidence:
@@ -4371,14 +4371,14 @@ with open(adr_file, "w") as f:
 # Fire both agents in parallel — outputs written to files
 red_team_result = Agent(
     description="red_team — attack the ADR for hidden assumptions, failure modes, elegant-but-wrong reasoning",
-    prompt=f"Read your agent definition at P:/packages/cc-skills-meta/skills/reason_openai/agents/red_team.md\nReview the draft ADR at {adr_file}\nFollow the red_team output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/red_team_output.md",
+    prompt=f"Read your agent definition at P:\\\\\\packages/cc-skills-meta/skills/reason_openai/agents/red_team.md\nReview the draft ADR at {adr_file}\nFollow the red_team output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/red_team_output.md",
     subagent_type="general-purpose",
     background=True,
 )
 
 implementation_realist_result = Agent(
     description="implementation_realist — pressure-test practicality, migration risk, maintenance burden, rollout complexity",
-    prompt=f"Read your agent definition at P:/packages/cc-skills-meta/skills/reason_openai/agents/implementation_realist.md\nReview the draft ADR at {adr_file}\nFollow the implementation_realist output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/impl_realist_output.md",
+    prompt=f"Read your agent definition at P:\\\\\\packages/cc-skills-meta/skills/reason_openai/agents/implementation_realist.md\nReview the draft ADR at {adr_file}\nFollow the implementation_realist output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/impl_realist_output.md",
     subagent_type="general-purpose",
     background=True,
 )
@@ -4573,7 +4573,7 @@ After ADR passes critic review, `/design` validates the architectural decision's
 **If `SDLC_MULTI_LLM=1`** — multi-model strategic validation via `/ai-pcli`:
 
 ```bash
-python "P:/.claude/skills/ai-pcli/ai_cli.py" "Evaluate the architecture decision in the provided context for strategic quality across 4 dimensions: 1) Architecture soundness — are the boundaries and contracts well-defined? 2) Design pattern appropriateness — does the pattern fit the problem domain? 3) Technology fit — is the technology choice justified against alternatives? 4) Engineering balance — is the solution appropriately scoped (not over-engineered or under-specified)? Output: {dimensions: [{name, rating: Sound|Concerning|Critical, evidence, concern}], overall: Sound|Concerning|Critical, summary}" --context "<adr_path>" --quality-weighted --quality-gate --output-format json --no-critic --timeout 180
+python "P:\\\\\\.claude/skills/ai-pcli/ai_cli.py" "Evaluate the architecture decision in the provided context for strategic quality across 4 dimensions: 1) Architecture soundness — are the boundaries and contracts well-defined? 2) Design pattern appropriateness — does the pattern fit the problem domain? 3) Technology fit — is the technology choice justified against alternatives? 4) Engineering balance — is the solution appropriately scoped (not over-engineered or under-specified)? Output: {dimensions: [{name, rating: Sound|Concerning|Critical, evidence, concern}], overall: Sound|Concerning|Critical, summary}" --context "<adr_path>" --quality-weighted --quality-gate --output-format json --no-critic --timeout 180
 ```
 
 The `--quality-weighted --quality-gate` flags filter findings to confidence >= 80%, preventing noise from low-confidence disagreements across models.
@@ -4736,7 +4736,7 @@ See `references/routing-contract.md` for input-to-template routing with expected
 - **Template-based execution:** Read and execute, don't delegate
 - **ADR-first output:** Default output is concise ADR format; `--verbose` for full analysis
 - **Edge case awareness:** Every output must document edge cases
-- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:/.claude/design_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
+- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:\\\\\\.claude/design_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
 
 ---
 
@@ -5036,7 +5036,7 @@ Use `challenge` whenever the architecture introduces a new boundary, state mecha
 For contract-sensitive designs, the `challenge` pass can be strengthened by dispatching to `/ai-pcli` for independent adversarial review across multiple models. This catches blind spots that a single model's context bias may miss.
 
 ```bash
-python "P:/.claude/skills/ai-pcli/ai_cli.py" "You are an architecture challenger. The following is a proposed architecture design. Find the strongest counter-arguments, contradictory evidence, simpler alternatives, and downstream ownership conflicts. Focus on: 1) What existing mechanism already overlaps with this proposal? 2) What boundary remains unclosed? 3) What fallback behavior is undefined? 4) What is the simplest alternative that achieves the same goal? Output: {challenges: [{challenge, evidence, severity, alternative}], strongest_challenge, recommendation}" --context "<adr_path>" --diff --no-critic --timeout 180
+python "P:\\\\\\.claude/skills/ai-pcli/ai_cli.py" "You are an architecture challenger. The following is a proposed architecture design. Find the strongest counter-arguments, contradictory evidence, simpler alternatives, and downstream ownership conflicts. Focus on: 1) What existing mechanism already overlaps with this proposal? 2) What boundary remains unclosed? 3) What fallback behavior is undefined? 4) What is the simplest alternative that achieves the same goal? Output: {challenges: [{challenge, evidence, severity, alternative}], strongest_challenge, recommendation}" --context "<adr_path>" --diff --no-critic --timeout 180
 ```
 
 The `--diff` flag surfaces where models disagree on the design's weaknesses — disagreement flags genuine uncertainty, agreement across models flags a confirmed defect.
@@ -5045,11 +5045,11 @@ The `--diff` flag surfaces where models disagree on the design's weaknesses — 
 
 **When to skip**: lightweight architecture notes, non-contract-sensitive queries, or designs that don't introduce new boundaries.
 
-Reference: `P:/.claude/skills/__lib/sdlc_internal_modes.md`
+Reference: `P:\\\\\\.claude/skills/__lib/sdlc_internal_modes.md`
 
 ## Strategic Reasoning
 
-This skill uses strategic reasoning patterns from `P:/.claude/skills/__lib/strategic_reasoning.md`:
+This skill uses strategic reasoning patterns from `P:\\\\\\.claude/skills/__lib/strategic_reasoning.md`:
 
 - **GoT+ToT**: For constraint analysis and branching scenario exploration on architecture alternatives (enabled by default v2.5)
 - **Strategic Questioning**: For blind-spot detection before emitting Contract Authority Packets or ADRs
@@ -5573,7 +5573,7 @@ Minimum shape:
 ```yaml
 planning_handoff_packet:
   packet_version: "1"
-  source_adr: "P:/packages/example/design_decisions/ADR-001-example.md"
+  source_adr: "P:\\\\\\packages/example/design_decisions/ADR-001-example.md"
   plan_title: "Example implementation"
   goal: "What the implementation must achieve."
   current_state_with_evidence:
@@ -5717,14 +5717,14 @@ with open(adr_file, "w") as f:
 # Fire both agents in parallel — outputs written to files
 red_team_result = Agent(
     description="red_team — attack the ADR for hidden assumptions, failure modes, elegant-but-wrong reasoning",
-    prompt=f"Read your agent definition at P:/packages/cc-skills-meta/skills/reason_openai/agents/red_team.md\nReview the draft ADR at {adr_file}\nFollow the red_team output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/red_team_output.md",
+    prompt=f"Read your agent definition at P:\\\\\\packages/cc-skills-meta/skills/reason_openai/agents/red_team.md\nReview the draft ADR at {adr_file}\nFollow the red_team output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/red_team_output.md",
     subagent_type="general-purpose",
     background=True,
 )
 
 implementation_realist_result = Agent(
     description="implementation_realist — pressure-test practicality, migration risk, maintenance burden, rollout complexity",
-    prompt=f"Read your agent definition at P:/packages/cc-skills-meta/skills/reason_openai/agents/implementation_realist.md\nReview the draft ADR at {adr_file}\nFollow the implementation_realist output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/impl_realist_output.md",
+    prompt=f"Read your agent definition at P:\\\\\\packages/cc-skills-meta/skills/reason_openai/agents/implementation_realist.md\nReview the draft ADR at {adr_file}\nFollow the implementation_realist output contract exactly.\nWrite your complete output to {tempfile.gettempdir()}/impl_realist_output.md",
     subagent_type="general-purpose",
     background=True,
 )
@@ -5919,7 +5919,7 @@ After ADR passes critic review, `/design` validates the architectural decision's
 **If `SDLC_MULTI_LLM=1`** — multi-model strategic validation via `/ai-pcli`:
 
 ```bash
-python "P:/.claude/skills/ai-pcli/ai_cli.py" "Evaluate the architecture decision in the provided context for strategic quality across 4 dimensions: 1) Architecture soundness — are the boundaries and contracts well-defined? 2) Design pattern appropriateness — does the pattern fit the problem domain? 3) Technology fit — is the technology choice justified against alternatives? 4) Engineering balance — is the solution appropriately scoped (not over-engineered or under-specified)? Output: {dimensions: [{name, rating: Sound|Concerning|Critical, evidence, concern}], overall: Sound|Concerning|Critical, summary}" --context "<adr_path>" --quality-weighted --quality-gate --output-format json --no-critic --timeout 180
+python "P:\\\\\\.claude/skills/ai-pcli/ai_cli.py" "Evaluate the architecture decision in the provided context for strategic quality across 4 dimensions: 1) Architecture soundness — are the boundaries and contracts well-defined? 2) Design pattern appropriateness — does the pattern fit the problem domain? 3) Technology fit — is the technology choice justified against alternatives? 4) Engineering balance — is the solution appropriately scoped (not over-engineered or under-specified)? Output: {dimensions: [{name, rating: Sound|Concerning|Critical, evidence, concern}], overall: Sound|Concerning|Critical, summary}" --context "<adr_path>" --quality-weighted --quality-gate --output-format json --no-critic --timeout 180
 ```
 
 The `--quality-weighted --quality-gate` flags filter findings to confidence >= 80%, preventing noise from low-confidence disagreements across models.
@@ -6082,7 +6082,7 @@ See `references/routing-contract.md` for input-to-template routing with expected
 - **Template-based execution:** Read and execute, don't delegate
 - **ADR-first output:** Default output is concise ADR format; `--verbose` for full analysis
 - **Edge case awareness:** Every output must document edge cases
-- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:/.claude/design_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
+- **Compaction resilience:** If a session is compacted mid-ADR, the draft ADR must be saved to `P:\\\\\\.claude/design_decisions/` before the compact window closes, so the next session can resume without loss. Auto-save is mandatory for any ADR longer than one exchange.
 
 ---
 

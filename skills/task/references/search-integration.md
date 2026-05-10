@@ -7,7 +7,7 @@ When `/task list` is invoked (without `--no-suggest`), the skill performs contex
 ### Terminal Context Building
 
 Terminal context factors:
-- Current working directory (e.g., `P:\__csf\src\daemons` -> "semantic daemon work")
+- Current working directory (e.g., `$__CSF_ROOT/src\daemons` -> "semantic daemon work")
 - Git branch name (e.g., `feature/safety-hooks` -> "safety hooks implementation")
 - Recent file edits (last 5 modified files indicate active work)
 - Pending task subjects (indicate ongoing themes)
