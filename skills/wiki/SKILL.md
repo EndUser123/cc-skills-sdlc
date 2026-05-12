@@ -1,11 +1,11 @@
 ---
 name: wiki
 description: Persistent knowledge system using Obsidian wiki + QMD search
-version: 1.2.0
+version: 1.3.0
 type: skill
 enforcement: none
 workflow_steps:
-  - ingest: "3-phase pipeline: manifest (script) → per-file parallel ingest (subagents) → post-phase (script). Handles large files via tiered strategy."
+  - ingest: "3-phase pipeline: manifest (script) → per-file parallel ingest (subagents) → post-phase (script). Handles large files via tiered strategy. YouTube URLs are auto-detected and routed to the yt-is transcript pipeline (yt-dlp → Selenium → Gemini CLI) before ingestion."
   - query: "Accept question, search wiki via QMD_WIKI backend, synthesize answer"
   - lint: "Health-check wiki for contradictions, orphans, missing cross-refs"
   - index: "Rebuild index.md catalog from current wiki state"
@@ -24,46 +24,42 @@ Persistent knowledge management: LLM maintains an Obsidian wiki (ingest/synthesi
 
 3-phase pipeline: **Pre-phase** (Python script, no LLM) → **Ingest phase** (parallel per-file subagents) → **Post-phase** (QMD update, no file content).
 
+**Option A — one wiki page per video** (per user decision, 2026-05-11): each transcript produces one dedicated wiki page. Do not aggregate multiple videos into a single page.
+
 **Pre-phase — manifest generation** (main session, script, no LLM content):
+
 ```powershell
-python - <<'PY'
-import json, hashlib, pathlib, re
+# Script: skills/wiki/scripts/wiki_manifest.py
+# --source yt-is  → P:/.data/yt-is/  (transcript_*.txt files, YouTube transcripts)
+# --source <path> → explicit directory override  (.txt files)
+# (no arg)        → C:/Users/brsth/Downloads  (.md files, default)
+python skills/wiki/scripts/wiki_manifest.py
 
-VAULT_DIR = pathlib.Path("P:/.data/wiki")
-LOG_FILE  = VAULT_DIR / "log.md"
-MANIFEST  = pathlib.Path("/tmp/wiki_ingest_manifest.json")
-SRC_DIR   = pathlib.Path("C:/Users/brsth/Downloads")
-MAX_SAFE  = 200_000   # bytes — safe for single LLM call
-MAX_WARN = 500_000   # bytes — warn but attempt ingest
-SALT     = "SHA256:" # log entry prefix for dedup check
+# For YouTube URL ingestion:
+python skills/wiki/scripts/wiki_manifest.py --source yt-is
 
-existing = set()
-if LOG_FILE.exists():
-    text = LOG_FILE.read_text(encoding="utf-8")
-    existing = set(re.findall(r"SHA256:([a-f0-9]{64})", text))
+# For explicit path:
+python skills/wiki/scripts/wiki_manifest.py --source /path/to/dir
 
-entries = []
-for f in sorted(SRC_DIR.glob("*.md"), key=lambda p: p.stat().st_size, reverse=True):
-    h = hashlib.sha256(f.read_bytes()).hexdigest()
-    if h in existing:
-        entries.append({"path": str(f), "size": f.stat().st_size, "hash": h, "status": "skipped"})
-        continue
-    sz = f.stat().st_size
-    tier = "large_skip" if sz > MAX_WARN else ("large_warn" if sz > MAX_SAFE else "safe")
-    entries.append({"path": str(f), "size": sz, "hash": h, "status": "pending", "tier": tier})
-
-MANIFEST.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-print(f"Manifest: {len(entries)} files — safe={sum(1 for e in entries if e['tier']=='safe')} "
-      f"large_warn={sum(1 for e in entries if e['tier']=='large_warn')} "
-      f"large_skip={sum(1 for e in entries if e['tier']=='large_skip')} "
-      f"skipped={sum(1 for e in entries if e['status']=='skipped')}")
-PY
+# For retry/resume (skip already-done entries):
+python skills/wiki/scripts/wiki_manifest.py --resume
 ```
-Running this produces `/tmp/wiki_ingest_manifest.json` with all Downloads .md files, their hashes, sizes, and tier. The script reads file bytes only for hashing — no LLM context involvement.
+
+The script reads file bytes only for hashing — no LLM context involvement.
+Manifest is written to a tempfile when `--resume` is used (prevents cross-terminal collision).
+
+**Manifest schema** (`/tmp/wiki_ingest_manifest.json`):
+```json
+[{"path": "...", "size": 12345, "hash": "sha256:...", "status": "pending", "tier": "safe"}]
+```
+Required fields: `path`, `hash`; Optional: `size`, `tier`; Valid `status`: `pending`, `done`, `failed`, `skipped`.
+
+**Idempotency**: SHA256 dedup via `log.md` check — if a file's hash already appears in `log.md`, the subagent marks it `status: skipped` and skips ingest. On retry after crash, `pending` entries are re-dispatched; already-ingested files are safely skipped via the log check. This prevents true duplicates.
 
 **Ingest phase — parallel per-file dispatch** (subagents, 1 file each):
 - Dispatch one subagent per `status: pending` entry from the manifest.
-- Each subagent: reads exactly one file, verifies SHA256 against manifest, skips if hash matches log, writes wiki page to `P:/.data/wiki/concepts/<slug>.md`, updates manifest entry to `status: done` or `status: failed`.
+- Each subagent: reads exactly one file, verifies SHA256 against manifest, skips if hash matches log, writes wiki page to `P:/.data/wiki/concepts/<slug>.md`, appends to `log.md`, updates manifest entry to `status: done` or `status: failed`.
+- **Resume**: On re-run after crash, pass `--resume` or re-run the manifest script — `pending` entries are re-dispatched; log.md SHA256 check prevents duplicate ingest of already-processed files.
 - **Failure handling**: If a subagent hits a context window error, it writes `status: failed` to the manifest with `error: context_limit`. The coordinator re-queues failed entries for retry with a warning.
 - Safe files (`<200KB`): direct ingest.
 - Large-warn files (`200KB-500KB`): ingest with explicit size warning in output.
@@ -76,22 +72,114 @@ Hash: <hash from manifest>
 Vault: P:/.data/wiki/concepts/
 Log:   P:/.data/wiki/log.md
 
+--- PHASE 1: VERIFICATION (before any generation) ---
+
 1. Read the file at <file_path>.
 2. Verify SHA256 matches <hash>. If not, skip and report status=failed, reason=hash_mismatch.
 3. Check <LOG_FILE> for existing SHA256:<hash>. If found, report status=skipped, reason=already_ingested.
-4. Distill file into a wiki page: YAML frontmatter (title, tags, summary, created), body with ## Summary + ## Key Findings + ## Related.
-5. Write to <VAULT/concepts/slug.md>. Slug = lowercase alphanumeric + hyphens from filename.
+
+STOP GATE — If verification fails, do NOT proceed to generation.
+Report the failure status and stop.
+
+--- PHASE 2: GENERATION (only after verification passes) ---
+
+4. Distill file into a wiki page with enhanced metadata and structured extraction (see below).
+5. Write to <VAULT/concepts/slug>.md. For collision-safe slugs, use `make_collision_slug()` from `scripts/wiki_manifest.py` (slug = safe-slug + SHA256[:8]).
 6. Append to <LOG_FILE>: "## [YYYY-MM-DD] ingest | <title>\nSource: <original_filename>\nSHA256: <hash>\n"
+
+--- PHASE 3: COMPLETION REPORT (separate from generation) ---
+
 7. Update manifest entry to status=done.
+
+NOTICE: Steps 4-5 are generation. Step 7 is completion reporting.
+Do NOT mix "page written successfully" with "page meets quality bar."
+Quality assessment is a SEPARATE step handled by the coordinator.
+```
+
+Enhanced wiki page format:
+- For YouTube transcript files: extract and include Video Title, Channel, Duration, URL as frontmatter fields.
+- For all files: always include the Pillar Match Matrix scores and EVIDENCE_GAP flags (see below).
+
+YAML frontmatter (required fields):
+---
+title: <title>
+created: <YYYY-MM-DD>
+source: <original_filename>
+tags: [<relevant tags>]
+summary: <2-3 sentence summary of the big idea>
+pillar_scores:         # only for YouTube/video content
+  vision_integration: <1-5>
+  terminal_isolation: <1-5>
+  wiki_integrity: <1-5>
+  diagnostic_rigor: <1-5>
+cognitive_load: <1-5>  # overall cognitive load for this content; clamped to 1-5 if out of range
+evidence_gaps: [<list of evidence gaps — see body annotation syntax below>]
+source_url: <YouTube URL if video source>
+channel: <YouTube channel name>
+duration: <video duration if known>
+---
+
+Body sections (in order):
+## Summary
+<2-3 sentence "big idea" — the single most important takeaway>
+
+## Key Findings (Verbatim Extraction)
+<List of specific techniques, claims, or insights extracted verbatim from the source.
+Each item should be quoted exactly where possible.
+For each item, annotate with cognitive load (1-5) and flag any EVIDENCE_GAP:
+- EVIDENCE_GAP: <what evidence is missing or unverified>   # bullet syntax required
+- Assumption: <what is assumed but not proven>             # bullet syntax required
+
+## Related
+<Auto-generated wikilinks to top-5 semantically similar existing pages>
+
+## Sources
+<List of source URLs, references, or material used to extract this content>
 ```
 
 **Post-phase — index update** (main session, single call):
 ```powershell
-qmd update wiki --lang en 2>$null; if ($LASTEXITCODE -ne 0) { qmd update wiki }
+# One retry only; propagate error to manifest + user on second failure
+qmd update wiki --lang en 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) {
+    qmd update wiki 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) {
+        Write-Error "QMD update failed twice — wiki index may be stale"; exit 1
+    }
+}
 ```
 Then report summary: done / failed / skipped counts.
 
-**URL handling with Crawl4AI**: When a URL is provided (starts with `http://` or `https://`), invoke the `/crawl` workflow:
+**URL handling with yt-is → yt-dlp → Selenium → Gemini CLI**: When a URL matches
+`youtube.com/@`, `youtube.com/channel/`, `youtube.com/c/`, `youtu.be/`, or
+`youtube.com/watch`:
+
+1. **Channel already tracked** (`csf-source list` shows it):
+   - Run `python bin/csf-source fetch --source <url>` to trigger yt-dlp → Selenium escalation
+   - Check `transcripts.sqlite` for completion; on failure, invoke Gemini CLI as last resort:
+     `gemini -p "Summarize the content of this YouTube video. Return a detailed summary: <url>"`
+   - Write fetched transcripts to `P:/.data/yt-is/transcripts/` as individual `.txt` files
+   - These `.txt` files become the input for the pre-phase manifest script
+
+2. **Channel NOT tracked**:
+   - Run `python bin/csf-source add <url>` to import channel and enumerate all videos
+   - Then run `python bin/csf-source fetch --source <url>` (same as above)
+   - Note: channel sync is required to refresh the pending queue (queue may be stale)
+
+3. **Single video URL** (`/watch` or `youtu.be/`):
+   - Extract video ID; use `csf-transcripts <video_id> --transcript` to check cache
+   - If not cached: `csf-transcript-fetch --channel <video_url>` or prompt Gemini CLI directly
+   - The single `.txt` transcript file becomes the input for the pre-phase manifest script
+
+4. **After transcripts fetched**: run the manifest script targeting `P:/.data/yt-is/`:
+   ```powershell
+   "yt-is" | python skills/wiki/scripts/wiki_manifest.py --stdin-source --source yt-is
+   ```
+   Then proceed with standard pipeline (manifest → per-file subagents → QMD update).
+
+5. **Failover to Gemini CLI**: fires when `transcripts.sqlite` shows `failure_reason: no_transcript`
+   for all methods exhausted — invoke `gemini -p` with the video URL and parse the text response.
+
+**Web URL handling (non-YouTube)**: When a URL is provided (http/https that doesn't match YouTube patterns),
+invoke the `/crawl` workflow:
 ```bash
 /crawl <url> --max-pages 5 --collection wiki
 ```
@@ -220,3 +308,17 @@ Select items to refresh (e.g. "1,3,U" = update 1 & 3): _
 **Token cost**: No in-context tokens during auto-refresh. Each page refresh is an independent subagent call (out-of-context).
 
 Usage: `/wiki update [--auto] [--max-age <days>] [--limit <n>] [<topic>]
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
