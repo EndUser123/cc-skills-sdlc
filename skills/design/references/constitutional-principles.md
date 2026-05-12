@@ -155,6 +155,24 @@ Phrases like "detects patterns" or "routes to validators" are **not** sufficient
 
 ---
 
+## Enforcement Design Principles
+
+When designing gate or enforcement systems:
+
+1. **Evidence before conclusion** — Runtime/mechanism claims require inspected runtime artifacts. Plausible code paths are not evidence.
+
+2. **Routing before enforcement** — Gates should short-circuit on inapplicable turns rather than fire and suppress. Declared applicability (turn kind, claim kind) is the primary reliability control surface.
+
+3. **Progressive commitment** — Hard enforcement without observability is a false guarantee. Ship shadow → advisory → block with metric-gated promotion.
+
+4. **Single-owner visibility** — Multiple gates surfacing independent blocks per turn erodes trust even when each block is individually correct.
+
+5. **Schema-per-mode** — Different response modes (fast, deep, ADR) carry different contracts. Fast responses require minimal ceremony; deep responses demand [FACT]/[INFERENCE]/[RECOMMENDATION] structure; ADR responses require full decision-record schema. Apply mode-appropriate validation, not a single one-size-fits-all checklist.
+
+6. **Isolate scaffolding from payload** — Injected scaffolds (OWNERSHIP-COLOCATION CHECK, TEST STRATEGY CONTRACT, COGNITIVE GUARDRAILS ACTIVE, plan-mode headers) must be logically separated before claim verification. Validate only the assistant-authored analytical body against the chosen schema. Scaffolding presence is not a claim and should not be evidence for or against a finding.
+
+---
+
 ## Red Flags Summary
 
 | Red Flag | Severity | Action |

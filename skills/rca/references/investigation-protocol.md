@@ -256,6 +256,9 @@ See `references/search-templates.md` for the 5 symptom-type templates (PERFORMAN
 - Proposing timeout changes without identifying WHERE it blocks
 - Adding skip/wrapper logic without tracing execution path
 - Assuming subsystem X is slow without measuring
+- Explaining hook behavior, gate firing, or claim validation from plausible code paths rather than the actual artifact
+
+**Core epistemic discipline**: Inspect the artifact (telemetry, trace, log) before forming a conclusion about mechanism or enforcement behavior. Code-path plausibility is not evidence.
 
 ---
 

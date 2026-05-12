@@ -29,6 +29,8 @@ workflow_steps:
 
 Execute a sequential quality analysis pipeline against a target codebase.
 
+**Evidence-first rule:** Before claiming that code is absent, broken, or non-compliant — verify with tools. Claims of absence or non-existence are only valid after confirmed Read/Grep/git failures, not from assumption or not having looked.
+
 **Mandatory Protocol:** See `__lib/quality_layers.md` for the 11-layer model, health score formula, and two-sided enforcement principle.
 
 ## Usage

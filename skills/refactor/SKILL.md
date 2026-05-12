@@ -35,6 +35,8 @@ Orchestrate complex, multi-file refactoring while maintaining safety and TDD dis
 
 **Mandatory Standards:** See `__lib/refactoring_patterns.md` for the 16-step workflow, debt classification types, and the Solo-Dev constitutional filter.
 
+**Evidence-first rule:** Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures, not from assumption or not having looked.
+
 ## Workflow Summary
 
 1. **Preflight & Discovery**: Identify hotspots and parallel agent analysis.

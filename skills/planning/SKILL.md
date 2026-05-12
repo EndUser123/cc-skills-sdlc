@@ -521,6 +521,8 @@ After collecting findings, Claude must:
 6. Write findings to `*.review.findings.json`
 7. Write summary to `*.review.summary.md`
 
+**Scaffolding isolation:** Adversarial findings are evidence about the plan, not plan content. Never merge raw findings, reviewer scaffolding, or diagnostic output directly into the plan artifact. The plan body must contain only assistant-authored implementation content validated against the v2 plan schema. Scaffolding blocks (ownership checks, test strategy headers, cognitive guardrails) that appear in findings or reviewer output are not findings and must not appear in the plan.
+
 See `references/artifact-contract.md` for disposition table format required in `*.review.summary.md`.
 
 ## Step 5: Present Results

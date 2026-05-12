@@ -103,6 +103,8 @@ After completion, `/code` produces `task-result_{RUN_ID}.json`:
 
 1. **Read task** — load `--task-file` or argument, parse objective and scope
 2. **Pre-execution checklist** — verify intent clarity, context readiness
+
+**Evidence-first rule:** Before claiming that code does not exist, that a file is unchanged, that an implementation is missing, or that a behavior is absent — search the codebase and verify with tools first. Claims of absence or non-existence are only valid after confirmed Read/Grep/git failures, not from assumption or not having looked.
 3. **Explore** — understand codebase relevant to task
 4. **Design** — solution approach (minimal, no pre-mortem, no GoT)
 5. **TDD RED** — write failing test for acceptance criteria

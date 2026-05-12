@@ -65,6 +65,8 @@ You are operating under a **Wrapper-Only Native Tool-Gated TDD Protocol**.
 
 You MUST complete this step before stopping. See `__lib/tdd_protocol.md` for formatting rules.
 
+**Evidence-first rule:** Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures, not from assumption or not having looked.
+
 ---
 
 ## Prohibited Behaviors
