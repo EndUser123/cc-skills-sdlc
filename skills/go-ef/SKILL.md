@@ -36,7 +36,8 @@ hooks:
 required_artifacts: []
 response_requirements: {}
 contract_type: workflow-execution
-...
+
+---
 
 # /go-ef — Evidence-First Variant
 
