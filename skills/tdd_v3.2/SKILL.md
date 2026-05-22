@@ -1,43 +1,7 @@
 ---
-name: tdd
-description: >
-  Strict Test-Driven Development protocol. All test execution goes through
-  run_phase.py which produces HMAC-signed receipts. The validator checks
-  receipts, log integrity, temporal ordering, and output patterns. No
-  pasted logs. Windows 11 optimized with O(1) active session tracking.
-hooks:
-  pre_prompt:
-    - command: "python .claude/hooks/preflight_require_tdd.py"
-  pre_response:
-    - command: "python .claude/hooks/stop_if_tdd_unverified.py"
-
-# Evidence-bound verification (anti-confabulation)
-verification:
-  commands:
-    - description: "Confirm evidence.json exists for this run"
-      tool: "Bash"
-      args:
-        command: "ls -la .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/evidence.json 2>/dev/null || echo 'MISSING'"
-    - description: "Confirm validated.json exists (validation passed)"
-      tool: "Bash"
-      args:
-        command: "ls -la .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/validated.json 2>/dev/null || echo 'NOT VALIDATED'"
-    - description: "Show test files modified"
-      tool: "Bash"
-      args:
-        command: "python -c \"import json; e=json.load(open('.claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/evidence.json')); print('test_files:', e.get('test_files_modified',[])); print('impl_files:', e.get('impl_files_modified',[]))\" 2>/dev/null || echo 'CANNOT READ'"
-    - description: "Verify RED receipt exists and GREEN receipt exists"
-      tool: "Bash"
-      args:
-        command: "ls .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/red_receipt.json .claude/.artifacts/$CLAUDE_TERMINAL_ID/tdd/$RUN_ID/green_receipt.json 2>/dev/null || echo 'RECEIPTS MISSING'"
-  summary_mode: evidence_only
-  expected_artifacts:
-    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/evidence.json"
-    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/validated.json"
-    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/red_receipt.json"
-    - ".claude/.artifacts/{TERMINAL_ID}/tdd/{RUN_ID}/green_receipt.json"
+name: tdd_v3.2
+description: TDD skill with RED/GREEN cycle enforcement
 ---
-
 # /tdd Protocol (NTP v3.2)
 
 You are operating under a **Wrapper-Only Native Tool-Gated TDD Protocol**.

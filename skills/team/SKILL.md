@@ -1,18 +1,7 @@
 ---
 name: team
 description: Multi-agent task coordination for parallel Claude Code sessions.
-version: "1.0.0"
-status: stable
-category: orchestration
-triggers:
-  - "/team"
-  - "pull a task"
-  - "claim a task"
-  - "team coordination"
-aliases:
-  - /team
 ---
-
 # /team - Multi-Agent Task Coordination
 
 ## When to Use
@@ -181,6 +170,12 @@ See `references/claude-code-tasks.md` for:
 - No continuous monitoring or background daemons
 - Failed claims/tasks halt execution (requires manual intervention)
 - Clear stopping condition (all matching tasks processed)
+
+## Prohibited Behaviors
+
+- **E1**: Claim code absent without confirmed tool failure (Read/Grep/git)
+- **E4**: Answer without reading relevant source files first
+- **E5**: "I assume", "I think", "probably" without tool verification
 
 ## Constitution Compliance
 

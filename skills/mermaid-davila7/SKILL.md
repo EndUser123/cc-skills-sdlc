@@ -2,7 +2,6 @@
 name: mermaid-davila7
 description: Use when users need to create or visualize software through diagrams. This skill redirects to the modern mermaid-c4 protocol.
 ---
-
 # Mermaid Diagramming
 
 ## DEPRECATED

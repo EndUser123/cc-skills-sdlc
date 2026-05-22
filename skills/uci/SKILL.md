@@ -1,46 +1,7 @@
 ---
 name: uci
 description: "Unified Code Inspection with intelligent auto-detection. Override with --lite or --full flags."
-version: "1.0.0"
-status: stable
-enforcement: advisory
-category: quality
-triggers:
-  - "/uci"
-  - "/code-review"
-  - "/unified-code-inspection"
-parameters:
-  - name: lite
-    description: Fast review with 3 core agents (triage mode)
-    required: false
-    type: boolean
-  - name: full
-    description: Complete review with all agents (comprehensive mode)
-    required: false
-    type: boolean
-  - name: include
-    description: Comma-separated list of agents to include
-    required: false
-  - name: exclude
-    description: Comma-separated list of agents to exclude
-    required: false
-  - name: scope
-    description: Git scope (branch, commit, PR, files)
-    required: false
-  - name: format
-    description: "Output format: json, markdown, or summary"
-    required: false
-    default: "markdown"
-  - name: assessment
-    description: "Assessment mode: Analyze without making changes"
-    required: false
-    type: boolean
-  - name: dry-run
-    description: "Dry-run mode: Preview agents and scope without execution"
-    required: false
-    type: boolean
 ---
-
 # Unified Code Inspection (`/uci`)
 
 ## Purpose
@@ -181,9 +142,49 @@ See `references/workflow-details.md` for detailed steps:
 1. **Scope Detection** - Auto-detect: user scope > feature branch > staged > latest commit
 2. **Mode Detection** - Analyze signals, select triage/standard/deep/comprehensive
 3. **Agent Selection** - Mode determines agent set
-4. **Parallel Execution** - Agents run in parallel with circuit breaker
+
+---
+
+## PHASE GATE: Generation vs. Validation Separation
+
+**STOP — Before any findings are reported:**
+
+Steps 1-3 above are **generation** (discovery, selection, dispatch). Step 4 (agent execution) is also **generation**. Step 5 (finding aggregation) is **validation**.
+
+**Do NOT mix generation with validation:**
+- Agent execution outputs are evidence, not verdicts
+- Aggregated findings become verdicts only after cross-agent validation
+- Before aggregation: "Agent X found issue Y" (observation)
+- After aggregation: "Issue Y is confirmed by 2+ agents" (verdict)
+
+---
+
+4. **Agent Execution** - Agents run in parallel with circuit breaker
 5. **Finding Aggregation** - Cross-agent validation, impact/effort, pre-existing detection
+
+---
+
+**PHASE GATE: Stop before Output Generation**
+
+```
+STOP — Before any claims appear in output:
+
+Aggregated findings require a SEPARATE validation step:
+  1. Was the finding confirmed by multiple agents?
+  2. Is the confidence threshold met (>= 0.4 for MEDIUM, >= 0.7 for HIGH)?
+  3. Is this a pre-existing issue (existed before changes) or new issue?
+  4. Is this a MUST FIX or a NICE TO HAVE?
+
+Only after questions 1-4 are answered does the finding become a verdict.
+```
+
+---
+
 6. **Output Generation** - markdown/json/summary
+
+---
+
+## Evidence-First Principles
 
 Additional modes: `--assessment` (analyze only), `--dry-run` (preview agents/scope)
 
@@ -208,3 +209,17 @@ UCI integrates with CKS for cross-session learning: retrieve past findings befor
 | `references/workflow-details.md` | Step-by-step workflow, circuit breaker |
 | `references/memory-integration.md` | CKS metadata schema, learning loop |
 | `references/output-format-examples.md` | Markdown/JSON output examples |
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

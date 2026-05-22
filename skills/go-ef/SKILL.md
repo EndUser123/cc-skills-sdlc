@@ -11,6 +11,7 @@ workflow_steps:
   - verify_end_to_end
   - simplify_code
   - seven_pass_review
+  - qa_verification
   - merge_sync
   - local_pr_artifacts
   - post_clean
@@ -41,7 +42,7 @@ contract_type: workflow-execution
 
 # /go-ef — Evidence-First Variant
 
-## What changed from go2
+## What changed from go
 
 `-ef` is the canonical naming format for evidence-first enforced skills.
 Phase gates are managed by the shared enforce layer.
@@ -111,11 +112,12 @@ mkdir -p "$GO_STATE_DIR"
 | Source | Env Var | Description |
 |--------|---------|-------------|
 | Direct prompt | `GO_PROMPT` | User's task description at invocation |
+| Current session transcript | `identity.json` | Path to this session's transcript (read directly by the orchestrator) |
 | Handoff transcript | `HANDOFF_TRANSCRIPT` | Path to prior session transcript |
 | Plan file | `GO_PLAN_FILE` | Path to `.md` plan file |
 | Task queue | `GO_TASKS_FILE` | JSON file with queued tasks |
 
-Priority: `GO_PROMPT` > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
+Priority: `GO_PROMPT` > **current session transcript** > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
 
 When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, the first task with `status` in `{ready, queued, approved}` is selected.
 
@@ -190,6 +192,24 @@ Audits orphaned worktrees and stale state dirs. **Never destructive by default**
 An orphaned worktree is one with no corresponding state dir. A stale state dir is one with no corresponding worktree. Pre-clean catches interrupted sessions and accumulated debris.
 
 On every `/go` invocation, pre-clean runs in `audit` mode — reports what it finds, then proceeds. User can re-run with `force` to actually clean up.
+
+## STEP 0.5: Synthesize from Current Session Transcript
+
+When `GO_PROMPT` is empty, read the current session transcript directly and synthesize the task from the last substantive user directive. This uses the orchestrator's native context-reading ability — no hook injection required.
+
+**Transcript path:** `~/.claude/.artifacts/{TERMINAL_ID}/identity.json` → `session.transcript_path`
+
+**Synthesize from transcript:**
+1. Read the transcript JSONL file
+2. Scan backwards from the end
+3. Skip meta-instructions (`thanks`, `summarize`, `revert`, slash-command invocations) and correction messages (`No, the task is not about...`, `That's not what I asked`)
+4. Stop at session boundary (different `session_chain_id`) or topic shift
+5. Take the first substantive directive found — this is the task goal
+6. Synthesize into `active-task_{RUN_ID}.json` and proceed to STEP 1
+
+**Output:** `active-task_{RUN_ID}.json` with the same contract shape as a queued task, with `source: "transcript"` and `message_intent` observability fields.
+
+If no transcript path is found or the transcript cannot be read, fall back to `HANDOFF_TRANSCRIPT` → `GO_PLAN_FILE` → `GO_TASKS_FILE`.
 
 ## STEP 1: Worktree Provisioning
 
@@ -311,6 +331,39 @@ STATUS=$?
 [ "$STATUS" -ne 0 ] && exit 1
 touch "$GO_STATE_DIR/.reviews-passed_$RUN_ID"
 ```
+
+---
+
+## STEP 6.5: QA Verification (GTO)
+
+Run GTO quality verdict after 7-pass review, before merge. Routing-aware: design/planning tasks skip QA.
+
+```bash
+python ".claude/skills/go/scripts/run-qa-verification.py"
+STATUS=$?
+if [ "$STATUS" -ne 0 ]; then
+  QA_VERDICT="$GO_STATE_DIR/qa-verdict-${RUN_ID}.json"
+  if [ -f "$QA_VERDICT" ]; then
+    QA_STATUS=$(python -c "import json; print(json.load(open('$QA_VERDICT'))['qa_status'])")
+    echo "QA failed with status: $QA_STATUS"
+  fi
+  ATTEMPT_NEXT=$(find "$GO_STATE_DIR" -maxdepth 1 -type f -name ".attempt_*_$RUN_ID" | wc -l | tr -d ' ')
+  [ "$ATTEMPT_NEXT" -ge "$MAX_ATTEMPTS" ] && touch "$GO_STATE_DIR/.blocked_$RUN_ID" && echo "<promise>BLOCKED</promise>" && exit 1
+  exit 1
+fi
+touch "$GO_STATE_DIR/.qa-passed_$RUN_ID"
+```
+
+Output: `qa-verdict-{RUN_ID}.json` with `qa_status` in `{accept, accept-with-concerns, redo, error, skipped}`.
+
+**qa_status mapping:**
+- `accept` — all gates 0, GTO status accept
+- `accept-with-concerns` — escape_hatches > 0 OR mixed_substance > 0 OR unverified_impl_claims > 0
+- `redo` — GTO status revise/reject/blocked
+- `error` — runner crashed or produced unparseable output
+- `skipped` — task_type is design/planning
+
+**go-ef is NOT blocked globally.** QA's non-zero exit means redo or error — go-ef's local policy decides. `accept-with-concerns` exits 0 and continues.
 
 ---
 

@@ -2,7 +2,6 @@
 name: brainstorming
 description: Use when starting any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.
 ---
-
 # Brainstorming Ideas Into Designs
 
 Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
@@ -159,3 +158,17 @@ A browser-based companion for showing mockups, diagrams, and visual options duri
 - **Use the terminal** for content that is text — requirements questions, conceptual choices, tradeoff lists, A/B/C/D text options, scope decisions
 
 A question about a UI topic is not automatically a visual question. "What does personality mean in this context?" is a conceptual question — use the terminal. "Which wizard layout works better?" is a visual question — use the browser.
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

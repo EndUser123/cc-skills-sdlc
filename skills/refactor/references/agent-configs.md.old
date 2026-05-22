@@ -1,0 +1,44 @@
+# Agent Configuration Details - LEGACY (10 agents)
+
+## 10-Agent Discovery Configuration (Legacy)
+
+This is the original 10-agent configuration, preserved for rollback via `--legacy-agents` flag.
+
+### Agent Assignments
+
+| Agent | Type | Focus | Specialty Dimensions |
+|-------|------|-------|---------------------|
+| 1 | `adversarial-bugs` | Bugs/Logic | Immutability (race conditions, error handling, TOCTOU) |
+| 2 | `adversarial-performance` | DRY/Simplicity | Object Calisthenics (duplication, extraction, concurrency) |
+| 3 | `adversarial-performance` (tuned `--focus performance`) | Performance | Performance (leaks, bottlenecks, N+1, algorithmic) |
+| 4 | `adversarial-quality` | Conventions | Naming, Type System (type hints, patterns, maintainability) |
+| 5 | `python-simplifier` | Python 2025 | Simplicity (async patterns, modern standards) |
+| 6 | `/ai-pi-zai-glm51` | Architecture | Coupling/Cohesion, Domain Integrity |
+| 7 | `/ai-pi-mm-m27` | Testing | Coverage gaps, missing scenarios, brittle tests |
+| 8 | `/ai-gemini` | Deep insight | Semantic bugs, idiom violations |
+| 9 | `adversarial-security` | Security/Data Exposure | Auth flow, injection vectors, data access |
+| 10 | `adversarial-io-validation` | I/O Safety | Path traversal, file operations, external assumptions |
+
+### Agent Launch Protocol
+
+- **Stagger launches**: 30 seconds apart to avoid context flooding
+- **Total discovery time**: ~4.5 minutes (30s × 9 intervals)
+- **Output format**: Each agent writes findings via `Write` tool (not `Bash`) to avoid shell quoting issues
+- **Verification requirement**: Each agent MUST read the actual file at the reported line before including findings. Confirmed code = VERIFIED (confidence 95+); description-only inference = UNVERIFIED
+- **Minimum finding quality**: Every finding requires non-empty `description`, `file`, `line`, and `confidence`. Discard findings with empty descriptions or confidence below threshold
+- **Graceful degradation**: If any agent fails or times out, skip it and continue with remaining agents
+
+### Known Issues
+
+- Agent #10 (`adversarial-io-validation`) runs at ~4.5 minutes after start
+- High risk of timeout for agents 7-10
+- May miss CRITICAL I/O and TOCTOU issues due to skipped agents
+- No Health Score calculation
+- No synthesis phase
+
+### Migration
+
+Use `--legacy-agents` flag to revert to this configuration:
+```bash
+/refactor <path> --legacy-agents
+```

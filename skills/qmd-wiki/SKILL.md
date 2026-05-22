@@ -1,22 +1,35 @@
 ---
 name: qmd-wiki
-version: "1.0.0"
-status: "draft"
-category: knowledge
-enforcement: advisory
 description: Ingest, query, lint, and index QMD wiki pages from an Obsidian vault.
-workflow_steps:
-  - ingest
-  - query
-  - lint
-  - index
 ---
-
 # qmd-wiki
 
 **Goal:** Manage a QMD wiki — ingest sources, query pages, lint frontmatter, and build an index.
 
 **Graceful degradation:** When `qmd` is unavailable, operations fall back to glob+grep over the vault path.
+
+---
+
+## Phase Structure
+
+### PHASE 1: Discovery / Planning
+Determine operation type (ingest/query/lint/index), identify targets, plan approach.
+
+### PHASE 2: Execution
+Perform the actual operation (fetch, search, validate, build index).
+
+### PHASE 3: Presentation
+Present results to user with summary and any follow-up recommendations.
+
+---
+### STOP GATE
+
+**Between PHASE 2 and PHASE 3**: You MUST present the results to the user before declaring completion.
+
+**Do NOT:**
+- Skip presenting results after operations
+- Mix execution and presentation in the same block
+- Declare success without showing evidence
 
 ---
 

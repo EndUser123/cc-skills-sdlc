@@ -43,6 +43,7 @@ GoT enhancement is **enabled by default** for `/arch` execution. It extracts arc
 | `PRUNE` | Remove nodes that are dominated by alternatives |
 | `EXPLORE` | Generate new candidate nodes to fill gaps in the graph |
 | `COMPARE` | Produce a multi-alternative comparison from the graph |
+| `TAG_LENS` | Assign architectural lens to each option (Value, Consolidation, Dependency, Contract) |
 
 ---
 

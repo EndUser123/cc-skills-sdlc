@@ -1,38 +1,14 @@
 ---
 name: go
-version: 2.0.0
 description: Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Handles intent parsing, task selection, worktree enforcement, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
-category: execution
-enforcement: strict
-workflow_steps:
-  - worktree_enforcement
-  - task_selection
-  - verify_end_to_end
-  - simplify_code
-  - seven_pass_review
-  - local_pr_artifacts
-  - loop_check
-suggest:
-  - /planning
-  - design
-  - /code
-  - refactor
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: |
-            python -c "import os,sys,glob; tid=os.environ.get('CLAUDE_TERMINAL_ID','unknown'); sd=f'.claude/.artifacts/{tid}/go'; sys.exit(0) if not glob.glob(f'{sd}/active-task_*.json') else None; rid=os.environ.get('GO_RUN_ID','unknown'); sys.exit(0) if os.path.isfile(f'{sd}/.verified_{rid}') and os.path.isfile(f'{sd}/.reviews-passed_{rid}') else (print('WARNING: /go completed without all gates passed',file=sys.stderr), sys.exit(1))"
-          description: "Self-verify all gates passed on Stop"
 ---
-
 # /go — Thin Orchestrator
 
 **Role:** `/go` is a **thin orchestrator** that stay on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome.
 
 **Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `__lib/sdlc_schemas.py`.
 
-**MANDATORY SEQUENCE:** Worktree Check → Task Selection → Classify → Verify → Simplify → 7-Pass Review → PR Artifacts → Loop Check
+**MANDATORY SEQUENCE:** Worktree Check → Task Selection → Classify → Verify → Simplify → 7-Pass Review → QA Verification → PR Artifacts → Loop Check
 
 **State root:** `.claude/.artifacts/{TERMINAL_ID}/go/`
 
@@ -90,11 +66,12 @@ mkdir -p "$GO_STATE_DIR"
 | Source | Env Var | Description |
 |--------|---------|-------------|
 | Direct prompt | `GO_PROMPT` | User's task description at invocation |
+| Current session transcript | `identity.json` | Path to this session's transcript (read directly by the orchestrator) |
 | Handoff transcript | `HANDOFF_TRANSCRIPT` | Path to prior session transcript |
 | Plan file | `GO_PLAN_FILE` | Path to `.md` plan file |
 | Task queue | `GO_TASKS_FILE` | JSON file with queued tasks |
 
-Priority: `GO_PROMPT` > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
+Priority: `GO_PROMPT` > **current session transcript** > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
 
 When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, the first task with `status` in `{ready, queued, approved}` is selected.
 
@@ -177,6 +154,26 @@ git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 | `claude -p` with `--cd "$WORKTREE"` | External CLI-based LLM |
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
+
+---
+
+## STEP 0.5: Synthesize from Current Session Transcript
+
+When `GO_PROMPT` is empty, read the current session transcript directly and synthesize the task from the last substantive user directive. This uses the orchestrator's native context-reading ability — no hook injection required.
+
+**Transcript path:** `~/.claude/.artifacts/{TERMINAL_ID}/identity.json` → `session.transcript_path`
+
+**Synthesize from transcript:**
+1. Read the transcript JSONL file
+2. Scan backwards from the end
+3. Skip meta-instructions (`thanks`, `summarize`, `revert`, slash-command invocations) and correction messages (`No, the task is not about...`, `That's not what I asked`)
+4. Stop at session boundary (different `session_chain_id`) or topic shift
+5. Take the first substantive directive found — this is the task goal
+6. Synthesize into `active-task_{RUN_ID}.json` and proceed to STEP 1
+
+**Output:** `active-task_{RUN_ID}.json` with the same contract shape as a queued task, with `source: "transcript"` and `message_intent` observability fields.
+
+If no transcript path is found or the transcript cannot be read, fall back to `HANDOFF_TRANSCRIPT` → `GO_PLAN_FILE` → `GO_TASKS_FILE`.
 
 ---
 
@@ -283,7 +280,40 @@ touch "$GO_STATE_DIR/.reviews-passed_$RUN_ID"
 
 ---
 
-## STEP 6: Local PR Artifacts
+## STEP 6: QA Verification (GTO)
+
+Run GTO quality verdict after 7-pass review, before PR artifacts. Routing-aware: design/planning tasks skip QA.
+
+```bash
+python ".claude/skills/go/scripts/run-qa-verification.py"
+STATUS=$?
+if [ "$STATUS" -ne 0 ]; then
+  QA_VERDICT="$GO_STATE_DIR/qa-verdict-${RUN_ID}.json"
+  if [ -f "$QA_VERDICT" ]; then
+    QA_STATUS=$(python -c "import json; print(json.load(open('$QA_VERDICT'))['qa_status'])")
+    echo "QA failed with status: $QA_STATUS"
+  fi
+  ATTEMPT_NEXT=$(find "$GO_STATE_DIR" -maxdepth 1 -type f -name ".attempt_*_$RUN_ID" | wc -l | tr -d ' ')
+  [ "$ATTEMPT_NEXT" -ge "$MAX_ATTEMPTS" ] && touch "$GO_STATE_DIR/.blocked_$RUN_ID" && echo "<promise>BLOCKED</promise>" && exit 1
+  exit 1
+fi
+touch "$GO_STATE_DIR/.qa-passed_$RUN_ID"
+```
+
+Output: `qa-verdict-{RUN_ID}.json` with `qa_status` in `{accept, accept-with-concerns, redo, error, skipped}`.
+
+**qa_status mapping:**
+- `accept` — all gates 0, GTO status accept
+- `accept-with-concerns` — escape_hatches > 0 OR mixed_substance > 0 OR unverified_impl_claims > 0
+- `redo` — GTO status revise/reject/blocked
+- `error` — runner crashed or produced unparseable output
+- `skipped` — task_type is design/planning (QA not applicable)
+
+**go is NOT blocked globally.** This step's non-zero exit means QA found concerns — go's local policy decides whether to proceed. `accept-with-concerns` exits 0 and continues.
+
+---
+
+## STEP 7: Local PR Artifacts
 
 Generate commit message, PR title, PR body, PR-ready report.
 
@@ -314,3 +344,17 @@ python ".claude/skills/go/scripts/loop-check.py"
 - Ignoring HIGH/CRITICAL simplify findings
 - Auto-pushing or creating remote PRs
 - Modifying `forbidden_files` listed in task contract
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

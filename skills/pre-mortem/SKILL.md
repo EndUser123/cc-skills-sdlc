@@ -44,12 +44,40 @@ verification:
     - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p1_findings.md"
     - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p2.md"
     - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p3.md"
-
 ---
-
 # Critique — Adaptive Adversarial Review
 
 Dynamically dispatch specialist subagents based on what you're reviewing. Absorbs `/adversarial-review` — one adaptive skill instead of two overlapping pipelines.
+
+## Package-Owned Layout
+
+This skill folder is the source of truth for the pre-mortem capability across agent environments.
+
+- Claude Code primary workflow: `SKILL.md`
+- Shared method and contracts: `references/`
+- Phase prompts: `references/phases/`
+- Codex adapter: `.codex/SKILL.md`
+- PI harness contract: `.pi/pre-mortem-contract.md`
+
+Before changing the review contract, check the relevant shared reference files:
+
+- `references/method.md` — common pre-mortem method and quality bar
+- `references/failure-mode-checklist.md` — internal predictable-issue prompts
+- `references/output-contract.md` — final critique and RNS requirements
+- `references/evidence-contract.md` — evidence and verification requirements
+- `references/modes.md` — quick, standard, and deep modes
+- `references/investigation-types.md` — static vs non-static investigation boundaries
+- `references/static-test-contract.md` — static checks that must cover package and prompt wiring
+- `references/non-static-validation.md` — safe live/plugin validation and permission boundaries
+- `references/review-lenses.md` — logic, state, safety, performance, testing, and observability lenses
+- `references/project-profiles.md` — repo-local domain profile discovery and application
+- `references/decision-model.md` — GO / watchpoint / no-go decisions
+- `references/live-probe-planner.md` — exact runtime probe planning when static evidence is insufficient
+- `references/finding-synthesis.md` — deduplication, evidence strength, falsifiers, and wrong-order risk
+- `references/destructive-live-preflight.md` — hard gate for destructive or live operations
+- `references/historical-regression-awareness.md` — prior-failure checks before readiness claims
+
+The shared references are additive to the Claude workflow below. If a reference and this file conflict, preserve the stricter requirement until the conflict is resolved explicitly.
 
 ## Subagent Architecture
 
@@ -145,9 +173,16 @@ Create a pre-mortem session for token-efficient file passing:
 python -c "
 from pathlib import Path
 import sys
-sys.path.insert(0, 'P:\\\\\\.claude/skills/pre-mortem/__lib')
+candidate_lib_dirs = [
+    Path('P:/packages/cc-skills-sdlc/skills/pre-mortem/__lib'),
+    Path('P:/.claude/skills/pre-mortem/__lib'),
+]
+for lib_dir in candidate_lib_dirs:
+    if lib_dir.exists():
+        sys.path.insert(0, str(lib_dir))
+        break
 from premortem_io import PreMortemSession
-session = PreMortemSession()
+session = PreMortemSession.find_or_create_session()
 session.setup()
 session.write_work(sys.argv[1] if len(sys.argv) > 1 else '')
 print(session.get_session_dir())
@@ -163,31 +198,22 @@ This creates: `{session_dir}/work.md`
 Before dispatching, check if this session already has completed work:
 
 ```python
-import json
-from pathlib import Path
+from premortem_io import PreMortemSession
 
-session_dir = Path("P:\\\\\\.claude/.evidence/pre-mortem/")
-# Find most recent session for this work
-work_marker = "{WORK_INPUT}"[:50]  # match on first 50 chars
+session = PreMortemSession.find_or_create_session()
+session_dir = session.get_session_dir()
+p1_findings = session_dir / "p1_findings.md"
+p2_meta = session_dir / "p2.md"
+p3_final = session_dir / "p3.md"
 
-existing = sorted(session_dir.glob("*/work.md"), key=lambda p: p.stat().st_mtime, reverse=True)
-for work_file in existing:
-    session = work_file.parent
-    if work_file.read_text().startswith(work_marker):
-        p1_findings = session / "p1_findings.md"
-        p2_meta = session / "p2.md"
-        p3_final = session / "p3.md"
-        if p3_final.exists():
-            print(f"Session {session.name} already complete — reading from: {p3_final}")
-            # Read and deliver existing output
-            sys.exit(0)
-        elif p1_findings.exists():
-            print(f"Session {session.name} has partial work — resuming from Step 4")
-            # Proceed to Step 4 with existing session_dir
-            break
-        else:
-            print(f"Session {session.name} exists but incomplete — re-running Phase 1")
-            break
+if p3_final.exists():
+    print(f"Session {session_dir.name} already complete — reading from: {p3_final}")
+elif p1_findings.exists() and not p2_meta.exists():
+    print(f"Session {session_dir.name} has Phase 1 output — resume from Step 4")
+elif p2_meta.exists() and not p3_final.exists():
+    print(f"Session {session_dir.name} has Phase 2 output — resume from Step 5")
+else:
+    print(f"Session {session_dir.name} is new or incomplete — run Phase 1")
 ```
 
 **Manifest-based resume:** The dispatch manifest at `{session_dir}/specialists/dispatch_manifest.json` tracks which specialists were already dispatched. Re-running `/pre-mortem` skips already-dispatched specialists.
@@ -197,7 +223,7 @@ for work_file in existing:
 Read the triage prompt, classify the work, select specialists, dispatch in parallel, consolidate findings.
 
 ```
-Read P:\\\\\\.claude/skills/pre-mortem/phases/p1_initial_review.md
+Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p1_initial_review.md`
 Read the work: cat "P:\\\\\\{session_dir}/work.md"
 Follow the triage and dispatch instructions in p1_initial_review.md
 Write consolidated findings to: P:\\\\\\{session_dir}/p1_findings.md
@@ -215,7 +241,7 @@ Phase 1 agents dispatch specialists in parallel via Task tool. Each specialist w
 After Phase 1 specialists complete:
 
 ```
-Read P:\\\\\\.claude/skills/pre-mortem/phases/p2_meta_critique.md
+Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p2_meta_critique.md`
 Read: cat "P:\\\\\\{session_dir}/work.md"
 Read: cat "P:\\\\\\{session_dir}/p1_findings.md"
 Follow the meta-critique instructions
@@ -228,7 +254,7 @@ Output ONLY the path P:\\\\\\{session_dir}/p2.md
 After Phase 2 complete:
 
 ```
-Read P:\\\\\\.claude/skills/pre-mortem/phases/p3_synthesis.md
+Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p3_synthesis.md`
 Read: cat "P:\\\\\\{session_dir}/work.md"
 Read: cat "P:\\\\\\{session_dir}/p1_findings.md"
 Read: cat "P:\\\\\\{session_dir}/p2.md"
@@ -247,7 +273,14 @@ After presenting, log the skill coverage:
 python -c "
 import sys
 from pathlib import Path
-sys.path.insert(0, 'P:\\\\\\.claude/skills/pre-mortem/__lib')
+candidate_lib_dirs = [
+    Path('P:/packages/cc-skills-sdlc/skills/pre-mortem/__lib'),
+    Path('P:/.claude/skills/pre-mortem/__lib'),
+]
+for lib_dir in candidate_lib_dirs:
+    if lib_dir.exists():
+        sys.path.insert(0, str(lib_dir))
+        break
 sys.path.insert(0, 'P:\\\\\\.claude/skills/gto/lib')
 from premortem_io import PreMortemSession, _get_terminal_id
 from skill_coverage_detector import _append_skill_coverage
@@ -278,7 +311,7 @@ Before cleanup, you MUST complete verification. Do NOT write a freeform summary.
 
 ### Step 7: Cleanup
 
-Session directories persist at `P:\\\\\\.claude/.evidence/pre-mortem/` until manually removed.
+Session directories persist under `P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/` until manually removed.
 
 ## Output Structure
 

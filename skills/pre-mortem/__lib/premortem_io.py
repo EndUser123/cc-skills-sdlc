@@ -12,7 +12,7 @@ File layout per pre-mortem session:
         p3.md      - Phase 3 output (final)
 
 Session registry (compact resilience):
-    P:\\\\\\.claude/.evidence/pre-mortem/sessions.json
+    P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/sessions.json
     Maps terminal_id -> session_dir for recovery after compaction.
 
 Usage:
@@ -111,7 +111,7 @@ class PreMortemSession:
 
         Args:
             staging_root: Override staging root directory.
-                         Defaults to P:\\\\\\.claude/.evidence/pre-mortem/
+                         Defaults to P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/
         """
         self.staging_root = staging_root or STAGING_ROOT
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -1,11 +1,7 @@
 ---
 name: diagnose
 description: Structured diagnostic protocol enforcing systematic hypothesis testing when investigating issues.
-version: "1.0.0"
-status: "stable"
-category: analysis
 ---
-
 # Structured Diagnostic Protocol
 
 ## Overview

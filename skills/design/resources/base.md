@@ -773,21 +773,41 @@ Rollback: how to undo.
 - Edge cases? (mention if subtle)
 - Constraints? (quota, perf, UX?)
 
-#### 6. Confidence
+#### 6. API Surface Consistency Check
+
+Before the ADR is finalized, verify every concrete claim about the target system's API against the confirmed API surface. Flag contradictions before the document leaves drafting.
+
+**What to check:**
+- Any claim about what a hook CAN or CANNOT do (append-only, transform, block, etc.)
+- Version-gated capabilities (`AskUserQuestion` requires 2.0.22+)
+- Field names or return shapes (`additionalContext`, `EnhancementResult`, etc.)
+- Latency or sync/async guarantees
+
+**Format:**
+```
+| Claim | Evidence | Status |
+|-------|-----------|--------|
+| Hooks can append `additionalContext` | code.claude.com/docs/en/hooks | VERIFIED |
+| Hooks can strip/mutate prompt text | code.claude.com/docs/en/hooks | CONTRADICTS-API |
+```
+
+**If CONTRADICTS-API entries exist:** fix the claim before the ADR proceeds. Do not publish with contradictions.
+
+#### 7. Confidence
 
 One-line confidence with evidence basis:
 ```
 Confidence: [X]% — [evidence summary]
 ```
 
-#### 7. Adversarial Self-Review (Recommended)
+#### 8. Adversarial Self-Review (Recommended)
 
 One-line weakest assumption check:
 ```
 Weakest assumption: [assumption]. If wrong: [consequence]. Mitigation: [action].
 ```
 
-#### 8. Persist Output
+#### 9. Persist Output
 
 Auto-save to `P:\\\\\\.claude/arch_decisions/` unless output is under 2KB or user requests ephemeral.
 

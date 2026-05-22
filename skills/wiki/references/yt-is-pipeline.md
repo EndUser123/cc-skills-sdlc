@@ -31,11 +31,36 @@ failure_reason values:
   'dead_notebook_recreate_failed' — NLM notebook recreation failed
 ```
 
-## Fetch Methods (in order)
+## Fetch Methods (in priority order)
 
-1. **yt-dlp** — primary; fetches subtitles via `--write-subs --write-auto-subs`
-2. **Selenium** — fallback when yt-dlp returns no subs; uses browser automation to scrape YouTube transcript panel
-3. **Gemini CLI** — last resort; `gemini -p "Summarize the content of this YouTube video. Return a detailed summary: <url>"`
+### 1. yt-dlp (primary)
+Fetches subtitles via `--write-subs --write-auto-subs`. Deterministic — no hallucination risk.
+
+### 2. Selenium (fallback)
+Browser automation to scrape YouTube transcript panel. Used when yt-dlp returns no subs. Bypasses TLS bot detection.
+
+### 3. Gemini CLI (last resort)
+`gemini -m gemini-2.5-flash -p "Summarize the content of this YouTube video. Return a detailed summary: <url>"`
+
+**Model: always specify `-m gemini-2.5-flash`** — the default model may be slower or more expensive. The `gemini-2.5-flash` model is optimized for this use case.
+
+**Known failure modes and mitigations** (Google issue tracker #1359, #1898):
+
+| Failure | Cause | Mitigation |
+|---------|-------|-------------|
+| Timestamp drift (5-10min off on 30min video) | Gemini fetches YouTube URL differently than uploaded video | Prefer yt-dlp extraction first; Gemini is fallback only |
+| Random truncation on first (uncached) request | Sampling rate issue | Set `fps=1.0` in video metadata when using SDK directly |
+| Speaker hallucination / misattribution | Model fills gaps with plausible content | Pass title + description as context; verify against extracted captions |
+| Text hallucination at scale | LLM trained on internet text | Chunk at ~512 words; use structured output schema for reliable format |
+
+**Hybrid pipeline (preferred architecture)**:
+```
+yt-dlp extract (bit-perfect, no hallucination) → Gemini summarize (hallucination risk only in transform)
+```
+This limits hallucination to the transformation step, not the extraction step.
+
+**Structured output for reliable timestamps** (when timestamps are needed):
+Use `fps=1.0` in video metadata and format timestamps as `0m0s0ms` via structured output schema.
 
 ## Wiki Ingest Flow
 

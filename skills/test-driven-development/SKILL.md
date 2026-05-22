@@ -2,7 +2,6 @@
 name: test-driven-development
 description: Use when implementing any feature or bugfix. This skill redirects to the modern /tdd protocol.
 ---
-
 # Test-Driven Development (TDD)
 
 ## DEPRECATED

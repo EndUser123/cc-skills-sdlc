@@ -1,0 +1,17 @@
+{
+  "skill": "pre-mortem",
+  "source_of_truth": "P:/packages/cc-skills-sdlc/skills/pre-mortem",
+  "mode": "standard",
+  "target": "",
+  "repo_root": "",
+  "profile": "",
+  "evidence_dir": ".logs/pre-mortem",
+  "output": "markdown",
+  "allow_non_static_probes": false,
+  "require_static_test_coverage": true,
+  "require_review_lens_coverage": true,
+  "require_stop_go_decision": true,
+  "require_live_probe_plan": true,
+  "require_historical_regression_check": true,
+  "blocking": false
+}

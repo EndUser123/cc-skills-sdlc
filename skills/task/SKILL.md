@@ -1,52 +1,7 @@
 ---
 name: task
 description: Task orchestration - manage Claude Code task list
-version: "1.0.0"
-status: stable
-category: workflow
-enforcement: advisory
-triggers:
-  - /task
-aliases:
-  - /task
-  - /tasks
-  - /todo
-
-suggest:
-  - /nse
-  - /breakdown
-  - /session
-
-hooks:
-  PostToolUse:
-    - matcher: "TaskList"
-      hooks:
-        - type: prompt
-          prompt: |
-            Verify /task list workflow was executed completely.
-
-            ENFORCEMENT LEVEL: advisory (warn, don't block)
-
-            Required workflow steps:
-            1. TaskList() was called (built-in tool)
-            2. Results were filtered by terminal_id (unless --all flag)
-            3. /search was called for terminal context (unless --no-suggest flag)
-            4. CHS search for unresolved items (unless --no-suggest flag)
-            5. Output includes "Suggested" or "Unresolved" sections (unless --no-suggest)
-
-            This validation applies only to /task list flows.
-            Do not enforce these requirements for TaskCreate/TaskUpdate/TaskGet operations.
-            If this is not a list-style flow, return {"ok": true}.
-
-            Check the user's message and tool usage.
-            - If all steps complete: return {"ok": true}
-            - If steps missing BUT enforcement is advisory: return {"ok": true, "warning": "ADVISORY: [which step missing] - use /task list for enhanced output"}
-            - Do NOT return {"ok": false} - this skill is advisory enforcement
-          model: haiku
-          timeout: 30
-user-invocable: true
 ---
-
 # /task - Task Orchestration
 
 ## Purpose
@@ -62,32 +17,57 @@ Orchestrator for Claude Code task list operations. Routes sub-commands to built-
 - **Multi-terminal safe**: Tasks persist across compaction and sessions
 - **No Python handler**: This SKILL.md IS the implementation
 
-## Workflow
+## Phase 1: Workflow (Generation Only)
 
 1. **Parse sub-command** - Extract first argument as operation
 2. **Route to handler** - Delegate to appropriate implementation
 3. **Execute tool** - Call built-in tool (TaskCreate/TaskUpdate/etc)
 4. **Return result** - Display formatted output
 
-## Sub-Commands
+## Phase Gate 1 → 2
 
-| Command | Purpose | Tool |
-|---------|---------|------|
-| `list` | Show tasks (filtered by terminal) | TaskList |
-| `add <subject>` | Create new task | TaskCreate |
-| `done <id>` | Mark task complete | TaskUpdate |
-| `start <id>` | Start working on task | TaskUpdate |
-| `search <query>` | Find tasks by keyword | TaskList |
-| `clean` | Remove completed tasks | TaskUpdate |
-| `help` | Show usage | None |
+**STOP condition before validation:**
 
-## Validation Rules
+```json
+{"ok": false, "reason": "STOP: Generation phase incomplete", "missing": "<step>"}
+```
+
+Validation phase MUST NOT execute unless ALL of the following are true:
+- Parse step completed (valid sub-command extracted)
+- Route step completed (handler identified)
+- Execute step completed (tool called successfully)
+
+---
+
+## Phase 2: Validation (Validation Only)
+
+### Pre-Route Validation
 
 - **Before routing**: Validate sub-command exists
-- **Before task creation**: Check subject is not empty, no duplicates
+- **STOP**: Unknown sub-command → halt, show usage
+
+### Pre-Create Validation
+
+- **Before task creation**: Check subject is not empty
+- **STOP**: Empty subject → halt, return error
+
+### Pre-Update Validation
+
 - **Before task update**: Verify task ID exists
+- **STOP**: Non-existent task ID → halt, return error
+
+### Post-Operation Validation
+
 - **After operations**: Show confirmation with task details
-- **Prohibited**: Marking non-existent tasks, bulk ops without confirmation, creating separate task system
+- **E1**: Claim code absent only after confirmed Read/Grep/git failure
+- **E4**: Do NOT answer without reading relevant source files first
+- **E5**: No "I assume", "I think", "probably" without tool verification
+
+### Prohibited Actions
+
+- Marking non-existent tasks
+- Bulk ops without confirmation
+- Creating separate task system
 
 ## Usage
 

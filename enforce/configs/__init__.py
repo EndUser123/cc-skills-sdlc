@@ -152,6 +152,23 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "qa_passed",
+        "gate_type": "hard",
+        "evidence": [
+            {
+                "type": "file_flag",
+                "files": [".claude/.artifacts/{terminal_id}/go/.qa-passed_{run_id}"],
+                "all": True,
+            },
+            {
+                "type": "json_file",
+                "path": ".claude/.artifacts/{terminal_id}/go/qa-verdict-{run_id}.json",
+                "key": "qa_status",
+                "expected": "skipped",
+            },
+        ],
+    },
+    {
         "name": "pr_ready",
         "gate_type": "hard",
         "evidence": [

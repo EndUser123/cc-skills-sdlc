@@ -2,7 +2,6 @@
 name: executing-plans
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
 ---
-
 # Executing Plans
 
 ## Overview
@@ -23,11 +22,20 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ### Step 2: Execute Tasks
 
+**Phase 1 — Execute (Generation)**
 For each task:
 1. Mark as in_progress
 2. Follow each step exactly (plan has bite-sized steps)
-3. Run verifications as specified
+3. Do NOT run verifications yet — complete all steps first
 4. Mark as completed
+
+**Phase Gate — STOP before validation begins**
+All Phase 1 steps must be marked completed before proceeding.
+
+**Phase 2 — Validate (Verification)**
+After all Phase 1 tasks complete:
+1. Run verifications as specified in the plan
+2. Mark verification as completed
 
 ### Step 3: Complete Development
 
@@ -68,3 +76,17 @@ After all tasks complete and verified:
 - **using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
 - **writing-plans** - Creates the plan this skill executes
 - **finishing-a-development-branch** - Complete development after all tasks
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

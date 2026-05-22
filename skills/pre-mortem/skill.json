@@ -1,0 +1,29 @@
+{
+  "name": "pre-mortem",
+  "primary_environment": "claude-code",
+  "source_of_truth": "P:/packages/cc-skills-sdlc/skills/pre-mortem",
+  "adapters": {
+    "claude": "SKILL.md",
+    "codex": ".codex/SKILL.md",
+    "pi": ".pi/pre-mortem-contract.md"
+  },
+  "references": {
+    "method": "references/method.md",
+    "failure_mode_checklist": "references/failure-mode-checklist.md",
+    "output_contract": "references/output-contract.md",
+    "evidence_contract": "references/evidence-contract.md",
+    "modes": "references/modes.md",
+    "investigation_types": "references/investigation-types.md",
+    "static_test_contract": "references/static-test-contract.md",
+    "non_static_validation": "references/non-static-validation.md",
+    "review_lenses": "references/review-lenses.md",
+    "project_profiles": "references/project-profiles.md",
+    "decision_model": "references/decision-model.md",
+    "live_probe_planner": "references/live-probe-planner.md",
+    "finding_synthesis": "references/finding-synthesis.md",
+    "destructive_live_preflight": "references/destructive-live-preflight.md",
+    "historical_regression_awareness": "references/historical-regression-awareness.md",
+    "predictable_issues": "references/predictable-issues.md",
+    "phases": "references/phases"
+  }
+}

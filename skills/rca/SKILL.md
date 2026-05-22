@@ -1,85 +1,7 @@
 ---
 name: rca
 description: AI-assisted root cause analysis engine combining Python RCA library and Claude Code skill for systematic debugging.
-category: analysis
-domain: debugging
-version: 2.12.0
-triggers:
-  - /rca
-aliases: []
-suggest:
-  - /r
-  - /verify
-
-governance:
-  layer1_enforcement: true
-  usage_markers:
-    - "Phase -1:"
-    - "Phase 0:"
-    - "Phase 1:"
-    - "Phase 2:"
-    - "Phase 7:"
-    - "Hypothesis"
-    - "ROOT CAUSE"
-    - "5 Whys"
-    - "Data Flow Trace"
-    - "INVESTIGATION"
-    - "EVIDENCE"
-    - "RETROSPECTIVE"
-    - "CONVERGE"
-    - "HYPOTHESIS_RANKING"
-    - "COGNITIVE_STACK"
-    - "ACTION_GRAPH"
-    - "ARCHITECTURE_REVIEW"
-    - "FIX_OPTIMALITY"
-    - "SIDE_EFFECTS"
-
-workflow_steps:
-  - diagnose_with_evidence
-  - recommend_fix_with_verification
-  - complete_root_cause_analysis
-  - tier_evidence_tagging
-  - documentation_completion
-
-enforcement: strict
-
-depends_on_skills: []
-
-hooks:
-  PostToolUse:
-    - matcher: "Skill"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_init.py"
-          timeout: 10
-    - matcher: "Bash|Task|TaskCreate|TaskUpdate|Read|Write|Edit|Grep|Skill|WebSearch|WebFetch|mcp__plugin_serena|mcp__plugin_context7|mcp__plugin_claude-mem"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_phase_tracker.py"
-          timeout: 10
-    - matcher: "Bash|Task|TaskCreate|TaskUpdate|Read|Write|Edit|Grep|Skill|WebSearch|WebFetch|mcp__plugin_serena|mcp__plugin_context7|mcp__plugin_claude-mem"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_action_tracker.py"
-          timeout: 10
-    - matcher: "Grep"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_search_validator.py"
-          timeout: 10
-    - matcher: "WebSearch|WebFetch|mcp__web-reader__webReader"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/PostToolUse_rca_research_storage.py"
-          timeout: 10
-  SessionEnd:
-    - matcher: ".*"
-      hooks:
-        - type: command
-          command: python "$CLAUDE_PLUGIN_ROOT/skills/rca/hooks/SessionEnd_rca_cleanup.py"
-          timeout: 10
 ---
-
 # Debug RCA Skill v2.12.0
 
 ## Identity: Root Cause Analysis Specialist
@@ -92,6 +14,24 @@ You are a **Root Cause Analysis specialist**. Your purpose: thorough investigati
 - **Scoring**: See `__lib/hypothesis_scoring.md` for ranking hypotheses.
 - **Output**: See `__lib/rca_output_format.md` for the RCA Structure template.
 - **Internal Modes**: See `__lib/sdlc_internal_modes.md` for `trace` and `challenge`.
+
+## Phase Structure
+
+### PHASE 1: Investigation
+Diagnose -- Identify root cause with evidence using steps -1 through 9 from `__lib/rca_investigation_protocol.md`.
+
+### PHASE 2: Recommendation
+Recommend fix with verification steps -- but do NOT implement.
+
+---
+### STOP GATE
+
+**Between PHASE 2 and any action**: You MUST present the RCA findings and wait for user approval before proceeding to implementation or further action.
+
+**Do NOT:**
+- Implement fixes before user approval
+- Mix investigation with recommendation in the same prose block without explicit separation
+- Proceed past recommendation to implementation
 
 ## CRITICAL CONSTRAINT
 

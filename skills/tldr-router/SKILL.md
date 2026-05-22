@@ -1,11 +1,7 @@
 ---
 name: tldr-router
 description: Maps questions to the optimal tldr command. Use this to pick the right layer
-version: "1.0.0"
-status: stable
-category: tools
 ---
-
 # TLDR Smart Router
 
 Maps questions to the optimal tldr command. Use this to pick the right layer.
@@ -55,18 +51,30 @@ tldr search "pattern" src/
 ```
 START
   │
-  ├─► "What exists?" ──► tree / structure
+  ├─► "What exists?" ──► tree / structure  [GENERATION — discovery only]
   │
-  ├─► "How does X connect?" ──► context / calls
+  ├─► "How does X connect?" ──► context / calls  [GENERATION — mapping only]
   │
-  ├─► "Why is X complex?" ──► cfg
+  ├─► "Why is X complex?" ──► cfg  [GENERATION — measurement only]
   │
-  ├─► "Where does Y flow?" ──► dfg
+  ├─► "Where does Y flow?" ──► dfg  [GENERATION — tracing only]
   │
-  ├─► "What depends on Z?" ──► slice
+  ├─► "What depends on Z?" ──► slice  [GENERATION — dependency analysis]
   │
-  └─► "Find something" ──► search
+  └─► "Find something" ──► search  [GENERATION — search only]
+
+--- SEPARATION ---
+
+DO NOT intermix generation outputs with validation conclusions.
+
+After each generation command:
+  1. Read the output
+  2. [STOP GATE] Ask: "Is this output CLAIMING correctness, or just DESCRIBING state?"
+  3. If correctness claim: defer to /verification-before-completion
+  4. If description: proceed to next generation step or synthesize findings
 ```
+
+## Intent Detection Keywords
 
 ## Intent Detection Keywords
 
@@ -93,8 +101,28 @@ You don't need to manually run these commands - the hooks do it for you.
 If you need a specific layer the hooks didn't provide:
 
 ```bash
-# Force specific analysis
+# Force specific analysis — generation only, NOT validation
 tldr cfg path/to/file.py function_name
 tldr dfg path/to/file.py function_name
 tldr slice path/to/file.py function_name 42
+
+# STOP GATE: After running manual override, do NOT claim correctness.
+# Output is EVIDENCE for a separate validation phase.
+# Do NOT say "this function is complex" as if it were a verdict.
+# Say instead: "cfg shows cyclomatic complexity of 12 — threshold for review is 10"
+```
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
 ```

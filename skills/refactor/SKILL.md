@@ -1,32 +1,7 @@
 ---
 name: refactor
 description: Multi-file refactoring orchestration with agent discovery, TDD characterization, and constitutional filtering.
-version: 3.1.0
-status: stable
-category: refactoring
-enforcement: advisory
-workflow_steps:
-  - PREFLIGHT
-  - DISCOVER
-  - DEDUPLICATE
-  - EVIDENCE_VERIFY
-  - CLASSIFY_DEBT
-  - PRIORITIZE
-  - CONSTITUTIONAL_FILTER
-  - PLAN
-  - RED_PHASE
-  - CHECKPOINT_RED
-  - ADVERSARIAL_REVIEW
-  - REFACTOR
-  - LSP_VALIDATE
-  - CHECKPOINT_GREEN
-  - REGRESSION
-  - CODE_SIMPLIFICATION
-  - DELETION_METRIC
-triggers:
-  - /refactor
 ---
-
 # /refactor - Multi-File Refactoring Orchestrator
 
 ## Overview
@@ -54,6 +29,17 @@ Orchestrate complex, multi-file refactoring while maintaining safety and TDD dis
 /refactor src/ --focus security  # Tune agent focus
 /refactor continue               # Run all priority levels without stopping
 ```
+
+## Target Inference (When No Path Provided)
+
+When invoked without a path argument (e.g., just `/refactor`):
+
+1. **Check recently modified files** — Use `git diff --name-only` to find files changed in the current worktree. If a coherent package or module dominates, use that directory as the target.
+2. **Check conversation context** — If the session has been working on a specific module, that module is the target scope.
+3. **If exactly one candidate** — Use it automatically, but state the inferred target before proceeding.
+4. **If multiple candidates OR no clear context** — Ask user to specify. Do not guess silently.
+
+**Precedent:** Follows the same pattern as `/planning` context-aware behavior.
 
 ## Focus Lenses
 

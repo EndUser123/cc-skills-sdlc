@@ -1,13 +1,7 @@
 ---
 name: tldr-code
 description: Token-efficient code analysis via 5-layer stack (AST, Call Graph, CFG, DFG, PDG). 95% token savings.
-version: "1.0.0"
-status: stable
-category: tools
-allowed-tools: [Bash]
-keywords: [debug, refactor, understand, complexity, "call graph", "data flow", "what calls", "how complex", search, explore, analyze, dead code, architecture, imports]
 ---
-
 # TLDR-Code: Token-Efficient Code Analysis
 
 **95% token savings** vs raw file reads using a 5-layer analysis stack.
@@ -48,19 +42,96 @@ Total:              ~1,200 tokens  vs 23,000 raw = 95% savings
 
 ---
 
-## Bug Fixing Workflow
+## Execution Phases
 
-**Key insight:** TLDR navigates, then you read. Don't fix bugs from summaries alone.
+### PHASE 1: NAVIGATION (Generation)
+
+Use these commands to explore and find relevant files:
 
 ```bash
-# 1. NAVIGATE: Find which files matter
-tldr imports file.py              # What does buggy file depend on?
-tldr impact func_name .           # Who calls the buggy function?
-tldr calls .                      # Cross-file edges
+tldr tree src/                    # File overview
+tldr structure src/ --lang python  # Functions and classes
+tldr search "pattern" .            # Find code matching pattern
+tldr imports file.py               # What does this file depend on?
+tldr impact func_name .            # Who calls this function?
+tldr calls .                       # Cross-file call graph
+```
+
+**Purpose:** Discover the scope and structure. Do NOT make claims about correctness yet.
+
+---
+
+### PHASE GATE: Stop after Navigation
+
+```
+STOP — Before claiming correctness or beginning fixes:
+
+Navigation outputs evidence about WHERE problems exist, not WHY they exist.
+Do NOT interpret navigation output as validation of correctness.
+
+Proceed to PHASE 2 (Deep Analysis) only after Phase 1 outputs are gathered.
+```
+
+---
+
+### PHASE 2: DEEP ANALYSIS (Generation)
+
+For a specific function or file under investigation:
+
+```bash
+tldr extract <found_file>              # L1: Full file structure
+tldr context <function_name> --project . --depth 2  # L2: Call graph
+tldr cfg <found_file> <function_name>  # L3: Control flow
+tldr dfg <found_file> <function_name>  # L4: Data flow
+tldr slice <found_file> <function_name> <target_line>  # L5: Slice
+```
+
+**Purpose:** Generate evidence about HOW the code works. Do NOT claim "fixed" or "correct" yet.
+
+---
+
+### PHASE GATE: Stop before Implementation Claims
+
+```
+STOP — Before claiming bugs are fixed or code is correct:
+
+Deep analysis outputs describe HOW the code currently behaves,
+not whether it SHOULD behave that way.
+
+Implementation (writing new code) is a separate phase.
+Validation (proving the implementation works) is another separate phase.
+```
+
+---
+
+### PHASE 3: IMPLEMENTATION (Generation — only after both gates passed)
+
+Only after Phase 1 AND Phase 2 gates have been passed:
+
+```bash
+# Navigate + analyze first (Phases 1-2)
+# Then write your fix
 
 # 2. READ: Get actual code for critical files (2-4 files, not all 50)
 tldr search "def buggy_func" . -C 20
 ```
+
+**Purpose:** Implement the change. This is generation, not proof.
+
+---
+
+### PHASE 4: VALIDATION (Separate — never mixed with generation)
+
+After implementation, validation is a SEPARATE workflow handled by `verification-before-completion`:
+
+```bash
+# Run verification — this is NOT part of tldr-code
+pytest tests/                        # Or appropriate test command
+git diff                            # Show what changed
+# Read the output, THEN claim success
+```
+
+**Rule:** tldr-code generates context. A different skill (or manual verification) validates correctness.
 
 ---
 
@@ -105,3 +176,9 @@ Import from `tldr.api` for programmatic access to all 5 layers plus unified `get
 ### Tool Selection
 
 See `references/languages-and-tool-comparison.md` for the TLDR vs Grep/Read comparison table, and `rules.md` for the decision tree and integration notes.
+
+## Prohibited Behaviors
+
+- **E1**: Claim code absent without confirmed tool failure (Read/Grep/git)
+- **E4**: Answer without reading relevant source files first
+- **E5**: "I assume", "I think", "probably" without tool verification

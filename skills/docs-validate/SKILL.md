@@ -1,11 +1,7 @@
 ---
 name: docs-validate
 description: This skill should be used when the user asks to "validate documentation", "check docs", "docs quality", "check documentation quality", or "validate markdown files". Provides manual documentation quality validation with automated checks and actionable fix suggestions.
-version: "1.0.0"
-status: "stable"
-category: quality
 ---
-
 # Documentation Quality Validation
 
 Validate documentation quality using automated checks and receive actionable improvement suggestions.
@@ -169,7 +165,19 @@ See **references/validation-checks.md** for troubleshooting guidance on:
 - Missing issues (obvious problems not caught)
 - Import errors (DocumentationValidator not found)
 
-## Integration with /package
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
 
 - **PostToolUse Hook**: Automatic validation enabled by default for all skills
 - **Manual Validation**: `/docs-validate` command provides comprehensive reports

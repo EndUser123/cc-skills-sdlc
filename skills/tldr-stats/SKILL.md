@@ -1,11 +1,7 @@
 ---
 name: tldr-stats
 description: Show full session token usage, costs, TLDR savings, and hook activity
-version: "1.0.0"
-status: stable
-category: tools
 ---
-
 # TLDR Stats Skill
 
 Show a beautiful dashboard with token usage, actual API costs, TLDR savings, and hook activity.
@@ -86,3 +82,17 @@ python3 $CLAUDE_PROJECT_DIR/.claude/scripts/tldr_stats.py
 - Cache hit rate starts low, increases as you re-read files
 - Cost estimates use: Opus $15/1M, Sonnet $3/1M, Haiku $0.25/1M
 - Stats update in real-time as you work
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

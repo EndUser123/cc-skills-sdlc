@@ -1,23 +1,7 @@
 ---
 name: specify
 description: Generate detailed specification from PRD requirements
-version: 1.0.0
-status: stable
-enforcement: advisory
-category: specification
-triggers:
-  - /specify
-
-suggest:
-  - /prd
-
-workflow_steps:
-  - read_prd
-  - expand_requirements
-  - write_specify_md
-  - review_with_user
 ---
-
 # Specify — Detailed Specification
 
 Generate detailed `specify.md` from PRD requirements.
@@ -43,37 +27,26 @@ Generate detailed `specify.md` from PRD requirements.
 - Output: `/design` or `/planning` for next steps
 - Works with `/prd` → `/specify` → `/design` workflow
 
-## Your Workflow
+## Phase Structure
 
-### 1. Read PRD
-Check if `prd.md` exists in the current project. If not, ask the user for requirements input.
+### PHASE 1: Requirements Reading
+Read PRD, extract FR/NF requirements.
 
-### 2. Expand Requirements
-For each FR/NF from PRD:
-- Add acceptance criteria (specific, testable conditions)
-- Add technical constraints (API contracts, data schemas, error codes)
-- Add user stories with Given/When/Then format
+### PHASE 2: Specification Expansion
+Expand each requirement into acceptance criteria, technical constraints, and user stories.
 
-### 3. Write specify.md
-```
-## Functional Requirements
-- FR-1: [requirement] — Acceptance: [criteria]
+### PHASE 3: Presentation
+Present the specification to user for review and confirmation.
 
-## Non-Functional Requirements
-- NFR-1: [requirement] — Acceptance: [criteria]
+---
+### STOP GATE
 
-## User Stories
-### US-1: [title]
-**Given** [context]
-**When** [action]
-**Then** [outcome]
+**Between PHASE 2 and PHASE 3**: You MUST present the specification and wait for user confirmation before proceeding to /design or /planning.
 
-## Technical Constraints
-- [API contracts, data formats, error codes]
-```
-
-### 4. Review
-Present specification to user. Confirm scope before proceeding to `/design` or `/planning`.
+**Do NOT:**
+- Proceed to /design or /planning without user approval
+- Mix generation and review in the same response
+- Skip user review step
 
 ## Validation Rules
 
@@ -82,15 +55,30 @@ Present specification to user. Confirm scope before proceeding to `/design` or `
 - Creating user stories without clear Given/When/Then
 - Skipping error handling paths
 
+### Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
+
 ### Required Coverage
 - All FRs from PRD must appear with acceptance criteria
 - All NFRs from PRD must appear with measurable criteria
 - At least one user story per major feature
 - Error paths documented for all user interactions
 
-## Tell the User
+## After User Approval
 
-After writing the specification, tell them:
-- What `/specify` suggests next (`/design` for architecture, `/planning` for implementation)
-- That they can edit specify.md directly
-- That `/prd` is the input source if requirements change
+After the user approves the specification:
+- Proceed to `/design` for architecture decisions
+- Or proceed to `/planning` for implementation plan
+- User can edit specify.md directly if changes are needed
+- `/prd` is the input source if requirements change

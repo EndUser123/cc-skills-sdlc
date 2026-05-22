@@ -1,39 +1,7 @@
 ---
 name: code
-version: 4.0.0
 description: Single-task TDD implementation engine. Takes a task contract from /go, produces a task result. No loop, no review, no planning — /go owns all orchestration.
-category: development
-enforcement: strict
-domain: development
-depends_on:
-  - sdlc: ">=0.1.0"
-triggers:
-  - 'code feature'
-  - 'build feature'
-  - 'new feature'
-  - 'implement feature'
-  - 'start development'
-argument-hint: <task_description|stats|continue> [--fast] [--no-checklist]
-context: main
-user-invocable: true
-status: new
-depends_on_skills: ['/search']
-requires_tools: ['python', 'git', 'pytest']
-aliases:
-  - '/code'
-workflow_steps:
-  - read_task
-  - pre_execution_checklist
-  - analyze_query_intent
-  - explore_codebase
-  - design_solution
-  - tdd_red
-  - tdd_green
-  - tdd_refactor
-  - smoke_validation
-  - write_task_result
 ---
-
 # /code v4.0 — Single-Task TDD Implementation Engine
 
 ## Purpose

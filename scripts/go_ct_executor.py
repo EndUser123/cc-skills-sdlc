@@ -1,9 +1,10 @@
 """go-ct executor — orchestrates the task pipeline using Pydantic state + file-based phase gates.
 
 Usage:
-    python go_ct_executor.py --task "description" [--output-dir .claude/.artifacts/go]
+    python go_ct_executor.py --task "description" [--output-dir .claude/.artifacts/go] [--cleanup pre|force]
+    python go_ct_executor.py --cleanup audit  # scan for orphaned worktrees and stale state
 
-Phase sequence: worktree → task → code → verify → simplify → review → PR → loop
+Phase sequence: pre-clean (advisory) → worktree → task → code → verify → simplify → review → merge → PR → post-clean
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import uuid
@@ -18,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 try:
     from pydantic import BaseModel, Field, ConfigDict
@@ -42,6 +44,12 @@ class TaskStatus(str, Enum):
     IN_PROGRESS = "in-progress"
     BLOCKED = "blocked"
     COMPLETED = "completed"
+
+
+class CleanupMode(str, Enum):
+    AUDIT = "audit"      # report only, never destructive
+    FORCE = "force"      # prune orphaned worktrees, archive stale state
+    SKIP = "skip"        # skip pre-clean entirely
 
 
 class PhaseStatus(str, Enum):
@@ -118,6 +126,253 @@ def touch_gate(state_dir: Path, gate_name: str) -> None:
 def check_gate(state_dir: Path, gate_name: str) -> bool:
     """Check if a phase gate exists."""
     return (state_dir / f".{gate_name}").exists()
+
+
+# === Pre-Clean Functions ===
+
+def get_worktrees() -> dict[str, str]:
+    """Return {worktree_path: branch_name} for all git worktrees."""
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        return {}
+
+    worktrees = {}
+    current_path = None
+    current_branch = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = line[9:]
+        elif line.startswith("branch "):
+            current_branch = line[8:]
+        elif line == "" and current_path and current_branch:
+            worktrees[current_path] = current_branch
+            current_path = None
+            current_branch = None
+    return worktrees
+
+
+def find_state_dirs(base_dir: Path, skill: str) -> list[dict]:
+    """Find all state directories for a skill across all terminals."""
+    artifacts_dir = base_dir / skill
+    if not artifacts_dir.exists():
+        return []
+
+    state_dirs = []
+    for term_dir in artifacts_dir.iterdir():
+        if not term_dir.is_dir():
+            continue
+        worktree_info = term_dir / "worktree.json"
+        if worktree_info.exists():
+            try:
+                info = json.loads(worktree_info.read_text())
+                state_dirs.append({
+                    "terminal_id": term_dir.name,
+                    "worktree_path": info.get("path", ""),
+                    "branch": info.get("branch", ""),
+                    "run_id": info.get("run_id", ""),
+                    "state_dir": term_dir,
+                })
+            except (json.JSONDecodeError, OSError):
+                continue
+    return state_dirs
+
+
+def pre_clean(base_dir: Path, skill: str, mode: CleanupMode) -> list[dict]:
+    """Audit and optionally clean orphaned worktrees and stale state.
+
+    Returns a list of finding dicts: {type, path, action, message}
+    """
+    findings = []
+    worktrees = get_worktrees()
+    state_dirs = find_state_dirs(base_dir, skill)
+
+    # Build sets for comparison
+    known_worktrees = {s["worktree_path"] for s in state_dirs if s["worktree_path"]}
+    active_state_runs = {s["run_id"] for s in state_dirs if s["run_id"]}
+
+    # 1. Orphaned worktrees: worktree exists but no state dir references it
+    for wt_path, branch in worktrees.items():
+        if wt_path not in known_worktrees and "ai/go-" in branch:
+            # Check for uncommitted changes
+            has_changes = False
+            if Path(wt_path).exists():
+                r = subprocess.run(
+                    ["git", "diff", "--quiet"],
+                    cwd=wt_path, capture_output=True
+                )
+                has_changes = r.returncode != 0
+
+            findings.append({
+                "type": "orphaned_worktree",
+                "path": wt_path,
+                "branch": branch,
+                "has_changes": has_changes,
+                "action": "none",
+                "message": f"Orphaned worktree: {wt_path} ({branch})"
+                    + (" — has uncommitted changes" if has_changes else " — clean"),
+            })
+
+    # 2. Stale state: state dir exists but worktree is gone
+    for state in state_dirs:
+        if state["worktree_path"] and not Path(state["worktree_path"]).exists():
+            findings.append({
+                "type": "stale_state",
+                "path": str(state["state_dir"]),
+                "worktree_path": state["worktree_path"],
+                "run_id": state["run_id"],
+                "action": "none",
+                "message": f"Stale state: no worktree at {state['worktree_path']} "
+                    f"(run {state['run_id']})",
+            })
+
+    # 3. Apply cleanup actions only in FORCE mode
+    if mode == CleanupMode.FORCE:
+        for f in findings:
+            if f["type"] == "orphaned_worktree" and not f["has_changes"]:
+                _prune_worktree(f["path"], f["branch"])
+                f["action"] = "pruned"
+                f["message"] += " [PRUNED]"
+            elif f["type"] == "stale_state":
+                _archive_state(f["path"], base_dir)
+                f["action"] = "archived"
+                f["message"] += " [ARCHIVED]"
+
+    return findings
+
+
+def _prune_worktree(path: str, branch: str) -> None:
+    """Remove a git worktree."""
+    # First remove the worktree (filesystem)
+    if Path(path).exists():
+        try:
+            shutil.rmtree(path)
+            print(f"  [CLEANUP] Removed worktree directory: {path}")
+        except OSError as e:
+            print(f"  [CLEANUP] Failed to remove directory {path}: {e}", file=sys.stderr)
+            return
+
+    # Then prune via git (this also deletes the branch if fully merged)
+    result = subprocess.run(
+        ["git", "worktree", "prune"],
+        capture_output=True, text=True
+    )
+    if result.returncode == 0:
+        print(f"  [CLEANUP] Pruned git worktree refs: {branch}")
+    else:
+        print(f"  [CLEANUP] git worktree prune failed: {result.stderr}", file=sys.stderr)
+
+
+def _archive_state(state_path: str, base_dir: Path) -> None:
+    """Archive a stale state directory to .artifacts/archive."""
+    archive_dir = base_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = archive_dir / f"{Path(state_path).name}_{ts}"
+    try:
+        shutil.move(state_path, dest)
+        print(f"  [CLEANUP] Archived stale state: {state_path} -> {dest}")
+    except OSError as e:
+        print(f"  [CLEANUP] Failed to archive {state_path}: {e}", file=sys.stderr)
+
+
+def purge_attempt_files(state_dir: Path) -> int:
+    """Remove .attempt_* files older than 7 days. Returns count purged."""
+    if not state_dir.exists():
+        return 0
+    count = 0
+    cutoff = datetime.now().timestamp() - (7 * 24 * 3600)
+    for f in state_dir.glob(".attempt_*"):
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+                count += 1
+        except OSError:
+            pass
+    return count
+
+
+# === Merge / Sync Functions ===
+
+def merge_worktree(state: PipelineState, state_dir: Path) -> dict:
+    """Stage and commit worktree changes, return commit info."""
+    if not state.worktree_path:
+        raise RuntimeError("No worktree to merge")
+
+    wt_path = Path(state.worktree_path)
+
+    # Check for changes
+    r = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=wt_path, capture_output=True, text=True
+    )
+    has_changes = bool(r.stdout.strip())
+
+    if not has_changes:
+        print("  [MERGE] No changes to commit")
+        return {"commit": None, "has_changes": False, "message": "no changes"}
+
+    # Stage all changes
+    subprocess.run(["git", "add", "."], cwd=wt_path, capture_output=True)
+
+    # Commit with task title as message
+    task_msg = state.task.title if state.task else "go-ct task"
+    commit_result = subprocess.run(
+        ["git", "commit", "-m", task_msg],
+        cwd=wt_path, capture_output=True, text=True
+    )
+
+    if commit_result.returncode != 0:
+        print(f"  [MERGE] Commit failed: {commit_result.stderr}", file=sys.stderr)
+        return {"commit": None, "has_changes": True, "message": "commit failed"}
+
+    # Get commit hash
+    log_result = subprocess.run(
+        ["git", "log", "-1", "--format=%H %s"],
+        cwd=wt_path, capture_output=True, text=True
+    )
+    if log_result.returncode == 0:
+        commit_hash, commit_msg = log_result.stdout.strip().split(" ", 1)
+    else:
+        commit_hash, commit_msg = "unknown", ""
+
+    print(f"  [MERGE] Committed: {commit_hash[:8]} - {commit_msg}")
+    return {
+        "commit": commit_hash,
+        "message": commit_msg,
+        "has_changes": True,
+    }
+
+
+def post_clean(state: PipelineState, base_dir: Path) -> None:
+    """Prune worktree and archive artifacts after PR_READY."""
+    if not state.worktree_path:
+        return
+
+    state_dir = base_dir / state.terminal_id / "go"
+
+    # Prune worktree (branch stays via git worktree prune if fully merged)
+    _prune_worktree(state.worktree_path, state.worktree_branch or "")
+
+    # Purge attempt files
+    purged = purge_attempt_files(state_dir)
+    if purged:
+        print(f"  [CLEANUP] Purged {purged} stale attempt files")
+
+    # Archive state
+    if state_dir.exists():
+        archive_dir = base_dir / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dest = archive_dir / f"go-{state.run_id}_{ts}"
+        try:
+            shutil.copytree(state_dir, dest)
+            print(f"  [CLEANUP] Archived run artifacts: {dest}")
+        except OSError as e:
+            print(f"  [CLEANUP] Failed to archive {state_dir}: {e}", file=sys.stderr)
 
 
 # === Workflow Steps ===
@@ -257,20 +512,27 @@ def run_reviews(state: PipelineState, state_dir: Path) -> None:
     touch_gate(state_dir, "reviews-passed")
 
 
-def generate_pr_artifacts(state: PipelineState, state_dir: Path) -> None:
+def generate_pr_artifacts(state: PipelineState, state_dir: Path) -> dict:
     """STEP 6: Generate PR artifacts."""
     if not state.worktree_path:
         raise RuntimeError("No worktree created")
 
-    # Get commit info
-    result = subprocess.run(
-        ["git", "log", "-1", "--format=%H %s"],
-        cwd=state.worktree_path, capture_output=True, text=True
-    )
-    if result.returncode == 0:
-        commit_hash, commit_msg = result.stdout.strip().split(" ", 1)
+    # Check if we have a commit from merge_worktree
+    commit_file = state_dir / "commit-info.json"
+    if commit_file.exists():
+        commit_info = json.loads(commit_file.read_text())
+        commit_hash = commit_info.get("commit", "unknown")
+        commit_msg = commit_info.get("message", "")
     else:
-        commit_hash, commit_msg = "unknown", ""
+        # No merge happened — use worktree HEAD
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%H %s"],
+            cwd=state.worktree_path, capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            commit_hash, commit_msg = result.stdout.strip().split(" ", 1)
+        else:
+            commit_hash, commit_msg = "unknown", ""
 
     pr_artifacts = {
         "commit": commit_hash,
@@ -285,6 +547,7 @@ def generate_pr_artifacts(state: PipelineState, state_dir: Path) -> None:
 
     touch_gate(state_dir, "pr-ready")
     print(f"  [PR] {commit_hash[:8]} - {commit_msg}")
+    return pr_artifacts
 
 
 def save_state(state: PipelineState, base_dir: Path) -> None:
@@ -319,7 +582,11 @@ def save_state(state: PipelineState, base_dir: Path) -> None:
 
 # === Main Orchestrator ===
 
-def run_pipeline(task_desc: str, output_dir: Optional[str] = None) -> dict:
+def run_pipeline(
+    task_desc: str,
+    output_dir: Optional[str] = None,
+    cleanup_mode: CleanupMode = CleanupMode.AUDIT,
+) -> dict:
     """Execute the full go-ct pipeline."""
     base_dir = Path(output_dir) if output_dir else Path(".claude/.artifacts")
 
@@ -330,6 +597,16 @@ def run_pipeline(task_desc: str, output_dir: Optional[str] = None) -> dict:
 
     print(f"[GO-CT] Run {state.run_id} | Terminal {state.terminal_id}")
     print(f"[GO-CT] Task: {task_desc[:60]}...")
+
+    # PRE-CLEAN: audit orphaned worktrees and stale state
+    if cleanup_mode != CleanupMode.SKIP:
+        print(f"[GO-CT] Pre-clean ({cleanup_mode.value}):")
+        findings = pre_clean(base_dir, "go", cleanup_mode)
+        if findings:
+            for f in findings:
+                print(f"  {f['message']}")
+        else:
+            print("  No orphaned resources found")
 
     try:
         # STEP 0: Worktree
@@ -364,11 +641,20 @@ def run_pipeline(task_desc: str, output_dir: Optional[str] = None) -> dict:
         run_reviews(state, state_dir)
         state.complete_phase("reviews")
 
+        # STEP 5.5: Merge
+        print("[GO-CT] Merging worktree...")
+        commit_info = merge_worktree(state, state_dir)
+        state.complete_phase("merge")
+
         # STEP 6: PR
         generate_pr_artifacts(state, state_dir)
         state.complete_phase("pr")
 
-        # STEP 7: Save final state
+        # STEP 7: Post-clean
+        print("[GO-CT] Post-clean:")
+        post_clean(state, base_dir)
+
+        # STEP 8: Save final state
         save_state(state, base_dir)
 
         print(f"[GO-CT] COMPLETE | {state.run_id} | {worktree_path}")
@@ -377,6 +663,7 @@ def run_pipeline(task_desc: str, output_dir: Optional[str] = None) -> dict:
             "run_id": state.run_id,
             "worktree": worktree_path,
             "branch": branch,
+            "commit": commit_info.get("commit"),
         }
 
     except Exception as e:
@@ -388,11 +675,34 @@ def run_pipeline(task_desc: str, output_dir: Optional[str] = None) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="go-ct executor")
-    parser.add_argument("--task", required=True, help="Task description")
+    parser.add_argument("--task", help="Task description (required for pipeline run)")
     parser.add_argument("--output-dir", help="Output directory for artifacts")
+    parser.add_argument(
+        "--cleanup",
+        choices=["audit", "force", "skip"],
+        default="audit",
+        help="Pre-clean mode: audit (report only), force (prune/archive), skip (none)",
+    )
     args = parser.parse_args()
 
-    result = run_pipeline(args.task, args.output_dir)
+    base_dir = Path(args.output_dir) if args.output_dir else Path(".claude/.artifacts")
+
+    # Standalone audit mode
+    if args.cleanup == "audit" and not args.task:
+        print("[GO-CT] Running cleanup audit...")
+        findings = pre_clean(base_dir, "go", CleanupMode.AUDIT)
+        if not findings:
+            print("No orphaned resources found.")
+        else:
+            for f in findings:
+                print(f"  {f['message']}")
+        return
+
+    if not args.task:
+        parser.error("--task is required unless running --cleanup audit only")
+
+    cleanup_mode = CleanupMode(args.cleanup)
+    result = run_pipeline(args.task, args.output_dir, cleanup_mode)
     print("\n" + json.dumps(result, indent=2))
 
     if result["status"] == "blocked":

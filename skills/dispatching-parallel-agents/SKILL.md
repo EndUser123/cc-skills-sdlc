@@ -2,7 +2,6 @@
 name: dispatching-parallel-agents
 description: Use when facing 2 or more independent tasks that can be worked on without shared state or sequential dependencies
 ---
-
 # Dispatching Parallel Agents
 
 ## Overview
@@ -73,13 +72,40 @@ Task("Fix tool-approval-race-conditions.test.ts failures")
 // All three run concurrently
 ```
 
+---
+
+## PHASE GATE: STOP before Validation
+
+**Before proceeding to step 4, verify the dispatch phase is complete.**
+
+STOP conditions (all must be TRUE):
+- [ ] All agents have returned with their summaries
+- [ ] Each summary contains root cause analysis
+- [ ] Each summary describes specific changes made
+- [ ] No agent reported a conflict with another agent's changes
+
+If ANY STOP condition is FALSE:
+- Resolve the incomplete or conflicting result
+- Re-dispatch the affected agent if needed
+- Do NOT proceed to validation until all conditions are met
+
+---
+
 ### 4. Review and Integrate
 
-When agents return:
-- Read each summary
-- Verify fixes don't conflict
-- Run full test suite
-- Integrate all changes
+Split into two distinct sub-phases:
+
+**4a. Review (Generation Validation)** — understand what was produced:
+- Read each agent summary
+- Verify each fix addresses the assigned problem domain
+- Confirm no two agents modified the same code
+- Check that changes are scoped to the assigned file/subsystem only
+
+**4b. Validate (Integration Validation)** — verify the system still works:
+- Run the full test suite
+- Spot-check that fixes don't break unrelated functionality
+- Verify all originally failing tests now pass
+- Confirm no regression in broader system behavior
 
 ## Agent Prompt Structure
 
@@ -180,3 +206,17 @@ From debugging session (2025-10-03):
 - All investigations completed concurrently
 - All fixes integrated successfully
 - Zero conflicts between agent changes
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

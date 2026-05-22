@@ -169,7 +169,7 @@ def _get_or_create_encryption_key(state_file: Path) -> bytes:
     Raises:
         StateEncryptionError: If key cannot be created or accessed
     """
-    keys_dir = Path(".claude/state/keys")
+    keys_dir = Path.home() / ".claude" / ".state" / "keys"
     keys_dir.mkdir(parents=True, exist_ok=True)
 
     key_file = keys_dir / f"{state_file.name}.key"
@@ -445,7 +445,7 @@ def verify_gdpr_compliance(state_file: Path) -> Dict[str, bool]:
                 compliance["access_control"] = not bool(file_mode & 0o077)
 
         # Check 3: Key management
-        key_dir = Path(".claude/state/keys")
+            key_dir = Path.home() / ".claude" / ".state" / "keys"
         if key_dir.exists():
             if IS_WINDOWS:
                 # Windows: Key directory exists, encryption protects data at rest

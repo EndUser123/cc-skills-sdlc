@@ -22,7 +22,7 @@ for _candidate in _CONTRACT_PRIMITIVES_CANDIDATES:
 
 from contract_primitives import parse_contract_authority_packet, parse_planning_handoff_packet
 
-_DEFAULT_STATE_DIR = Path(__file__).resolve().parents[1] / ".claude" / "state" / "arch_handoff"
+_DEFAULT_STATE_DIR = Path.home() / ".claude" / ".state" / "arch_handoff"
 _DEFAULT_RECEIPT_TTL_SECONDS = 20 * 60
 
 

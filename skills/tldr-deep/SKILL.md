@@ -1,11 +1,7 @@
 ---
 name: tldr-deep
 description: Full 5-layer analysis of a specific function. Use when debugging or deeply understanding code.
-version: "1.0.0"
-status: stable
-category: tools
 ---
-
 # TLDR Deep Analysis
 
 Full 5-layer analysis of a specific function. Use when debugging or deeply understanding code.
@@ -26,21 +22,74 @@ Full 5-layer analysis of a specific function. Use when debugging or deeply under
 | L4: DFG | Data flow | `tldr dfg <file> <func>` |
 | L5: Slice | Dependencies | `tldr slice <file> <func> <line>` |
 
-## Execution
+## Execution Phases
 
-Given a function name, run all layers:
+### PHASE 1: LOCATE (Generation)
+
+Find the file containing the function:
 
 ```bash
-# First find the file
 tldr search "def <function_name>" .
+```
 
-# Then run each layer
+**Output:** File path(s) where the function is defined.
+
+---
+
+### PHASE GATE: Stop after Location
+
+```
+STOP — Before analyzing HOW the function works:
+
+Location tells you WHERE the function is, not HOW it behaves.
+Do NOT skip to analysis without first locating the target.
+```
+
+---
+
+### PHASE 2: ANALYSIS (Generation)
+
+After locating the file, run each analysis layer:
+
+```bash
 tldr extract <found_file>              # L1: Full file structure
 tldr context <function_name> --project . --depth 2  # L2: Call graph
 tldr cfg <found_file> <function_name>  # L3: Control flow
 tldr dfg <found_file> <function_name>  # L4: Data flow
 tldr slice <found_file> <function_name> <target_line>  # L5: Slice
 ```
+
+**Purpose:** Generate evidence about HOW the function works. This is analysis, not proof of correctness.
+
+---
+
+### PHASE GATE: Stop before Implementation
+
+```
+STOP — Before claiming the function is correct or broken:
+
+Analysis outputs describe the CURRENT behavior,
+not whether it SHOULD behave that way.
+
+Determining correctness requires comparing against a specification or running tests.
+Implementation (fixing) is a separate phase.
+```
+
+---
+
+### PHASE 3: VALIDATION (Separate)
+
+Analysis generates context. Validation proves correctness against requirements:
+
+```bash
+# Determine what "correct" means BEFORE claiming a function is broken
+# Run tests: pytest tests/   OR   the appropriate test command
+# Read test output → THEN claim pass/fail
+
+# If no tests exist: document what test WOULD prove correctness
+```
+
+**Rule:** tldr-deep generates understanding. Determining correctness against requirements is a separate step.
 
 ## Output Format
 
@@ -107,4 +156,18 @@ context = get_relevant_context("src/", "process_data", depth=2)
 cfg = get_cfg_context("src/processor.py", "process_data")
 dfg = get_dfg_context("src/processor.py", "process_data")
 slice_lines = get_slice("src/processor.py", "process_data", target_line=42)
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
 ```

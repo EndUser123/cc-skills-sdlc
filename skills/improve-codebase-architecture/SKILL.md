@@ -1,21 +1,7 @@
 ---
 name: improve-codebase-architecture
 description: Surface architectural friction and propose deepening opportunities — refactors that turn shallow modules into deep ones. Use when code architecture is causing friction, modules are shallow, or there are testability issues.
-category: architecture
-enforcement: advisory
-triggers:
-  - improve architecture
-  - refactor
-  - shallow modules
-  - deepen modules
-  - architectural friction
-  - testability
-workflow_steps:
-  - explore: Read project glossary and ADRs, use Explore subagent to walk codebase
-  - present: Present numbered deepening opportunities with files, problem, solution, benefits
-  - grill: Walk design tree — constraints, dependencies, shape of deepened module, tests
 ---
-
 # Improve Codebase Architecture
 
 Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
@@ -72,3 +58,17 @@ Side effects happen inline as decisions crystallize:
 - **Sharpening a fuzzy term?** Update `CONTEXT.md` right there.
 - **User rejects the candidate with a load-bearing reason?** Offer an ADR framed appropriately.
 - **Want to explore alternative interfaces?** See INTERFACE-DESIGN.md.
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

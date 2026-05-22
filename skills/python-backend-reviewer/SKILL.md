@@ -1,11 +1,7 @@
 ---
 name: python-backend-reviewer
 description: Expert Python backend code reviewer that identifies over-complexity, duplicates, bad optimizations, and violations of best practices. Use when asked to review Python code quality, check for duplicate code, analyze module complexity, optimize backend code, identify anti-patterns, or ensure adherence to best practices. Ideal for preventing AI-generated code from creating unnecessary files instead of imports, finding repeated validation logic, and catching over-engineered solutions.
-version: 1.0.0
-status: stable
-category: code-review
 ---
-
 # Python Backend Code Reviewer
 
 Expert analysis and refactoring of Python backend code to eliminate duplication, reduce complexity, and enforce best practices.
@@ -54,3 +50,17 @@ uv run python scripts/concurrency_analyzer.py <path>
 ## Output Format
 
 See `__lib/adversarial_review_protocol.md` for the required findings schema and severity ratings.
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

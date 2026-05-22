@@ -158,8 +158,9 @@ def main() -> None:
         _write_output(result)
         return
 
-    task_file = pathlib.Path(os.environ.get("GO_TASK_FILE", ""))
-    if not task_file.exists():
+    task_file_str = os.environ.get("GO_TASK_FILE", "")
+    task_file = pathlib.Path(task_file_str) if task_file_str else None
+    if not task_file or not task_file.is_file():
         # Try active-task pattern
         state_dir = pathlib.Path(os.environ.get("GO_STATE_DIR", ""))
         run_id = os.environ.get("RUN_ID", "")

@@ -22,7 +22,10 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | docs | /docs - Documentation Automation |
 | docs-validate | Documentation Quality Validation |
 | dpef | DPEF - Deterministic Prompt Execution Framework |
-| go | /go — Local PR-Ready Ralph Loop |
+| go | Task orchestrator (thin) — shared scripts for go-ef/go-pi |
+| go-ct | Task orchestrator (execution-contract migration) |
+| go-pi | Task orchestrator (Pi model variant) |
+| go-ef | Task orchestrator (evidence-first, canonical) |
 | harden | /harden |
 | mermaid-c4 | Mermaid Diagrams |
 | mermaid-davila7 | Mermaid Diagramming |

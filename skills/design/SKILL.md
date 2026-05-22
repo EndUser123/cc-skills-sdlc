@@ -1,39 +1,7 @@
 ---
 name: design
 description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Enhanced with Graph-of-Thought (GoT) for alternatives analysis and Hook Registration Consistency Checking."
-version: "5.6"
-status: stable
-enforcement: strict
-depends_on:
-  - sdlc: ">=0.1.0"
-category: architecture
-triggers:
-  - design
-  - architecture
-  - architectural decision
-  - adf
-suggest:
-  - /planning
-follow_up_offer:
-  - /ai-pcli
-hooks:
-  pre_response:
-    - command: "python skills/design_v1.0/hooks/stop_if_unverified.py"
-workflow_steps:
-  - preflight_checks
-  - explore_context
-  - classify_intent
-  - claim_verification
-  - contract_sensitivity_classification
-  - select_template
-  - execute_template_analysis
-  - contract_boundary_closure
-  - emit_contract_authority_packet
-  - adr_critic_review
-  - payload_validation
-  - generate_architecture_review
 ---
-
 # Architecture Advisor (Resource Router)
 
 ## Overview

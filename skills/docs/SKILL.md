@@ -1,20 +1,7 @@
 ---
 name: docs
 description: Unified document system with locality awareness
-version: "1.0.0"
-status: "stable"
-category: doc
-aliases:
-  - '/docs'
-
-suggest:
-  - /search
-  - /cks
-  - /research
-triggers:
-  - '/docs'
 ---
-
 > [!CAUTION]
 > **Context Safety**: In long sessions, run `/compact` before `/docs` to avoid context overflow.
 >
@@ -26,7 +13,30 @@ triggers:
 
 Unified document system with locality awareness -- intelligent document orchestration maintaining documentation hygiene through lazy mode (auto-detection) and structural locality awareness.
 
-## EXECUTION DIRECTIVE
+## Phase Structure
+
+### PHASE 1: Discovery
+Analyze git log, identify modified files, detect documentation gaps in locality.
+
+### PHASE 2: Presentation
+Present findings to user -- list files that need updates and what kind.
+
+---
+### STOP GATE
+
+**Between PHASE 1 and PHASE 2**: You MUST present the documentation findings to the user and wait for confirmation before making ANY updates.
+
+**Do NOT:**
+- Update documentation without presenting findings first
+- Say "docs need updating" without showing what specifically
+- Mix discovery and updating in the same prose block
+
+---
+
+### PHASE 3: Update (only after user approval)
+After user confirms, ACTUALLY UPDATE the docs using Write tool.
+
+## Execution Directive
 
 **When invoked, execute this workflow:**
 
@@ -39,43 +49,35 @@ MANDATORY:
    - --scan-repository flag -> SCAN MODE
    - --dry-run flag -> DRY RUN (show only, no changes)
 
-2. LAZY MODE (default):
-   a) Run git status to find modified files
-   b) For each modified file, identify documentation in locality:
-      - Same directory README.md, CLAUDE.md, ARCHITECTURE.md, CHANGELOG.md
-      - Parent directory docs for nested modules
-   c) Read existing documentation
-   d) ACTUALLY UPDATE the docs (Write tool) -- not just report
-   e) Confirm each update with file read
-   f) Report what was updated
+PHASE 1 (Discovery) workflow:
+a) Run git log to find modified files
+b) For each modified file, identify documentation in locality:
+   - Same directory README.md, CLAUDE.md, ARCHITECTURE.md, CHANGELOG.md
+   - Parent directory docs for nested modules
+c) Read existing documentation
+d) Compile findings -- list files that need updates and what kind
+e) DO NOT UPDATE YET -- proceed to PHASE 2 presentation
 
-3. TARGETED MODE:
-   a) Read target file/directory
-   b) Check for documentation in same location
-   c) Detect missing core docs
-   d) Create or update as needed (using Write tool)
-   e) Report changes
+PHASE 2 (Presentation) workflow:
+a) Present findings to user
+b) Wait for confirmation
+c) Only after user approval: proceed to PHASE 3
 
-4. SCAN MODE:
-   a) Walk repository for directories with code files
-   b) Check each for CLAUDE.md
-   c) Report all missing documentation
-
-5. DRY RUN: Skip all Write/Edit operations, report what WOULD be done
+PHASE 3 (Update) workflow:
+a) ACTUALLY UPDATE the docs (Write tool)
+b) Confirm each update with file read
+c) Report what was updated
 
 DEFAULT (no arguments): Lazy mode with git status
 
 DO NOT:
-- Report "documentation needs update" WITHOUT UPDATING IT
-- Ask "should I update docs?" -- just update
+- Report "documentation needs update" WITHOUT PRESENTING FINDINGS
+- Skip presenting findings and go straight to updates
 - Skip documentation "to save time"
-- Consider task complete until docs are ACTUALLY UPDATED
+- Consider task complete until docs are ACTUALLY UPDATED and verified
 
-CRITICAL: Step 2d says "ACTUALLY UPDATE the docs (Write tool)"
-- Use Write tool to make changes
-- Do NOT just say "docs need updating"
-- Do NOT wait for user confirmation
-- UPDATE THE DOCUMENTATION
+CRITICAL: You MUST present Phase 2 findings and wait for user confirmation BEFORE any updates.
+After confirmation, use Write tool to make changes.
 
 If git commands fail: Report exact error message. Do NOT fabricate results.
 ```
@@ -112,6 +114,23 @@ If git commands fail: Report exact error message. Do NOT fabricate results.
 - Asking "Should I update docs?" (just update if significant)
 - Leaving "TODO: update docs" comments
 - Skipping CLAUDE.md for code modules
+- **E1 — Evidence before claims**: Do NOT claim docs are absent or unchanged without first running git status and reading actual files
+- **E4 — Investigate before asking**: Do NOT tell the user "docs need updating" without actually running git log/status to find what changed
+- **E5 — Anti-lazy escape hatch**: Prohibited: "I assume docs are fine", claiming nothing changed without git verification, skipping evidence gathering because "it's obvious"
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
 
 ## When to Use
 

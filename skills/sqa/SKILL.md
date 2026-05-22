@@ -1,30 +1,7 @@
 ---
 name: sqa
 description: Unified SQA Orchestrator — 11-layer sequential quality analysis pipeline with contract-integrity and resume-integrity certification.
-version: 2.1.0
-status: stable
-category: quality
-triggers:
-  - /sqa
-suggest:
-  - /qr
-entry_type: skill
-enforcement: strict
-workflow_steps:
-  - L0_CHECKLIST
-  - L0_PREDICTIVE
-  - L1_SYNTACTIC
-  - L2_SEMANTIC
-  - L3_STRUCTURAL
-  - L4_REQUIREMENTS
-  - L5_SECURITY
-  - L6_PERFORMANCE
-  - L7_OPERATIONAL
-  - L8_E2E
-  - META_SYNTHESIS
-  - L9_CONTRACTS
 ---
-
 # /sqa — Unified SQA Orchestrator
 
 Execute a sequential quality analysis pipeline against a target codebase.

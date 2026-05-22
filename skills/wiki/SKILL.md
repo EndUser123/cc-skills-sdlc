@@ -1,17 +1,7 @@
 ---
 name: wiki
 description: Persistent knowledge system using Obsidian wiki + QMD search
-version: 1.3.0
-type: skill
-enforcement: none
-workflow_steps:
-  - ingest: "3-phase pipeline: manifest (script) → per-file parallel ingest (subagents) → post-phase (script). Handles large files via tiered strategy. YouTube URLs are auto-detected and routed to the yt-is transcript pipeline (yt-dlp → Selenium → Gemini CLI) before ingestion."
-  - query: "Accept question, search wiki via QMD_WIKI backend, synthesize answer"
-  - lint: "Health-check wiki for contradictions, orphans, missing cross-refs"
-  - index: "Rebuild index.md catalog from current wiki state"
-  - update: "Discover stale pages by age + search frequency, offer web-based refresh with SHA256 dedup"
 ---
-
 # /wiki — Obsidian Wiki + QMD Search Skill
 
 ## Purpose
@@ -155,7 +145,8 @@ Then report summary: done / failed / skipped counts.
 1. **Channel already tracked** (`csf-source list` shows it):
    - Run `python bin/csf-source fetch --source <url>` to trigger yt-dlp → Selenium escalation
    - Check `transcripts.sqlite` for completion; on failure, invoke Gemini CLI as last resort:
-     `gemini -p "Summarize the content of this YouTube video. Return a detailed summary: <url>"`
+     `gemini -m gemini-2.5-flash -p "Summarize the content of this YouTube video. Return a detailed summary: <url>"`
+     Always specify `-m gemini-2.5-flash` — the default model may be slower or more expensive.
    - Write fetched transcripts to `P:/.data/yt-is/transcripts/` as individual `.txt` files
    - These `.txt` files become the input for the pre-phase manifest script
 
@@ -176,7 +167,7 @@ Then report summary: done / failed / skipped counts.
    Then proceed with standard pipeline (manifest → per-file subagents → QMD update).
 
 5. **Failover to Gemini CLI**: fires when `transcripts.sqlite` shows `failure_reason: no_transcript`
-   for all methods exhausted — invoke `gemini -p` with the video URL and parse the text response.
+   for all methods exhausted — invoke `gemini -m gemini-2.5-flash -p` with the video URL and parse the text response.
 
 **Web URL handling (non-YouTube)**: When a URL is provided (http/https that doesn't match YouTube patterns),
 invoke the `/crawl` workflow:

@@ -1,21 +1,7 @@
 ---
 name: zoom-out
 description: Tell the agent to zoom out and give broader context or a higher-level perspective. Use when you're unfamiliar with a section of code or need to understand how it fits into the bigger picture.
-category: exploration
-enforcement: advisory
-disable-model-invocation: true
-triggers:
-  - zoom out
-  - broader context
-  - higher level
-  - understand the bigger picture
-  - unfamiliar with this code
-workflow_steps:
-  - orient: Ask agent to go up a layer of abstraction
-  - map: Request module map with callers and domain glossary
-  - clarify: Ask for entry points and exit points
 ---
-
 # Zoom Out
 
 > "I don't know this area of code well. Go up a layer of abstraction. Give me a map of all the relevant modules and callers, using the project's domain glossary vocabulary."
@@ -42,3 +28,17 @@ The agent should provide:
 2. Key dependencies and relationships
 3. Domain terminology glossary
 4. Entry points and exit points
+
+## Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious

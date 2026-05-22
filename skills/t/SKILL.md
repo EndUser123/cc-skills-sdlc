@@ -1,33 +1,7 @@
 ---
 name: t
 description: Context-aware adaptive testing with ToT enhancement - code flow tracing, incremental testing, advanced analytics, and branching test scenario exploration
-version: "2.4.0"
-status: stable
-category: testing
-triggers:
-  - /t
-  - /t <file>
-  - /t --force-full
-aliases:
-  - /t
-  - /t <target>
-metadata:
-  version: "2.4.0"
-  compatibility: "claude-code"
-enforcement: advisory
-workflow_steps:
-  - discovery: Scan codebase for test files, classify by type, detect gaps
-  - planning: Risk-based test strategy based on coverage level
-  - execute: Run tests with incremental scope and analytics
-  - verify: Generate director report with coverage gaps and next steps
-
-do_not:
-  - summarize this skill instead of executing it
-  - run full test suite for trivial changes (use incremental mode)
-  - skip health check validation before testing
-  - ignore solo-dev constraints when suggesting tests
 ---
-
 ## Code Editing Patterns
 
 For Python code editing patterns and anti-patterns:

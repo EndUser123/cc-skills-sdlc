@@ -1,10 +1,6 @@
 ---
 name: code-reviewer-business-logic
 description: "Correctness Review: reviews domain correctness, business rules, edge cases, and requirements."
-version: 1.0.0
-status: stable
-enforcement: advisory
-category: analysis
 ---
 # Business Logic Reviewer (Correctness)
 

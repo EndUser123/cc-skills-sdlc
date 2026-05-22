@@ -1,24 +1,7 @@
 ---
 name: review_bundle
 description: Create decision-ready review bundles for external architectural review with evidence quality controls
-version: 1.0.0
-status: stable
-category: documentation
-enforcement: advisory
-triggers:
-  - /review_bundle
-aliases:
-  - /review_bundle
-
-parallel_agents: true
-execution_mode: hybrid
-workflow_steps:
-  - scope_selection
-  - file_count_mode
-  - generate_bundle
-  - deliver
 ---
-
 # Review Bundle Creation
 
 Create comprehensive context bundles for LLM question-answering about any system.
@@ -303,6 +286,20 @@ Output a SINGLE Markdown file named: `review_bundle_[system_name]_[date].md`
 - Do NOT use parallel agents for <10 files (overhead exceeds benefit)
 - Do NOT skip scope selection step
 - Do NOT claim bundle created without Write tool verification
+
+### Evidence-First Principles
+
+### E1 — Evidence before claims
+Before claiming code is absent, unchanged, or non-existent — search the codebase and verify with tools first. Claims of absence are only valid after confirmed Read/Grep/git failures.
+
+### E4 — Investigate before asking
+Do NOT answer without reading relevant source files first. Do not ask the user for information you can obtain yourself via Read, Grep, Bash, git, or available MCP tools.
+
+### E5 — Anti-lazy escape hatch
+Prohibited:
+- "I assume", "I think", "probably" without tool verification
+- Claiming something doesn't exist without confirmed tool failure
+- Skipping evidence gathering because the answer seems obvious
 
 ### Configuration
 - `REVIEW_BUNDLE_OUTPUT_DIR`: Default `$__CSF_ROOT/.staging\`

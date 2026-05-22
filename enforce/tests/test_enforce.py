@@ -269,7 +269,7 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_no_flags_exit_2(self) -> None:
         """go_v3 Stop hook when no Gen 2 flag files exist → exit 2."""
-        script = _sdlc_root / "skills" / "go_v3.0" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         env = {
@@ -286,7 +286,7 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_all_flags_exit_0(self) -> None:
         """go_v3 Stop hook when all Gen 2 flag files exist → exit 0."""
-        script = _sdlc_root / "skills" / "go_v3.0" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-hook-terminal" / "go"
@@ -310,7 +310,7 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_missing_advisory_exit_0(self) -> None:
         """go_v3 Stop hook: advisory placeholders treated as satisfied → exit 0."""
-        script = _sdlc_root / "skills" / "go_v3.0" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-hook-terminal" / "go"
