@@ -1,6 +1,15 @@
 ---
 name: refactor
 description: Multi-file refactoring orchestration with agent discovery, TDD characterization, and constitutional filtering.
+workflow_steps:
+  - preflight_and_discovery
+  - analysis
+  - planning
+  - red_phase
+  - execution
+  - closing
+contract_type: workflow-execution
+enforcement: strict
 ---
 # /refactor - Multi-File Refactoring Orchestrator
 
