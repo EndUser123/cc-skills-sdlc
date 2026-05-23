@@ -210,6 +210,8 @@ ENFORCE_CONFIGS: dict[str, list[dict[str, Any]]] = {
     # Canonical evidence-first names
     "code-ef": CODE_EF_PHASES,
     "go-ef": GO_EF_PHASES,
+    # Consolidated skill aliases
+    "code": CODE_EF_PHASES,
     # Backward-compat aliases (numeric version naming)
     "code_v4.0": CODE_EF_PHASES,
     "go_v3.0": GO_EF_PHASES,

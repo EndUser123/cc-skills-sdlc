@@ -8,7 +8,7 @@ from pathlib import Path
 _HOOKS_DIR = Path(__file__).resolve().parent
 _REFACTOR_HOOKS = _HOOKS_DIR.parent / "skills" / "refactor" / "hooks"
 _PREMORTEM_HOOKS = _HOOKS_DIR.parent / "skills" / "pre-mortem" / "hooks"
-_CODE_HOOKS = _HOOKS_DIR.parent / "skills" / "code_v4.0" / "hooks"
+_CODE_HOOKS = _HOOKS_DIR.parent / "skills" / "code" / "hooks"
 
 if str(_REFACTOR_HOOKS) not in sys.path:
     sys.path.insert(0, str(_REFACTOR_HOOKS))

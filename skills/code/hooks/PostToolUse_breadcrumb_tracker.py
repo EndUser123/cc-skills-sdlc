@@ -83,7 +83,7 @@ def detect_completed_step(tool_name: str, tool_input: dict) -> str | None:
 
 def run(input_data: dict) -> dict | None:
     """In-process hook logic for router dispatch."""
-    skill_id = "code_v4.0"
+    skill_id = "code"
     try:
         session_id = input_data.get("session_id")
         tool_name = input_data.get("tool_name", "")
@@ -95,7 +95,7 @@ def run(input_data: dict) -> dict | None:
 
         step = detect_completed_step(tool_name, tool_input)
         if step:
-            set_breadcrumb("code_v4.0", step)
+            set_breadcrumb("code", step)
 
         if tool_name == "Bash":
             cmd = tool_input.get("command", "")

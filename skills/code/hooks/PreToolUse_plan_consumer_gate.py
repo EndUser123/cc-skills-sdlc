@@ -64,7 +64,7 @@ def run(input_data: dict) -> dict | None:
     if not plan_path:
         return None
 
-    ledger = read_phase_ledger("code_v4.0")
+    ledger = read_phase_ledger("code")
     precheck_done = False
     if ledger:
         precheck_phase = ledger.get("phases", {}).get("consumer_contract_precheck", {})
@@ -78,7 +78,7 @@ def run(input_data: dict) -> dict | None:
     if result.allowed:
         if not precheck_done:
             write_phase_marker(
-                "code_v4.0",
+                "code",
                 "consumer_contract_precheck",
                 {
                     "result": "pass",
