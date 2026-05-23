@@ -21,8 +21,8 @@
 ## Background
 
 Current AUDIT phase is defined in:
-- `P:\\\\\\packages/cc-skills-sdlc/skills/code/references/audit-phase-details.md` — full audit instructions
-- `P:\\\\\\packages/cc-skills-sdlc/skills/code/SKILL.md:54` — `critique_agent_review` as `kind: verification`
+- `P://packages/cc-skills-sdlc/skills/code/references/audit-phase-details.md` — full audit instructions
+- `P://packages/cc-skills-sdlc/skills/code/SKILL.md:54` — `critique_agent_review` as `kind: verification`
 
 Step 7.1 in `audit-phase-details.md` dispatches `pr-review-toolkit:code-reviewer` via Agent tool. This is the integration point.
 
@@ -97,7 +97,7 @@ Fallback: if DeepSeek unavailable, log warning and continue with Claude-only rev
 ### TASK-003: Define output schema for DeepSeek findings
 - Write output template for `findings_deepseek.md` (markdown table format above)
 - Confirm the existing synthesis step can consume markdown findings from multiple sources
-- **Output**: Template file at `P:\\\\\\packages/cc-skills-sdlc/skills/code/references/deepseek-critique-template.md`
+- **Output**: Template file at `P://packages/cc-skills-sdlc/skills/code/references/deepseek-critique-template.md`
 
 ### TASK-004: Add Step 7.1b to audit-phase-details.md
 - Insert new section "## Step 7.1b: DeepSeek V3.2 Independent Review" after Step 7.1

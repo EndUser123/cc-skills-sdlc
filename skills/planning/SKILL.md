@@ -38,11 +38,11 @@ Use `trace` when the plan depends on `/design` packets, prior blocker closure, o
 Use `challenge` whenever the plan is layered, stateful, hook-driven, or overlap-sensitive.
 Use `graduate` when the same class of plan defect appears repeatedly across reviews or verifier failures.
 
-Reference: `P:\\\\\\.claude/skills/__lib/sdlc_internal_modes.md`
+Reference: `P://.claude/skills/__lib/sdlc_internal_modes.md`
 
 ## Strategic Reasoning
 
-This skill uses strategic reasoning patterns from `P:\\\\\\.claude/skills/__lib/strategic_reasoning.md`:
+This skill uses strategic reasoning patterns from `P://.claude/skills/__lib/strategic_reasoning.md`:
 
 - **GoT+ToT**: For constraint analysis and branching scenario exploration when plan has competing alternatives or unresolved blockers
 - **Strategic Questioning**: For blind-spot detection before accepting plans as implementation-ready
@@ -381,7 +381,7 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 python -c "
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r'P:\\\\\\packages/cc-skills-sdlc/skills/planning/__lib')))
+sys.path.insert(0, str(Path(r'P://packages/cc-skills-sdlc/skills/planning/__lib')))
 from adversarial_review import prepare_adversarial_review_context
 
 context = prepare_adversarial_review_context(sys.argv[1])
@@ -422,7 +422,7 @@ The 5 phase-1 agents are: `adversarial-compliance`, `adversarial-logic`, `advers
 
 **IMPORTANT — File naming**: The reference prompts write to `{agent}-findings.json` (e.g., `compliance-findings.json`, `logic-findings.json`). Do NOT use `adversarial-{agent}.json` naming.
 **IMPORTANT — Path safety**: Never dispatch a prompt that still contains `{sanitized_plan_name}`. That means Step 4a output was not consumed, and agents may write into the shared root or stale plan directory.
-**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P:\\\\\\.claude/plans/adversarial/*.json` outputs as valid idempotent results.
+**IMPORTANT — Return-path safety**: If an agent returns any path other than its exact `findings_paths[agent]` value from Step 4a, reject it as invalid. Do not accept root-level `P://.claude/plans/adversarial/*.json` outputs as valid idempotent results.
 
 **Phase 1 Slot 5 — External LLM (conditional)**:
 

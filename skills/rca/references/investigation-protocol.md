@@ -117,7 +117,7 @@ Total boost: +25%
    python - <<'PY'
    import json
    from pathlib import Path
-   blocks = Path("P:\\\\\\.claude/hooks/logs/diagnostics/pretooluse_blocks.jsonl")
+   blocks = Path("P://.claude/hooks/logs/diagnostics/pretooluse_blocks.jsonl")
    if blocks.exists():
        with open(blocks) as f:
            lines = f.readlines()
@@ -132,7 +132,7 @@ Total boost: +25%
    ```bash
    python - <<'PY'
    import sqlite3, datetime
-   conn = sqlite3.connect(r"P:\\\\\\.claude/hooks/logs/diagnostics/diagnostics.db")
+   conn = sqlite3.connect(r"P://.claude/hooks/logs/diagnostics/diagnostics.db")
    cur = conn.cursor()
    cur.execute("""
        SELECT timestamp, hook_name, phase, session_id, error_text
@@ -144,15 +144,15 @@ Total boost: +25%
    ```
 
 3. **Enumerate all available sources:**
-   - Hook execution logs (`P:\\\\\\.claude/hooks/logs/`)
-   - Session/terminal state files (`P:\\\\\\.claude/hooks/state/`)
-   - Skill invocation audit log (`P:\\\\\\.claude/state/skill_invocations.jsonl`)
-   - Evidence store database (`P:\\\\\\__csf/data/cks.db`)
-   - Session transcript files (`P:\\\\\\.claude/transcripts/`)
+   - Hook execution logs (`P://.claude/hooks/logs/`)
+   - Session/terminal state files (`P://.claude/hooks/state/`)
+   - Skill invocation audit log (`P://.claude/state/skill_invocations.jsonl`)
+   - Evidence store database (`P://__csf/data/cks.db`)
+   - Session transcript files (`P://.claude/transcripts/`)
    - RCA workflow state (`~/.claude/state/rca/rca_workflow.json`)
-   - Pending intent files (`P:\\\\\\.claude/hooks/state/pending_command_intent_*.json`)
-   - **Hook events database** (`P:\\\\\\.claude/hooks/events.db`)
-   - **Hook diagnostics DB** (`P:\\\\\\.claude/hooks/logs/diagnostics/diagnostics.db`) — importer errors, load failures
+   - Pending intent files (`P://.claude/hooks/state/pending_command_intent_*.json`)
+   - **Hook events database** (`P://.claude/hooks/events.db`)
+   - **Hook diagnostics DB** (`P://.claude/hooks/logs/diagnostics/diagnostics.db`) — importer errors, load failures
 
 4. **Search relevant logs for symptom keywords:**
    ```bash
@@ -170,7 +170,7 @@ Total boost: +25%
    - **Bucket 2 (State)**: Session state, intent files, workflow state
    - **Bucket 3 (Outcome)**: Skill invocations, transcript events
    - **Bucket 4 (Hook Events)**: events.db constitutional_events filtered by symptom keyword
-   - **Bucket 0 (Authority)**: `P:\\\\\\.claude/settings.json` when the symptom involves hook registration or enforcement
+   - **Bucket 0 (Authority)**: `P://.claude/settings.json` when the symptom involves hook registration or enforcement
 
 **Why this matters:**
 - Telemetry is Tier 1 evidence (highest confidence) — logs don't lie
@@ -182,7 +182,7 @@ Total boost: +25%
 
 **Evidence tier:** Direct log access = Tier 1 (95%). If telemetry unavailable, note: "Telemetry unavailable — proceeding with code analysis (Tier 3)."
 
-**Hook-specific rule:** If the RCA is about hooks, skill enforcement, or hook registration, inspect `P:\\\\\\.claude/settings.json` before drawing any conclusion from directory listings. The registered hook commands in settings are the authority; `P:\\\\\\.claude/hooks/` is only the implementation tree.
+**Hook-specific rule:** If the RCA is about hooks, skill enforcement, or hook registration, inspect `P://.claude/settings.json` before drawing any conclusion from directory listings. The registered hook commands in settings are the authority; `P://.claude/hooks/` is only the implementation tree.
 
 ### Step 1.6: Check Learned Patterns (AUTO-LEARNING)
 

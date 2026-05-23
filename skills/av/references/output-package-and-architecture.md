@@ -84,7 +84,7 @@ PreToolUse gates CAN check for `--hooks` flag in user commands, but PostToolUse 
 **Two-skill solution (clean separation):**
 
 ```
-P:\\\\\\.claude/skills/
+P://.claude/skills/
 ├── main/              # Simple mode (no hooks)
 └── main-hooks/        # Hooks mode (all hooks active)
 ```

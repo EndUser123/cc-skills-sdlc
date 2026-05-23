@@ -14,7 +14,7 @@ Complete the quality enforcement improvements by implementing the pattern valida
 
 **Module structure**:
 ```
-P:\\\\\\.claude/skills/code/
+P://.claude/skills/code/
 ├── scripts/
 │   ├── pattern_validation.py      # CREATE - Validates detector patterns
 │   └── verify_plan_compliance.py   # EXISTS - Complete

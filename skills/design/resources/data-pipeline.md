@@ -360,7 +360,7 @@ Integrate findings inline. Cite version numbers and sources.
 **Adversarial Self-Review:** (Recommended)
 > One-line weakest assumption + consequence per `shared_frameworks.md`.
 
-**Persist:** Auto-save to `P:\\\\\\.claude/arch_decisions/` per **Output Persistence** protocol.
+**Persist:** Auto-save to `P://.claude/arch_decisions/` per **Output Persistence** protocol.
 
 ```python
 # Filename format (use actual datetime, do not hardcode date)

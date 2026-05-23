@@ -28,6 +28,16 @@ Execute a sequential quality analysis pipeline against a target codebase.
 3. **L4-L6 (Security & Performance)**: Spec compliance, path traversal, bottlenecks.
 4. **L7-L9 (Operational & Contracts)**: Hook audit, E2E workflow, CAP alignment.
 
+## Specialist Agents (Code Quality)
+
+Absorbed from pr-review-toolkit. Dispatched at specific layers when `--focus comprehensive`:
+
+| Layer | Specialist | Purpose |
+|-------|-----------|---------|
+| L6 | silent-failure-hunter | Silent failures, error suppression, catch block analysis |
+| L8 | type-design-analyzer | Type encapsulation, invariant expression, contract scoring |
+| L9 | comment-analyzer | Comment accuracy, completeness, documentation rot |
+
 ## Certification Thresholds
 
 | Health Score | Certification |

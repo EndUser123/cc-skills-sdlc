@@ -45,7 +45,7 @@ Unified code inspection with **intelligent auto-detection** for code review and 
 | **triage** | 3 | 5-10 min | Small doc changes, 1-2 files, low risk |
 | **standard** | 4 | 10-15 min | Typical code changes, 3-10 files |
 | **deep** | 8 | 20-30 min | Security code, large changes, bug fixes |
-| **comprehensive** | 11+ | 30-45 min | Auth/payments, 50+ files, infrastructure |
+| **comprehensive** | 14 | 30-45 min | Auth/payments, 50+ files, infrastructure |
 
 ## Agent Registry
 
@@ -71,6 +71,11 @@ Unified code inspection with **intelligent auto-detection** for code review and 
 - **test-quality-roi**: ROI-focused coverage analysis
 - **invariants**: ID collision, referential integrity, uniqueness constraints (NEW)
 - **io-validation**: Path validation, file existence checks, external service assumptions (NEW)
+
+### Code Quality Agents (comprehensive mode only)
+- **comments**: Comment accuracy, completeness, long-term maintainability (comment-analyzer)
+- **types**: Type design, encapsulation, invariant expression scoring (type-design-analyzer)
+- **failures**: Silent failures, error suppression, inadequate catch blocks (silent-failure-hunter)
 
 ### Blind Spot Detection (All Modes, ON BY DEFAULT)
 - **cross-session coverage**: Detects categories with risk signals that haven't been checked recently

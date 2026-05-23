@@ -54,7 +54,7 @@ Hooks use \$CLAUDE_PROJECT_DIR for portable path references.
 3. Verify: PreToolUse gate restricts tools by phase
 4. Confirm: Validator catches errors
 5. Test: Transition advances phases correctly
-6. Logs: P:\\\\\\.claude/logs/hooks.jsonl
+6. Logs: P://.claude/logs/hooks.jsonl
 
 ## Rollback (if needed)
 ```bash

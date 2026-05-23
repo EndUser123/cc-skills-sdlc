@@ -47,7 +47,7 @@ When writing ADRs that include `current_state_with_evidence` entries, every clai
 The verification hook checks for tool evidence within the **current turn only**. Claims like:
 ```yaml
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/: no QMD or wiki backend exists"
+  - "P://packages/search-research/core/backends/local/: no QMD or wiki backend exists"
 ```
 ...are flagged as **UNGROUNDED** because the tool output that verifies them (e.g., `ls`) was in an earlier turn.
 
@@ -55,21 +55,21 @@ current_state_with_evidence:
 
 ```yaml
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/: absent (verified this session: ls → 21 files, NO qmd_wiki_backend.py)"
+  - "P://packages/search-research/core/backends/local/: absent (verified this session: ls → 21 files, NO qmd_wiki_backend.py)"
 ```
 
 ### Pattern B — Explicit Tool Output Citation
 
 ```yaml
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/ — confirmed absent (ls showed: ast_code_backend, base_local_backend, ..., NO qmd_wiki_backend.py)"
+  - "P://packages/search-research/core/backends/local/ — confirmed absent (ls showed: ast_code_backend, base_local_backend, ..., NO qmd_wiki_backend.py)"
 ```
 
 ### Pattern C — Citation with Tool Command
 
 ```yaml
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/: NO qmd_wiki_backend (this session: ls | grep qmd → empty)"
+  - "P://packages/search-research/core/backends/local/: NO qmd_wiki_backend (this session: ls | grep qmd → empty)"
 ```
 
 ### What NOT to Write
@@ -77,13 +77,13 @@ current_state_with_evidence:
 ```yaml
 # ❌ BARE ASSERTION — triggers verification block
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/: no QMD or wiki backend exists"
+  - "P://packages/search-research/core/backends/local/: no QMD or wiki backend exists"
 ```
 
 ```yaml
 # ❌ PRESENT TENSE WITHOUT CITATION — looks like unverified claim
 current_state_with_evidence:
-  - "P:\\\\\\packages/search-research/core/backends/local/ — no QMD wiki backend present"
+  - "P://packages/search-research/core/backends/local/ — no QMD wiki backend present"
 ```
 
 ### Why This Works
@@ -142,7 +142,7 @@ See `references/got-integration.md` for full details.
 
 ## Decision Persistence
 
-ADRs are auto-saved to `P:\\\\\\.claude/design_decisions/` unless output is under 2KB or user requests ephemeral.
+ADRs are auto-saved to `P://.claude/design_decisions/` unless output is under 2KB or user requests ephemeral.
 
 **Filename format**:
 ```

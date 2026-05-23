@@ -1,10 +1,10 @@
 # Agent Configuration Details
 
-## 7-Agent Discovery Configuration (Enhanced with /code-review + Missing Coverage)
+## 12-Agent Discovery Configuration (Comprehensive Multi-File Analysis)
 
 Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), weighting by its specialty.
 
-**NOTE:** This enhanced configuration consolidates the original 10 agents into 7 focused specialists, absorbing capabilities from `/code-review` while restoring critical missing coverage (testing and Python modernization). Discovery completes in ~3 minutes.
+**NOTE:** Comprehensive configuration covering all code quality dimensions: security, logic, performance, quality, I/O, testing, Python modernization, cross-file analysis, duplicates, async concurrency, and business logic correctness. Agents run in parallel for efficient discovery.
 
 ### Agent Assignments
 
@@ -17,19 +17,18 @@ Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), w
 | 5 | `adversarial-io-validation` | I/O Safety | File operations, external assumptions, path validation |
 | 6 | `adversarial-testing` | Test Quality | Test coverage gaps, brittle tests, missing scenarios |
 | 7 | `python-simplifier` | Python Modernization | Python 3.14+ patterns, type hints, modern idioms |
+| 8 | `taint-propagation` | Cross-File Security | Taint analysis for path traversal, input sanitization across modules |
+| 9 | `circular-dependency` | Architecture | Circular import detection, layering violations, abstraction leaks |
+| 10 | `duplicate-detection` | Code Duplication | AST-based duplicate function/class detection across files |
+| 11 | `async-concurrency` | Async Safety | Shared state mutation in async, module-level mutable state |
+| 12 | `domain-correctness` | Business Logic | Requirements alignment, domain rules, edge cases, mental execution |
 
-### What Changed (Migration from 10 agents)
+### What Changed (Comprehensive Integration)
 
-**Removed agents and rationale:**
-- `adversarial-bugs` → absorbed by `adversarial-logic` (same coverage)
-- `adversarial-performance` (DRY) → absorbed by `adversarial-quality` (code quality)
-- `/ai-pi-zai-glm51` (architecture) → manual invoke for deep architectural analysis
-- `/ai-pi-mm-m27` (testing) → replaced by `adversarial-testing` (better test focus)
-- `/ai-gemini` (deep insight) → absorbed by `adversarial-logic` and `adversarial-quality`
-
-**Restored agents (added back):**
-- `adversarial-testing` → Test coverage gaps, brittle tests, missing edge cases
-- `python-simplifier` → Python 3.12+ modernization, type hints, modern idioms
+**Integrated from specialized review skills:**
+- `meta-review` → Split into `taint-propagation` and `circular-dependency` agents
+- `python-backend-reviewer` → Split into `duplicate-detection` and `async-concurrency` agents  
+- `code-reviewer-business-logic` → Integrated as `domain-correctness` agent
 
 **New capabilities from `/code-review`:**
 - Health Score calculation: `100 - (CRITICAL×20 + HIGH×10 + MEDIUM×5 + LOW×2)`
@@ -38,25 +37,16 @@ Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), w
 
 ### Agent Launch Protocol
 
-- **Stagger launches**: 30 seconds apart to avoid context flooding
-- **Total discovery time**: ~3 minutes (was ~4.5 minutes with 10 agents)
+- **Parallel launches**: All 12 agents run concurrently for efficient discovery
+- **Total discovery time**: ~3 minutes (parallel execution)
 - **Output format**: Each agent writes findings via `Write` tool (not `Bash`) to avoid shell quoting issues
 - **Verification requirement**: Each agent MUST read the actual file at the reported line before including findings. Confirmed code = VERIFIED (confidence 95+); description-only inference = UNVERIFIED
 - **Minimum finding quality**: Every finding requires non-empty `description`, `file`, `line`, and `confidence`. Discard findings with empty descriptions or confidence below threshold
 - **Graceful degradation**: If any agent fails or times out, skip it and continue with remaining agents
 
-### Rollback Option
-
-To use the legacy 10-agent configuration:
-```bash
-/refactor <path> --legacy-agents
-```
-
-This uses `agent-configs.md.old` and skips the synthesis phase.
-
 ## Output Paths
 
-- Artifacts dir: `P:\\\\.claude/.artifacts/{terminal_id}/refactor/`
+- Artifacts dir: `P://.claude/.artifacts/{terminal_id}/refactor/`
 - Output path: `{artifacts_dir}/{target}/refactor/findings-{agent-name}.json`
 - terminal_id resolution: `CLAUDE_TERMINAL_ID` → `WT_SESSION` → `ConEmuServerPID` → `console_unknown`
 

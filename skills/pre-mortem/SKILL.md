@@ -26,24 +26,24 @@ verification:
     - description: "Confirm p3.md synthesis exists"
       tool: "Bash"
       args:
-        command: 'ls -la "P:\\\\\\.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p3.md" 2>/dev/null | tail -1 || echo "NO P3 FOUND"'
+        command: 'ls -la "P://.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p3.md" 2>/dev/null | tail -1 || echo "NO P3 FOUND"'
     - description: "Confirm Phase 1 findings exist"
       tool: "Bash"
       args:
-        command: 'ls -la "P:\\\\\\.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p1_findings.md" 2>/dev/null | tail -1 || echo "NO P1 FOUND"'
+        command: 'ls -la "P://.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p1_findings.md" 2>/dev/null | tail -1 || echo "NO P1 FOUND"'
     - description: "Confirm Phase 2 meta-critique exists"
       tool: "Bash"
       args:
-        command: 'ls -la "P:\\\\\\.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p2.md" 2>/dev/null | tail -1 || echo "NO P2 FOUND"'
+        command: 'ls -la "P://.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p2.md" 2>/dev/null | tail -1 || echo "NO P2 FOUND"'
     - description: "Count findings with severity levels"
       tool: "Bash"
       args:
-        command: 'grep -cP "\\[(CRITICAL|HIGH|MEDIUM|LOW)\\]" "P:\\\\\\.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p3.md" 2>/dev/null || echo "0"'
+        command: 'grep -cP "\\[(CRITICAL|HIGH|MEDIUM|LOW)\\]" "P://.claude/.artifacts/$WT_SESSION/pre-mortem/pre-mortem-*/p3.md" 2>/dev/null || echo "0"'
   summary_mode: evidence_only
   expected_artifacts:
-    - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p1_findings.md"
-    - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p2.md"
-    - "P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p3.md"
+    - "P://.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p1_findings.md"
+    - "P://.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p2.md"
+    - "P://.claude/.artifacts/{terminal_id}/pre-mortem/{session_id}/p3.md"
 ---
 # Critique — Adaptive Adversarial Review
 
@@ -224,17 +224,17 @@ Read the triage prompt, classify the work, select specialists, dispatch in paral
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p1_initial_review.md`
-Read the work: cat "P:\\\\\\{session_dir}/work.md"
+Read the work: cat "P://{session_dir}/work.md"
 Follow the triage and dispatch instructions in p1_initial_review.md
-Write consolidated findings to: P:\\\\\\{session_dir}/p1_findings.md
-Output ONLY the path P:\\\\\\{session_dir}/p1_findings.md
+Write consolidated findings to: P://{session_dir}/p1_findings.md
+Output ONLY the path P://{session_dir}/p1_findings.md
 ```
 
 Phase 1 agents dispatch specialists in parallel via Task tool. Each specialist writes its findings to the session dir. Phase 1 agent consolidates all specialist output into `p1_findings.md`.
 
 **Dispatch failure tracking:** After launching specialist agents, the orchestrator must track which specialists were dispatched via the dispatch manifest. If a specialist was launched but produces no JSON output, that is a dispatch failure. After the dispatch loop, the orchestrator checks whether specialist JSONs are already available (idempotent resume). If all dispatched specialists have valid JSONs, it proceeds to consolidation. If partial or none, it prints guidance to re-run `/pre-mortem`.
 
-**Phase 1 Completion Gate:** Before proceeding to Step 4, verify that ALL dispatched specialists (from the manifest) have valid JSONs in `P:\\\\\\{session_dir}/specialists/` and `p1_findings.md` exists. If any dispatched specialist's JSON is missing, re-run `/pre-mortem` — the manifest ensures already-dispatched agents are skipped. Do not proceed to Phase 2 with partial input.
+**Phase 1 Completion Gate:** Before proceeding to Step 4, verify that ALL dispatched specialists (from the manifest) have valid JSONs in `P://{session_dir}/specialists/` and `p1_findings.md` exists. If any dispatched specialist's JSON is missing, re-run `/pre-mortem` — the manifest ensures already-dispatched agents are skipped. Do not proceed to Phase 2 with partial input.
 
 ### Step 4: Launch Phase 2 — Cross-Agent Meta-Critique
 
@@ -242,11 +242,11 @@ After Phase 1 specialists complete:
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p2_meta_critique.md`
-Read: cat "P:\\\\\\{session_dir}/work.md"
-Read: cat "P:\\\\\\{session_dir}/p1_findings.md"
+Read: cat "P://{session_dir}/work.md"
+Read: cat "P://{session_dir}/p1_findings.md"
 Follow the meta-critique instructions
-Write meta-critique to: P:\\\\\\{session_dir}/p2.md
-Output ONLY the path P:\\\\\\{session_dir}/p2.md
+Write meta-critique to: P://{session_dir}/p2.md
+Output ONLY the path P://{session_dir}/p2.md
 ```
 
 ### Step 5: Launch Phase 3 — Synthesis
@@ -255,17 +255,17 @@ After Phase 2 complete:
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p3_synthesis.md`
-Read: cat "P:\\\\\\{session_dir}/work.md"
-Read: cat "P:\\\\\\{session_dir}/p1_findings.md"
-Read: cat "P:\\\\\\{session_dir}/p2.md"
+Read: cat "P://{session_dir}/work.md"
+Read: cat "P://{session_dir}/p1_findings.md"
+Read: cat "P://{session_dir}/p2.md"
 Follow the synthesis instructions
-Write final critique to: P:\\\\\\{session_dir}/p3.md
-Output ONLY the path P:\\\\\\{session_dir}/p3.md
+Write final critique to: P://{session_dir}/p3.md
+Output ONLY the path P://{session_dir}/p3.md
 ```
 
 ### Step 6: Deliver Final Output — RNS Format
 
-Read `P:\\\\\\{session_dir}/p3.md` and present it as the final output **reformatted as RNS**.
+Read `P://{session_dir}/p3.md` and present it as the final output **reformatted as RNS**.
 
 After presenting, log the skill coverage:
 
@@ -281,7 +281,7 @@ for lib_dir in candidate_lib_dirs:
     if lib_dir.exists():
         sys.path.insert(0, str(lib_dir))
         break
-sys.path.insert(0, 'P:\\\\\\.claude/skills/gto/lib')
+sys.path.insert(0, 'P://.claude/skills/gto/lib')
 from premortem_io import PreMortemSession, _get_terminal_id
 from skill_coverage_detector import _append_skill_coverage
 
@@ -303,7 +303,7 @@ _append_skill_coverage(
 Before cleanup, you MUST complete verification. Do NOT write a freeform summary.
 
 1. Run each command from the `verification.commands` frontmatter
-2. **Write results to artifact:** `P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/verification.json`
+2. **Write results to artifact:** `P://.claude/.artifacts/{terminal_id}/pre-mortem/verification.json`
 3. Paste each tool's output verbatim with PASS/FAIL status
 4. Add NO interpretive claims not directly supported by tool output
 
@@ -311,7 +311,7 @@ Before cleanup, you MUST complete verification. Do NOT write a freeform summary.
 
 ### Step 7: Cleanup
 
-Session directories persist under `P:\\\\\\.claude/.artifacts/{terminal_id}/pre-mortem/` until manually removed.
+Session directories persist under `P://.claude/.artifacts/{terminal_id}/pre-mortem/` until manually removed.
 
 ## Output Structure
 
@@ -394,7 +394,7 @@ Organize by domain using the 7 sections as domains. Severity is implied by domai
 **Step 8a: Identify the target**
 
 From work.md, determine what was reviewed:
-- If a skill was reviewed, the target is `P:\\\\\\.claude/skills/{skill_name}/`
+- If a skill was reviewed, the target is `P://.claude/skills/{skill_name}/`
 - If a plan was reviewed, the target is the plan file referenced
 - If a module was reviewed, the target is that module's path
 

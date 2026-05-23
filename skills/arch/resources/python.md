@@ -212,7 +212,7 @@ boundaries = integrator.detect_boundaries(target_path)
 ## Resilience Considerations
 
 **For Python I/O-bound operations:** Use `@with_resilience(profile='aggressive')` for external API/LLM calls
-- Location: `P:\\\\\\__csf/src/lib/resilience_patterns.py`
+- Location: `P://__csf/src/lib/resilience_patterns.py`
 - Retry on: `ConnectionError`, `TimeoutError`, `TransientLLMError`, `QuotaError`
 - No retry on: `InvalidUserInputError` (user errors should fail fast)
 

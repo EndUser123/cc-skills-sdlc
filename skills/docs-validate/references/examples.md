@@ -3,7 +3,7 @@
 ## Example 1: Circular Reference Detection
 
 ```bash
-/docs-validate P:\\\\\\packages/skill-guard
+/docs-validate P://packages/skill-guard
 
 **Output**: Critical issue detected
 - circular_reference: src/skill_guard/SKILL.md <-> references/conversion.md
@@ -14,7 +14,7 @@
 ## Example 2: Incomplete Content Detection
 
 ```bash
-check docs in P:\\\\\\.claude/skills/my-skill
+check docs in P://.claude/skills/my-skill
 
 **Output**: Important issues detected
 - incomplete_content: references/advanced.md (12 lines)
@@ -25,7 +25,7 @@ check docs in P:\\\\\\.claude/skills/my-skill
 ## Example 3: Version Conflict Detection
 
 ```bash
-validate documentation P:\\\\\\packages/skill-guard
+validate documentation P://packages/skill-guard
 
 **Output**: Important issue detected
 - version_conflict: README.md references "v5.1 structure"

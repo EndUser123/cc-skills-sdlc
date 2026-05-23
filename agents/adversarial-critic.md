@@ -44,9 +44,12 @@ P:/.claude/plans/adversarial/testing-findings.json
 P:/.claude/plans/adversarial/security-findings.json
 P:/.claude/plans/adversarial/failure-modes-findings.json
 P:/.claude/plans/adversarial/performance-findings.json
+P:/.claude/plans/adversarial/comments-findings.json
+P:/.claude/plans/adversarial/types-findings.json
+P:/.claude/plans/adversarial/failures-findings.json
 ```
 
-Expected findings count: 5-6 agent files (some may not exist for all reviews).
+Expected findings count: 5-9 agent files (some may not exist for all reviews).
 
 **If files are missing**: Analyze available files, note which agents are missing. Do NOT fall back to generic file discovery.
 

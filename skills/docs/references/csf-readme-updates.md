@@ -48,8 +48,8 @@ When creating new documentation in `$__CSF_ROOT/`:
 | `CLAUDE.md` | Module context for Claude Code | All code modules |
 | `README.md` | General documentation for humans | All public packages |
 | `$__CSF_ROOT/README.md` | **Main project index** | Update when adding docs to CSF NIP |
-| `P:\\\\\\README.md` | **CSF documentation hub** | Update when adding major components |
-| `P:\\\\\\packages\README.md` | **Packages catalog** | Update when adding new packages |
+| `P://README.md` | **CSF documentation hub** | Update when adding major components |
+| `P://packages/README.md` | **Packages catalog** | Update when adding new packages |
 | `ARCHITECTURE.md` | System design and components | Complex systems |
 | `CHANGELOG.md` | Version history | Libraries/packages |
 | `API.md` | API reference | Libraries with external API |

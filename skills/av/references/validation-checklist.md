@@ -63,7 +63,7 @@ Run this checklist after analyzing a skill. Sections 0-F cover classification, s
 
 ## Section E: Execution Registry (EXECUTION skills only)
 
-Location: `P:\\\\\\.claude/hooks/StopHook_skill_execution_gate.py`
+Location: `P://.claude/hooks/StopHook_skill_execution_gate.py`
 
 - [ ] Skill added to `SKILL_EXECUTION_REGISTRY` dict
 - [ ] `tools` list specifies required execution tools (Bash, Task, Read, WebSearch, etc.)

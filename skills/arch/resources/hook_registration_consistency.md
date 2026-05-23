@@ -177,7 +177,7 @@ HOOK REGISTRATION INCONSISTENCY DETECTED
 Event: UserPromptSubmit
 Severity: warning
 Issue: 1 hook(s) registered via settings.json instead of modular registry
-  • P:\\\\\\.claude/hooks/UserPromptSubmit_discovery_block.py
+  • P://.claude/hooks/UserPromptSubmit_discovery_block.py
 
 Recommendation: Refactor to use @register_hook decorator pattern
   1. Move to UserPromptSubmit_modules/discovery_block.py
@@ -202,9 +202,9 @@ Architectural impact:
 Stage 0.2: Hook Registration Consistency Check
 
 SCANNING REGISTRATION SOURCES:
-  ✓ P:\\\\\\.claude/settings.json
-  ✓ P:\\\\\\.claude/hooks/PreToolUse.py (UNIVERSAL hooks)
-  ✓ P:\\\\\\.claude/hooks/UserPromptSubmit_modules/registry.py
+  ✓ P://.claude/settings.json
+  ✓ P://.claude/hooks/PreToolUse.py (UNIVERSAL hooks)
+  ✓ P://.claude/hooks/UserPromptSubmit_modules/registry.py
 
 DETECTED INCONSISTENCIES:
 
@@ -214,7 +214,7 @@ Issue: 1 hook(s) registered via settings.json instead of modular registry
   • UserPromptSubmit_discovery_block.py (standalone)
 
 Current registration:
-  settings.json → UserPromptSubmit → python P:\\\\\\.claude/hooks/UserPromptSubmit_discovery_block.py
+  settings.json → UserPromptSubmit → python P://.claude/hooks/UserPromptSubmit_discovery_block.py
 
 Architectural inconsistency:
   • Most UserPromptSubmit hooks use modular registry (@register_hook)
@@ -266,9 +266,9 @@ def test_hook_registration_consistency():
 
 ## Related Documentation
 
-- `P:\\\\\\.claude/hooks/CLAUDE.md` - Hook Registration Pattern section
-- `P:\\\\\\.claude/hooks/UserPromptSubmit_modules/registry.py` - Modular registry pattern
-- `P:\\\\\\.claude/hooks/PreToolUse.py` - Router pattern (UNIVERSAL hooks)
+- `P://.claude/hooks/CLAUDE.md` - Hook Registration Pattern section
+- `P://.claude/hooks/UserPromptSubmit_modules/registry.py` - Modular registry pattern
+- `P://.claude/hooks/PreToolUse.py` - Router pattern (UNIVERSAL hooks)
 
 ## Version History
 

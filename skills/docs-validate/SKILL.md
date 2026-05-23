@@ -37,13 +37,13 @@ Trigger this skill when:
 **Manual Validation** (comprehensive reports):
 ```bash
 # Validate specific documentation directory
-/docs-validate P:\\\\\\.claude/skills/my-skill
+/docs-validate P://.claude/skills/my-skill
 
 # Validate current directory
 /docs-validate
 
 # Check documentation quality
-check documentation quality in P:\\\\\\packages/my-project/docs
+check documentation quality in P://packages/my-project/docs
 ```
 
 ## Integration
@@ -102,7 +102,7 @@ See **references/validation-checks.md** for detailed detection rules, examples, 
 ```
 ## Documentation Validation Report
 
-Target: P:\\\\\\.claude/skills/my-skill
+Target: P://.claude/skills/my-skill
 Issues Found: 3
 
 ### Critical (1)

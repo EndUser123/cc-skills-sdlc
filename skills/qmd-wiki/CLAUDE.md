@@ -24,7 +24,7 @@ QMD-based wiki integration for the wiki skill — provides persistent knowledge 
 
 ## Vault Location
 
-`P:\\\\\\.data/wiki`
+`P://.data/wiki`
 
 ## Directory Structure
 

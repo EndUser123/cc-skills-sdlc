@@ -11,7 +11,7 @@ permissionMode: plan
 **MANDATORY: Read the plan path from the orchestrator's prompt FIRST, before any analysis.**
 
 The orchestrator will provide the plan path in the task prompt. You MUST:
-1. Extract the plan path from the prompt (look for a path like `C:\Users\...` or `P:\...`)
+1. Extract the plan path from the prompt (look for a path like `C:\Users\...` or `P:/...`)
 2. Read the entire plan file at that path
 3. THEN perform your analysis based on the plan content
 4. Write findings to `P:/.claude/plans/adversarial/performance-findings.json`

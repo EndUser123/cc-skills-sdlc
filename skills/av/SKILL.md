@@ -8,8 +8,8 @@ description: Analyze and improve skills - generates complete hook files automati
 
 **When invoked, IMMEDIATELY:**
 
-1. READ `P:\\\\\\.claude/skills/<skill>/SKILL.md`
-2. READ `P:\\\\\\.claude/docs/claude-hooks-v2.1.15.md` (lines 808-835 for skill hooks)
+1. READ `P://.claude/skills/<skill>/SKILL.md`
+2. READ `P://.claude/docs/claude-hooks-v2.1.15.md` (lines 808-835 for skill hooks)
 3. CLASSIFY skill type (see Skill Type Classification below)
 4. RUN validation checklist (6 sections) -- see `references/validation-checklist.md`
 5. ANALYZE complexity for recommendation:
@@ -71,7 +71,7 @@ hooks:
 ## Documentation References
 
 **Before generating hooks, READ:**
-- `P:\\\\\\.claude/docs/claude-hooks-v2.1.15.md` -- Lines 808-835 (skill hooks), 142-163 (lifecycle), 168-200 (schemas)
+- `P://.claude/docs/claude-hooks-v2.1.15.md` -- Lines 808-835 (skill hooks), 142-163 (lifecycle), 168-200 (schemas)
 - CKS queries: `/search "skill hooks frontmatter matcher"`, `/search "PreToolUse gate skill"`, `/search "PostToolUse validator transition"`
 
 ---

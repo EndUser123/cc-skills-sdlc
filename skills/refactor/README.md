@@ -52,8 +52,8 @@ New-Item -ItemType Junction -Path "$CLAUDE_ROOT/skills\$junctionName" -Target "$
 ```
 
 **Key points:**
-- ✅ Edit in `P:\\\\\\packages/cc-skills-sdlc/skills/refactor/`, changes work immediately
-- ✅ No reinstallation required - skills auto-discover from `P:\\\\\\.claude/skills/`
+- ✅ Edit in `P://packages/cc-skills-sdlc/skills/refactor/`, changes work immediately
+- ✅ No reinstallation required - skills auto-discover from `P://.claude/skills/`
 - ✅ Perfect for active development
 
 #### 2. HOOKS (Dev Deployment - Hook Files Only)
@@ -62,9 +62,9 @@ New-Item -ItemType Junction -Path "$CLAUDE_ROOT/skills\$junctionName" -Target "$
 
 **Setup:**
 ```powershell
-# Symlink individual hook files to P:\\\\\\.claude/hooks/
-cd P:\\\\\\.claude/hooks
-cmd /c "mklink HookName.py P:\\\\\\packages/cc-skills-sdlc/skills/refactor/scripts/hooks/HookName.py"
+# Symlink individual hook files to P://.claude/hooks/
+cd P://.claude/hooks
+cmd /c "mklink HookName.py P://packages/cc-skills-sdlc/skills/refactor/scripts/hooks/HookName.py"
 ```
 
 #### 3. PLUGINS (End User Deployment)
@@ -74,7 +74,7 @@ cmd /c "mklink HookName.py P:\\\\\\packages/cc-skills-sdlc/skills/refactor/scrip
 **Setup:**
 ```bash
 # End users install via /plugin command
-/plugin P:\\\\\\packages/cc-skills-sdlc/skills/refactor
+/plugin P://packages/cc-skills-sdlc/skills/refactor
 ```
 
 ## 🏗️ Architecture
@@ -152,7 +152,7 @@ Invoke the refactor skill from Claude Code:
 /refactor --files src/**/*.py
 
 # Enable incremental mode
-/refactor --incremental --state-file P:\\\\\\.claude/state/refactor/refactor_<terminal_id>.json
+/refactor --incremental --state-file P://.claude/state/refactor/refactor_<terminal_id>.json
 
 # Custom complexity threshold
 /refactor --cc-threshold 20

@@ -262,7 +262,7 @@ sqlalchemy.exc.OperationalError: server closed the connection unexpectedly
 
 Run tests with:
 ```bash
-cd P:\\\\\\.claude/skills/t
+cd P://.claude/skills/t
 python -m pytest tests/ -v
 
 # Run specific test file

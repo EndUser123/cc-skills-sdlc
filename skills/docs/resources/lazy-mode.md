@@ -97,7 +97,7 @@ Dry run mode specifically checks for these required files in modified directorie
 The CSF project uses a hierarchical README structure for documentation:
 
 ```
-P:\\\\\\
+P://
 ├── README.md                    # Main CSF documentation hub
 ├── __csf/
 │   └── README.md                # Project-specific (modules, commands)
@@ -120,11 +120,11 @@ When modifying files in these locations:
 
 | Modified Path | Check Documentation |
 |---------------|-------------------|
-| `P:\\\\\\*` | `P:\\\\\\README.md` (main hub) |
-| `P:\\\\\\__csf/*` | `P:\\\\\\__csf/README.md` |
-| `P:\\\\\\packages/*` | `P:\\\\\\packages/README.md` + specific package README |
-| `P:\\\\\\.claude/hooks/*` | `P:\\\\\\.claude/hooks/README.md` |
-| `P:\\\\\\.claude/skills/*` | `P:\\\\\\.claude/skills/README.md` |
+| `P://*` | `P://README.md` (main hub) |
+| `P://__csf/*` | `P://__csf/README.md` |
+| `P://packages/*` | `P://packages/README.md` + specific package README |
+| `P://.claude/hooks/*` | `P://.claude/hooks/README.md` |
+| `P://.claude/skills/*` | `P://.claude/skills/README.md` |
 
 ### Cross-Reference Updates
 
@@ -133,7 +133,7 @@ When creating NEW documentation:
 - Add to appropriate catalog/index
 - Maintain tree structure consistency
 
-Example: Creating `packages/new-package/` → Update `P:\\\\\\packages/README.md` AND `P:\\\\\\README.md`
+Example: Creating `packages/new-package/` → Update `P://packages/README.md` AND `P://README.md`
 
 ## How It Filters Your Work (Not Other Devs')
 

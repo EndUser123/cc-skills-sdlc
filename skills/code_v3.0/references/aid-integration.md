@@ -47,4 +47,4 @@ if analysis["scalability_bottlenecks"]:
     plan["architecture_notes"] += f"Known bottleneck: {analysis['scalability_bottlenecks'][0]}"
 ```
 
-**Integration module**: `P:\\\\\\\.claude\\skills\\arch\\aid_integration.py`
+**Integration module**: `P:///.claude//skills//arch//aid_integration.py`

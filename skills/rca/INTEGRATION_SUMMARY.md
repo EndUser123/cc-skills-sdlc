@@ -76,7 +76,7 @@ All modules have comprehensive docstrings:
 |----------|---------|---------|
 | `DEBUGRCA_LOCAL_ONLY` | unset | Enable local-only mode |
 | `DEBUGRCA_SATURATION_THRESHOLD` | 0.75 | Evidence saturation threshold |
-| `DEBUGRCA_STATE_DIR` | `P:\\\\\\.claude/state/rca` | State directory |
+| `DEBUGRCA_STATE_DIR` | `P://.claude/state/rca` | State directory |
 | `DEBUGRCA_TOOL_GATE_ENABLED` | true | Tool gate on/off |
 
 ## Installation
@@ -86,7 +86,7 @@ All modules have comprehensive docstrings:
 pip install rca
 
 # From source
-cd P:\\\\\\packages/rca
+cd P://packages/rca
 pip install -e .
 ```
 
@@ -144,14 +144,14 @@ To verify the installation:
 
 ```bash
 # Run tests
-cd P:\\\\\\packages/rca
+cd P://packages/rca
 pytest tests/ -v
 
 # Check imports
 python -c "from rca import EvidenceSaturationDetector; print('OK')"
 
 # Check hook
-python P:\\\\\\.claude/hooks/PreToolUse/debugrca_tool_gate.py
+python P://.claude/hooks/PreToolUse/debugrca_tool_gate.py
 ```
 
 ## Files Created/Modified

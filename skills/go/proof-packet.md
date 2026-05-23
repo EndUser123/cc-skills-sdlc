@@ -54,11 +54,11 @@ Transforms a skill's `SKILL.md` into a self-contained, navigable, browser-verifi
 # Example: /skill-to-page go
 ```
 
-**Reads:** `P:\\\\\\.claude/skills/{target}/SKILL.md`
+**Reads:** `P://.claude/skills/{target}/SKILL.md`
 **Outputs:**
-- `P:\\\\\\.claude/skills/{target}/index.html`
-- `P:\\\\\\.claude/skills/{target}/artifact-proof.json` (recommended)
-- `P:\\\\\\.claude/skills/{target}/workflow-model.json` (recommended)
+- `P://.claude/skills/{target}/index.html`
+- `P://.claude/skills/{target}/artifact-proof.json` (recommended)
+- `P://.claude/skills/{target}/workflow-model.json` (recommended)
 
 ---
 
@@ -697,9 +697,9 @@ const GO_DIAGRAM_COLORS = {
 {
   "skill_name": "go",
   "skill_version": "2.0.0",
-  "source_path": "P:\\\\\\\packages\\cc-skills-sdlc\\skills\\go\\SKILL.md",
-  "artifact_path": "P:\\\\\\\packages\\cc-skills-sdlc\\skills\\go\\index.html",
-  "workflow_model_path": "P:\\\\\\\packages\\cc-skills-sdlc\\skills\\go\\workflow-model.json",
+  "source_path": "P:///packages//cc-skills-sdlc//skills//go//SKILL.md",
+  "artifact_path": "P:///packages//cc-skills-sdlc//skills//go//index.html",
+  "workflow_model_path": "P:///packages//cc-skills-sdlc//skills//go//workflow-model.json",
   "generated_at": "2026-04-27T21:50:00Z",
   "generator_skill_version": "2.0.0",
   "mermaid_version": "11",

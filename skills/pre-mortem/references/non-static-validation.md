@@ -21,7 +21,7 @@ For this pre-mortem package, the safe local live checks are:
 
 - verify the Codex installed adapter exists and all package-owned reference paths resolve;
 - import `premortem_io.py`, create a temporary session root, write a work file, create the specialists directory, verify path containment, and delete the temporary root;
-- run `claude plugin validate P:\packages\cc-skills-sdlc`;
+- run `claude plugin validate P:/packages/cc-skills-sdlc`;
 - run `claude plugin details cc-skills-sdlc@local` and verify `pre-mortem` plus all package-owned adversarial agents are visible;
 - verify the Claude plugin cache contains the current package version and pre-mortem files after `claude plugin update`;
 - report when Claude says restart is required.

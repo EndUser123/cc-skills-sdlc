@@ -92,14 +92,14 @@ This must run before Step 4 so that the specialists directory exists for the ide
 
 Before dispatching specialists, check whether their output files already exist at the canonical path and read any existing dispatch manifest.
 
-**Expected output path pattern:** `P:\\\\\\{session_dir}/specialists/{specialist-name}-findings.json`
+**Expected output path pattern:** `P://{session_dir}/specialists/{specialist-name}-findings.json`
 
-For each selected specialist, check if `P:\\\\\\{session_dir}/specialists/{specialist-name}-findings.json` already exists and contains valid JSON (validation is implemented in Step 5c).
+For each selected specialist, check if `P://{session_dir}/specialists/{specialist-name}-findings.json` already exists and contains valid JSON (validation is implemented in Step 5c).
 
 - If ALL specialist output files exist and are valid, skip dispatch entirely and proceed directly to Step 6 (consolidation).
 - If ANY output file is missing or invalid, dispatch ONLY the missing or invalid specialists.
 
-**Also check for an existing dispatch manifest** from a prior interrupted run. If `P:\\\\\\{session_dir}/specialists/dispatch_manifest.json` exists, read it to know which specialists were already dispatched in the interrupted run. Use this to skip them on re-run.
+**Also check for an existing dispatch manifest** from a prior interrupted run. If `P://{session_dir}/specialists/dispatch_manifest.json` exists, read it to know which specialists were already dispatched in the interrupted run. Use this to skip them on re-run.
 
 ## Step 5: Dispatch Missing Specialists
 
@@ -133,7 +133,7 @@ Launch ALL specialists in parallel by making multiple `Agent(...)` tool calls in
 ```json
 Agent({
   "description": "Run specialist review",
-  "prompt": "Read P:/packages/cc-skills-sdlc/agents/{specialist}.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/{specialist}-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/{specialist}-complete.json containing: {\"specialist\": \"{specialist}\", \"complete\": true}. Return ONLY the file path in your response text.",
+  "prompt": "Read P:/packages/cc-skills-sdlc/agents/{specialist}.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/{specialist}-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/{specialist}-complete.json containing: {\"specialist\": \"{specialist}\", \"complete\": true}. Return ONLY the file path in your response text.",
   "subagent_type": "general-purpose"
 })
 ```
@@ -141,10 +141,10 @@ Agent({
 **Dispatch pattern for 4 specialists (example):**
 
 ```json
-Agent({"description": "adversarial-logic specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-logic.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/adversarial-logic-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/adversarial-logic-complete.json containing: {\"specialist\": \"adversarial-logic\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
-Agent({"description": "adversarial-compliance specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-compliance.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/adversarial-compliance-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/adversarial-compliance-complete.json containing: {\"specialist\": \"adversarial-compliance\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
-Agent({"description": "adversarial-quality specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-quality.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/adversarial-quality-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/adversarial-quality-complete.json containing: {\"specialist\": \"adversarial-quality\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
-Agent({"description": "adversarial-testing specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-testing.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/adversarial-testing-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/adversarial-testing-complete.json containing: {\"specialist\": \"adversarial-testing\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
+Agent({"description": "adversarial-logic specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-logic.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/adversarial-logic-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/adversarial-logic-complete.json containing: {\"specialist\": \"adversarial-logic\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
+Agent({"description": "adversarial-compliance specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-compliance.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/adversarial-compliance-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/adversarial-compliance-complete.json containing: {\"specialist\": \"adversarial-compliance\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
+Agent({"description": "adversarial-quality specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-quality.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/adversarial-quality-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/adversarial-quality-complete.json containing: {\"specialist\": \"adversarial-quality\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
+Agent({"description": "adversarial-testing specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-testing.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/adversarial-testing-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/adversarial-testing-complete.json containing: {\"specialist\": \"adversarial-testing\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
 ```
 
 **Key points:**
@@ -169,7 +169,7 @@ If not `"1"`, use the standard Agent dispatch for all specialists (Step 5b).
 **If enabled**, for `adversarial-quality` ONLY, dispatch via Bash instead of Agent. Remove `adversarial-quality` from the parallel Agent dispatch batch and handle it separately:
 
 ```bash
-python "P:\\\\\\packages/cc-skills-ai-cli/skills/ai-cli/ai_cli.py" "Review the work file at P:\\\\\\{session_dir}/work.md for maintainability risks, tech debt, structural quality issues, and missing best practices. Output findings as a JSON array with severity (HIGH/MEDIUM/LOW), description, and location." --context "P:\\\\\\{session_dir}/work.md" --gemini-only --output-format json --no-critic --timeout 120
+python "P://packages/cc-skills-ai-cli/skills/ai-cli/ai_cli.py" "Review the work file at P://{session_dir}/work.md for maintainability risks, tech debt, structural quality issues, and missing best practices. Output findings as a JSON array with severity (HIGH/MEDIUM/LOW), description, and location." --context "P://{session_dir}/work.md" --gemini-only --output-format json --no-critic --timeout 120
 ```
 
 **Transform output:** Parse the ai-cli JSON output and write to the canonical specialist findings path:
@@ -198,15 +198,15 @@ canonical = {
     'findings': findings,
     'model': raw.get('model', {}).get('name', 'gemini-external'),
 }
-findings_path = Path('P:\\\\\\{session_dir}/specialists/adversarial-quality-findings.json')
+findings_path = Path('P://{session_dir}/specialists/adversarial-quality-findings.json')
 findings_path.write_text(json.dumps(canonical, indent=2), encoding='utf-8')
 ```
 
-Write a completion marker to `P:\\\\\\{session_dir}/specialists/adversarial-quality-complete.json` containing `{"specialist": "adversarial-quality", "complete": true}`.
+Write a completion marker to `P://{session_dir}/specialists/adversarial-quality-complete.json` containing `{"specialist": "adversarial-quality", "complete": true}`.
 
 **Fallback:** If ai-cli fails, fall back to the standard Claude agent dispatch:
 ```json
-Agent({"description": "adversarial-quality specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-quality.md and follow its instructions to review the work at: P:\\\\\\{session_dir}/work.md. Write your JSON findings to: P:\\\\\\{session_dir}/specialists/adversarial-quality-findings.json. When complete, write a completion marker to: P:\\\\\\{session_dir}/specialists/adversarial-quality-complete.json containing: {\"specialist\": \"adversarial-quality\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
+Agent({"description": "adversarial-quality specialist", "prompt": "Read P:/packages/cc-skills-sdlc/agents/adversarial-quality.md and follow its instructions to review the work at: P://{session_dir}/work.md. Write your JSON findings to: P://{session_dir}/specialists/adversarial-quality-findings.json. When complete, write a completion marker to: P://{session_dir}/specialists/adversarial-quality-complete.json containing: {\"specialist\": \"adversarial-quality\", \"complete\": true}. Return ONLY the file path in your response text.", "subagent_type": "general-purpose"})
 ```
 
 **All other specialists** remain Claude agent dispatches (unchanged).
@@ -247,9 +247,9 @@ else:
 
 After all specialists complete, read their JSON output files and produce a consolidated Phase 1 findings document.
 
-**Input files:** Read all `P:\\\\\\{session_dir}/specialists/{name}-findings.json` files that exist (the set dispatched in Step 5 is dynamic — do not hardcode a fixed list).
+**Input files:** Read all `P://{session_dir}/specialists/{name}-findings.json` files that exist (the set dispatched in Step 5 is dynamic — do not hardcode a fixed list).
 
-**Output format** (write to `P:\\\\\\{session_dir}/p1_findings.md`):
+**Output format** (write to `P://{session_dir}/p1_findings.md`):
 
 ```
 ## Triage Classification
@@ -344,9 +344,9 @@ If a specialist found nothing notable in their domain, note: "No significant iss
 **Gate criteria:** ALL dispatched specialists produced JSONs AND `p1_findings.md` exists.
 
 **Verification steps:**
-1. Read `P:\\\\\\{session_dir}/specialists/dispatch_manifest.json` — extract the `dispatched` list
-2. For each specialist in `dispatched`, verify `P:\\\\\\{session_dir}/specialists/{name}-findings.json` exists
-3. Verify `P:\\\\\\{session_dir}/p1_findings.md` exists
+1. Read `P://{session_dir}/specialists/dispatch_manifest.json` — extract the `dispatched` list
+2. For each specialist in `dispatched`, verify `P://{session_dir}/specialists/{name}-findings.json` exists
+3. Verify `P://{session_dir}/p1_findings.md` exists
 
 **Failure modes:**
 - `dispatch_manifest.json` missing → Orchestrator never ran or failed before writing manifest. Re-run from Step 5.

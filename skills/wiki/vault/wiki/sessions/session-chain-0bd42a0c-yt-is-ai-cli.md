@@ -26,11 +26,11 @@ session_id: 0bd42a0c-b199-429a-9543-e71814b1090a
 **Topic:** /ai-cli code review — yt-is repo logging and summary-field mismatches
 
 **User query:** Review the yt-is repo, focused on logging and summary-field mismatches in:
-- `P:\\\\\\packages/yt-is/bin/csf-source`
-- `P:\\\\\\packages/yt-is/csf/transcript.py`
-- `P:\\\\\\packages/yt-is/csf/batch_status.py`
-- `P:\\\\\\packages/yt-is/tests/test_csf_source_fetch_timing.py`
-- `P:\\\\\\packages/yt-is/tests/test_transcript.py`
+- `P://packages/yt-is/bin/csf-source`
+- `P://packages/yt-is/csf/transcript.py`
+- `P://packages/yt-is/csf/batch_status.py`
+- `P://packages/yt-is/tests/test_csf_source_fetch_timing.py`
+- `P://packages/yt-is/tests/test_transcript.py`
 
 **Known context from user:**
 - Routing split intended to be:

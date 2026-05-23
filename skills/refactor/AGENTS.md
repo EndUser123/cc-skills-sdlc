@@ -70,5 +70,5 @@ New-Item -ItemType Junction -Path "$CLAUDE_ROOT/skills\$name" -Target "$CLAUDE_P
 Get-Item "$CLAUDE_ROOT/skills\refactor" | Select-Object LinkType, Target
 
 # Check hooks directory for broken symlinks
-Get-ChildItem P:\\\\\\.claude/hooks -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and -not (Test-Path $_.Target) }
+Get-ChildItem P://.claude/hooks -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and -not (Test-Path $_.Target) }
 ```

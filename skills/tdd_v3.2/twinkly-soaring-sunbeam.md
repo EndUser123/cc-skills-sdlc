@@ -145,7 +145,7 @@ Three interconnected issues with TDD enforcement:
 
 ### Step 1: Add hooks to SKILL.md frontmatter [R:1]
 
-**File:** `P:\\\\\\.claude/skills/tdd/SKILL.md`
+**File:** `P://.claude/skills/tdd/SKILL.md`
 
 Add `hooks:` section to YAML frontmatter (after line 15, before `---` closing):
 
@@ -169,19 +169,19 @@ hooks:
 
 ### Step 2: Create skill hook directory and files
 
-**Create directory:** `P:\\\\\\.claude/skills/tdd/hooks/`
+**Create directory:** `P://.claude/skills/tdd/hooks/`
 
-#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py`
+#### 2a: `PreToolUse_tdd_gate.py` — Migrate from `P://.claude/hooks/pretooluse_tdd_gate.py`
 
 Changes from original:
 - Remove `@lru_cache` on `is_tdd_exempt()` (line 30) — prevents stale exemption decisions
 - In `get_tdd_state_for_file()`: read state with NO cache (direct file read every time)
-- Add `sys.path.insert(0, str(Path("P:\\\\\\.claude/hooks")))` to access `tdd_core`
+- Add `sys.path.insert(0, str(Path("P://.claude/hooks")))` to access `tdd_core`
 - Use `terminal_detection.detect_terminal_id()` for state path resolution
 
 #### 2b: `PostToolUse_tdd_state.py` — New standalone hook with complete main()
 
-The standalone `P:\\\\\\.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
+The standalone `P://.claude/hooks/PostToolUse_tdd_state.py` has a truncated `main()`. Create a complete standalone version that:
 - Reads hook input from stdin (tool_name, tool_input, tool_response)
 - Dispatches to existing `handle_test_file_write()`, `handle_test_run()`, `handle_impl_file_write()` functions (imported from original module)
 - Outputs JSON result to stdout
@@ -193,7 +193,7 @@ The standalone `P:\\\\\\.claude/hooks/PostToolUse_tdd_state.py` has a truncated 
 
 ### Step 3: Fix state management in `tdd_core.py` [R:2]
 
-**File:** `P:\\\\\\.claude/hooks/tdd_core.py`
+**File:** `P://.claude/hooks/tdd_core.py`
 
 #### 3a: Remove in-memory cache
 
@@ -220,7 +220,7 @@ def _resolve_state_file(self, test_file: str | None) -> Path:
     terminal_id = detect_terminal_id()
 
     # Terminal-isolated state directory
-    state_dir = Path("P:\\\\\\.claude/state/tdd") / terminal_id
+    state_dir = Path("P://.claude/state/tdd") / terminal_id
     state_dir.mkdir(parents=True, exist_ok=True)
 
     if test_file:
@@ -233,7 +233,7 @@ Drop `cwd` from hash — terminal_id provides isolation instead.
 
 Update `STATE_DIR` references:
 - `_ensure_state_dir()` — use dynamic path
-- `cleanup_expired_states()` — scan all terminal dirs under `P:\\\\\\.claude/state/tdd/`
+- `cleanup_expired_states()` — scan all terminal dirs under `P://.claude/state/tdd/`
 - Debug/audit log paths — keep in shared location or move to terminal dir
 
 #### 3c: Update callers of STATE_DIR
@@ -245,23 +245,23 @@ Functions that reference the old `STATE_DIR` constant:
 
 ### Step 4: Update settings.json global hook to use fixed tdd_core [R:1]
 
-**File:** `P:\\\\\\.claude/settings.json`
+**File:** `P://.claude/settings.json`
 
 KEEP the `pretooluse_tdd_gate.py` entry in settings.json (lines 156-163) — but update the command path to point to the NEW version in the skill hooks directory:
 
 ```json
 {
   "type": "command",
-  "command": "python P:\\\\\\.claude/hooks/__lib/hook_runner.py P:\\\\\\.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
+  "command": "python P://.claude/hooks/__lib/hook_runner.py P://.claude/skills/tdd/hooks/PreToolUse_tdd_gate.py --timeout 3.0",
   "timeout": 3
 }
 ```
 
-This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P:\\\\\\.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
+This means both the global enforcement AND skill-based enforcement use the SAME fixed hook file (no lru_cache, terminal-isolated state). The original `P://.claude/hooks/pretooluse_tdd_gate.py` becomes dead code.
 
 ### Step 5: Remove TDDStateHook from PostToolUse router [R:1]
 
-**File:** `P:\\\\\\.claude/hooks/posttooluse/__init__.py`
+**File:** `P://.claude/hooks/posttooluse/__init__.py`
 
 REMOVE `TDDStateHook` registration (line 82) and its import (line 37).
 
@@ -373,18 +373,18 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 1. **Move plan to target directory:**
    ```bash
-   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P:\\\\\\.claude/skills/tdd/"
+   mv "C:/Users/brsth/.claude/plans/twinkly-soaring-sunbeam.md" "P://.claude/skills/tdd/"
    ```
 
 2. **Create/update README.md with plan link:**
    ```bash
-   # Add to P:\\\\\\.claude/skills/tdd/README.md:
+   # Add to P://.claude/skills/tdd/README.md:
    # **Plan:** [plan-20250205-tdd-migration.md](twinkly-soaring-sunbeam.md)
    ```
 
 3. **Run /r for deterministic pre-mortem validation:**
    ```
-   /r "validate plan P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md"
+   /r "validate plan P://.claude/skills/tdd/twinkly-soaring-sunbeam.md"
    ```
 
 4. **Adversarial review:**
@@ -394,31 +394,31 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 5. **Implement Step 1 (SKILL.md hooks frontmatter):** [R:1]
    ```bash
-   # Edit P:\\\\\\.claude/skills/tdd/SKILL.md
+   # Edit P://.claude/skills/tdd/SKILL.md
    # Add hooks: section after line 15
    ```
 
 6. **Implement Step 2 (Create skill hooks):** [R:1]
    ```bash
-   mkdir -p P:\\\\\\.claude/skills/tdd/hooks
+   mkdir -p P://.claude/skills/tdd/hooks
    # Create PreToolUse_tdd_gate.py, PostToolUse_tdd_state.py, SessionEnd_tdd_cleanup.py
    ```
 
 7. **Implement Step 3 (Fix tdd_core.py):** [R:2]
    ```bash
-   # Edit P:\\\\\\.claude/hooks/tdd_core.py
+   # Edit P://.claude/hooks/tdd_core.py
    # Remove cache (lines 407-496), add terminal isolation to _resolve_state_file()
    ```
 
 8. **Implement Step 4 (Update settings.json):** [R:1]
    ```bash
-   # Edit P:\\\\\\.claude/settings.json
+   # Edit P://.claude/settings.json
    # Update pretooluse_tdd_gate.py path to skill hooks version
    ```
 
 9. **Implement Step 5 (Remove TDDStateHook from router):** [R:1]
    ```bash
-   # Edit P:\\\\\\.claude/hooks/posttooluse/__init__.py
+   # Edit P://.claude/hooks/posttooluse/__init__.py
    # Remove import line 37 and registration line 82
    ```
 
@@ -431,5 +431,5 @@ The tdd_eval in UserPromptSubmit_router.py (priority 6) handles skill activation
 
 11. **Finalize plan:**
     ```
-    /finalize P:\\\\\\.claude/skills/tdd/twinkly-soaring-sunbeam.md
+    /finalize P://.claude/skills/tdd/twinkly-soaring-sunbeam.md
     ```

@@ -379,6 +379,6 @@ Write `review_bundle_[name]_[date].md` to `$__CSF_ROOT/.staging\`.
 /review_bundle hooks --serial
 # Force single-agent mode
 
-/review_bundle P:\\\\\\custom\path
+/review_bundle P://custom/path
 # Bundle custom directory
 ```

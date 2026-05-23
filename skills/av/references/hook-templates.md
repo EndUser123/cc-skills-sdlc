@@ -69,7 +69,7 @@ import time
 
 # Instance isolation - different CWD = different state file
 instance_id = hashlib.md5(str(Path.cwd()).encode()).hexdigest()[:8]
-STATE_DIR = Path("P:\\\\\\.claude/hooks/state")
+STATE_DIR = Path("P://.claude/hooks/state")
 STATE_FILE = STATE_DIR / f"{SKILL_NAME}_{instance_id}.json"
 
 # Note: State stored centrally in .claude/hooks/state/ (skill-internal hooks reference it)
@@ -215,7 +215,7 @@ suggest:
 **When invoked, IMMEDIATELY execute:**
 
 \`\`\`bash
-python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" "{{user_query}}" {{options}}
+python "P:///.claude//{PATH}\\{SCRIPT}.py" "{{user_query}}" {{options}}
 \`\`\`
 
 **MANDATORY:**
@@ -233,7 +233,7 @@ python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" "{{user_query}}" {{options}}
 
 **DEFAULT (no arguments):**
 \`\`\`bash
-python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" --help
+python "P:///.claude//{PATH}\\{SCRIPT}.py" --help
 \`\`\`
 
 **If execution fails:** Report exact error message. Do NOT fabricate results or provide your own analysis as substitute.
@@ -254,10 +254,10 @@ python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" --help
 
 \`\`\`bash
 # Basic usage
-python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" "example query"
+python "P:///.claude//{PATH}\\{SCRIPT}.py" "example query"
 
 # With options
-python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" "example" --option1 value
+python "P:///.claude//{PATH}\\{SCRIPT}.py" "example" --option1 value
 \`\`\`
 
 ---
@@ -277,7 +277,7 @@ python "P:\\\\\\\.claude\\{PATH}\\{SCRIPT}.py" "example" --option1 value
 
 **IMPORTANT:** After generating an EXECUTION skill, add it to the execution registry:
 
-Location: `P:\\\\\\.claude/hooks/StopHook_skill_execution_gate.py`
+Location: `P://.claude/hooks/StopHook_skill_execution_gate.py`
 
 Add entry to `SKILL_EXECUTION_REGISTRY`:
 ```python

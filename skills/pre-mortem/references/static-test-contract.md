@@ -31,8 +31,8 @@ When static tests are insufficient, report the required non-static validation us
 ## Minimum Local Commands
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File P:\packages\cc-skills-sdlc\skills\pre-mortem\scripts\verify-pre-mortem-layout.ps1
-python -m pytest P:\packages\cc-skills-sdlc\skills\pre-mortem\tests
+powershell -ExecutionPolicy Bypass -File P:/packages/cc-skills-sdlc/skills/pre-mortem/scripts/verify-pre-mortem-layout.ps1
+python -m pytest P:/packages/cc-skills-sdlc/skills/pre-mortem/tests
 ```
 
 These commands are necessary but not sufficient for plugin-install confidence. Use the live validation script when validating actual Claude/Codex availability.

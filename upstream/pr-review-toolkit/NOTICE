@@ -1,0 +1,6 @@
+pr-review-toolkit agents absorbed from Anthropic's claude-plugins-official repository.
+Original license: Apache License 2.0
+Source: C:/Users/brsth/.claude/plugins/cache/claude-plugins-official/pr-review-toolkit/f0d542e34cc7/
+
+Agents: code-reviewer, code-simplifier, comment-analyzer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer
+Command: review-pr

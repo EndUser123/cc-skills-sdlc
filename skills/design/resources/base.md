@@ -716,7 +716,7 @@ Your job: Answer "What's smallest change that solves this?"
 ```
 
 **Persist Output:**
-Auto-save to `P:\\\\\\.claude/arch_decisions/` unless output is under 2KB or user requests ephemeral.
+Auto-save to `P://.claude/arch_decisions/` unless output is under 2KB or user requests ephemeral.
 
 ```python
 # Filename format (use actual datetime, do not hardcode date)
@@ -809,7 +809,7 @@ Weakest assumption: [assumption]. If wrong: [consequence]. Mitigation: [action].
 
 #### 9. Persist Output
 
-Auto-save to `P:\\\\\\.claude/arch_decisions/` unless output is under 2KB or user requests ephemeral.
+Auto-save to `P://.claude/arch_decisions/` unless output is under 2KB or user requests ephemeral.
 
 ```python
 # Filename format (use actual datetime, do not hardcode date)
@@ -824,7 +824,7 @@ filename = f"{date}_{TEMPLATE_TYPE}_{slug}.md"
 ## Resilience Considerations (SHARED)
 
 **For I/O-bound operations:** Consider using `@with_resilience(profile='aggressive')` to handle transient errors
-- Location: `P:\\\\\\__csf/src/lib/resilience_patterns.py`
+- Location: `P://__csf/src/lib/resilience_patterns.py`
 - Retry on: `ConnectionError`, `TimeoutError`, `TransientLLMError`, `QuotaError`
 - No retry on: `InvalidUserInputError` (user errors should fail fast)
 

@@ -220,10 +220,10 @@ Found: 5 Git Bash path(s) to normalize
 
 Would fix:
   state1.json: 2 paths
-    /p/src/test.py → P:\\\\\\\src\\test.py
+    /p/src/test.py → P:///src//test.py
     /c/Users/config.json → C:\\Users\\config.json
   subdir/state2.json: 3 paths
-    /p/.claude/skills/code → P:\\\\\\\.claude\\skills\\code
+    /p/.claude/skills/code → P:///.claude//skills//code
     /d/data/file.txt → D:\\data\\file.txt
 
 No changes made (dry-run mode)
