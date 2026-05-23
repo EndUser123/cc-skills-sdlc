@@ -2,25 +2,23 @@
 
 SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (50)
+## Skills (44)
 
 | Skill | Purpose |
 |-------|---------|
-| arch | Architecture Advisor (Resource Router) |
 | av | Skill Improvement Tool |
 | cfg | /cfg - Control Flow Graph Visualization |
 | chat-to-decisions | God-Tier Chat-to-Decisions v12 |
-| code | /code -- Feature Development Mission Control |
+| code | /code -- Adaptive Feature Development (Task Engine under /go + Mission Control standalone) |
 | code-flow-visualizer | Code Flow Visualizer |
 | code-review | Code Review — Automated Multi-Agent Review |
 | code-reviewer-business-logic | Business Logic Reviewer (Correctness) |
 | critical-code-reviewer | Mindset |
 | deliberate-changes | Deliberate Changes Management |
 | deps | /deps - Dependency Management |
-| design | Architecture Advisor (Resource Router) |
+| design | Architecture Advisor with ADR Phase Gates |
 | diagnose | Structured Diagnostic Protocol |
-| docs | /docs - Documentation Automation |
-| docs-validate | Documentation Quality Validation |
+| docs | /docs - Documentation Automation with inline validation |
 | dpef | DPEF - Deterministic Prompt Execution Framework |
 | go | Task orchestrator (thin) — shared scripts for go-ef/go-pi |
 | go-ct | Task orchestrator (execution-contract migration) |
@@ -28,7 +26,6 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | go-ef | Task orchestrator (evidence-first, canonical) |
 | harden | /harden |
 | mermaid-c4 | Mermaid Diagrams |
-| mermaid-davila7 | Mermaid Diagramming |
 | meta-review | Meta-Review Skill |
 | multi-file-refactor | Code Editing Patterns |
 | perf | /perf - Performance Tracing Wrapper |
@@ -41,7 +38,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | review-pr | PR Review — Multi-agent PR review (absorbed from pr-review-toolkit) |
 | python-backend-reviewer | Python Backend Code Reviewer |
 | qmd-wiki | qmd-wiki |
-| rca | Debug RCA Skill v2.12.0 |
+| rca | Debug RCA Skill — Root cause analysis with Iron Law |
 | review_bundle | Review Bundle Creation |
 | ship | /ship — Deploy readiness and runtime snapshot |
 | snapshot | /snapshot — Session snapshot capture and restore (moved to snapshot package) |

@@ -8,7 +8,7 @@ from datetime import datetime
 
 TARGETS = [
     ('skill-guard', 'P:\\\\\\packages/skill-guard/src/skill_guard'),
-    ('sdlc/code_v3.0/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/code_v3.0/hooks'),
+    ('sdlc/code_v4.0/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/code_v4.0/hooks'),
     ('sdlc/rca/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/rca/hooks'),
     ('sdlc/refactor/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/refactor/hooks'),
     ('sdlc/design/hooks', 'P:\\\\\\packages/cc-skills-sdlc/skills/design/hooks'),

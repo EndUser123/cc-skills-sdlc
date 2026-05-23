@@ -198,6 +198,19 @@ Documentation must be scannable, actionable, specific, and testable. See [refere
 
 Documentation generation via AI Distiller for single-file or multi-file docs, API references, and legacy code discovery. See [references/aid-integration.md](references/aid-integration.md) for commands, capabilities, and when to use AID.
 
+## Automatic Validation
+
+Documentation validation runs automatically as part of every `/docs` invocation. After any documentation update:
+
+1. Check for broken internal links (`[text](path)` references)
+2. Verify code examples compile/parse (syntax check)
+3. Confirm section headings have content (no empty sections)
+4. Validate frontmatter structure in SKILL.md files
+
+This replaces the standalone `/docs-validate` command. Validation happens inline — no separate invocation needed.
+
+Validation reference material: `references/validation-checks.md`, `references/configuration.md`, `references/examples.md`
+
 ## Next Steps
 
 **If docs are updated:**

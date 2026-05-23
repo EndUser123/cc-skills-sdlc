@@ -7,12 +7,16 @@ from pathlib import Path
 # Setup paths for imports
 _HOOKS_DIR = Path(__file__).resolve().parent
 _REFACTOR_HOOKS = _HOOKS_DIR.parent / "skills" / "refactor" / "hooks"
+_CODE_HOOKS = _HOOKS_DIR.parent / "skills" / "code_v4.0" / "hooks"
 if str(_REFACTOR_HOOKS) not in sys.path:
     sys.path.insert(0, str(_REFACTOR_HOOKS))
+if str(_CODE_HOOKS) not in sys.path:
+    sys.path.insert(0, str(_CODE_HOOKS))
 
 # Import child hooks
 import PostToolUse_refactor_transition as transition
 import PostToolUse_refactor_validator as validator
+import PostToolUse_breadcrumb_tracker as breadcrumb
 
 _log = logging.getLogger(__name__)
 
@@ -20,6 +24,7 @@ _log = logging.getLogger(__name__)
 SEQUENCE = [
     ("validator", validator.run),
     ("transition", transition.run),
+    ("breadcrumb", breadcrumb.run),
 ]
 
 def main():

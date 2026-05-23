@@ -8,15 +8,19 @@ from pathlib import Path
 _HOOKS_DIR = Path(__file__).resolve().parent
 _REFACTOR_HOOKS = _HOOKS_DIR.parent / "skills" / "refactor" / "hooks"
 _PREMORTEM_HOOKS = _HOOKS_DIR.parent / "skills" / "pre-mortem" / "hooks"
+_CODE_HOOKS = _HOOKS_DIR.parent / "skills" / "code_v4.0" / "hooks"
 
 if str(_REFACTOR_HOOKS) not in sys.path:
     sys.path.insert(0, str(_REFACTOR_HOOKS))
 if str(_PREMORTEM_HOOKS) not in sys.path:
     sys.path.insert(0, str(_PREMORTEM_HOOKS))
+if str(_CODE_HOOKS) not in sys.path:
+    sys.path.insert(0, str(_CODE_HOOKS))
 
 # Import child hooks
 import Stop_refactor_verifier as refactor_stop
 import Stop_hook_premortem_quality_gate as premortem_stop
+import Stop_enforce_gate as code_stop
 
 _log = logging.getLogger(__name__)
 
@@ -24,6 +28,7 @@ _log = logging.getLogger(__name__)
 SEQUENCE = [
     ("refactor_stop", refactor_stop.run),
     ("premortem_stop", premortem_stop.run),
+    ("code_stop", code_stop.run),
 ]
 
 def main():

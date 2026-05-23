@@ -28,6 +28,25 @@ This skill routes architecture queries to specialized templates based on domain 
 5. **Critic Review**: Narrow audit for safety contradictions and packet drift.
 6. **Payload Validation**: Save result and write verification flag.
 
+## ADR Phase Gates
+
+When evaluating Architecture Decision Records or contract-sensitive designs, apply these gates:
+
+### Gate 1: Scope Check
+- Verify the ADR scope matches the actual change boundary
+- Flag scope creep: decisions that affect systems beyond their stated boundary
+- Confirm all affected systems are enumerated in the ADR
+
+### Gate 2: ADR Consistency
+- Cross-reference new ADR against existing ADRs for contradictions
+- Verify status transitions: proposed → accepted → deprecated → superseded
+- Ensure superseding ADRs explicitly reference the ADR they replace
+
+### Gate 3: Verification
+- Confirm the ADR includes measurable acceptance criteria
+- Verify implementation evidence exists for "accepted" ADRs
+- Check that reversal criteria are defined (when would we undo this decision?)
+
 ## Strategic Reasoning
 
 - **GoT (Graph-of-Thought)**: Analysis of architecture alternatives.
@@ -37,4 +56,4 @@ See `__lib/architectural_standards.md` for implementation details.
 
 ---
 
-**Version:** 5.6 | **Architecture:** Template-based router with GoT and Structured Authority.
+**Version:** 5.7 | **Architecture:** Template-based router with GoT, Structured Authority, and ADR phase gates.
