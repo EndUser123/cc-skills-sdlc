@@ -1,6 +1,9 @@
 ---
 name: wiki
 description: Persistent knowledge system using Obsidian wiki + QMD search
+required_artifacts: []
+response_requirements: {}
+contract_type: workflow-execution
 ---
 # /wiki — Obsidian Wiki + QMD Search Skill
 
@@ -62,7 +65,7 @@ Hash: <hash from manifest>
 Vault: P:/.data/wiki/concepts/
 Log:   P:/.data/wiki/log.md
 
---- PHASE 1: VERIFICATION (before any generation) ---
+ PHASE 1: VERIFICATION (before any generation) 
 
 1. Read the file at <file_path>.
 2. Verify SHA256 matches <hash>. If not, skip and report status=failed, reason=hash_mismatch.
@@ -71,13 +74,13 @@ Log:   P:/.data/wiki/log.md
 STOP GATE — If verification fails, do NOT proceed to generation.
 Report the failure status and stop.
 
---- PHASE 2: GENERATION (only after verification passes) ---
+ PHASE 2: GENERATION (only after verification passes) 
 
 4. Distill file into a wiki page with enhanced metadata and structured extraction (see below).
 5. Write to <VAULT/concepts/slug>.md. For collision-safe slugs, use `make_collision_slug()` from `scripts/wiki_manifest.py` (slug = safe-slug + SHA256[:8]).
 6. Append to <LOG_FILE>: "## [YYYY-MM-DD] ingest | <title>\nSource: <original_filename>\nSHA256: <hash>\n"
 
---- PHASE 3: COMPLETION REPORT (separate from generation) ---
+ PHASE 3: COMPLETION REPORT (separate from generation) 
 
 7. Update manifest entry to status=done.
 
@@ -91,7 +94,7 @@ Enhanced wiki page format:
 - For all files: always include the Pillar Match Matrix scores and EVIDENCE_GAP flags (see below).
 
 YAML frontmatter (required fields):
----
+
 title: <title>
 created: <YYYY-MM-DD>
 source: <original_filename>
@@ -107,7 +110,7 @@ evidence_gaps: [<list of evidence gaps — see body annotation syntax below>]
 source_url: <YouTube URL if video source>
 channel: <YouTube channel name>
 duration: <video duration if known>
----
+
 
 Body sections (in order):
 ## Summary
@@ -129,14 +132,8 @@ For each item, annotate with cognitive load (1-5) and flag any EVIDENCE_GAP:
 
 **Post-phase — index update** (main session, single call):
 ```powershell
-# One retry only; propagate error to manifest + user on second failure
-qmd update wiki --lang en 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) {
-    qmd update wiki 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) {
-        Write-Error "QMD update failed twice — wiki index may be stale"; exit 1
-    }
-}
-```
-Then report summary: done / failed / skipped counts.
+pwsh -NoProfile -File "P:/.claude/hooks/scripts/qmd_update_wrapper.ps1"
+```Then report summary: done / failed / skipped counts.
 
 **URL handling with yt-is → yt-dlp → Selenium → Gemini CLI**: When a URL matches
 `youtube.com/@`, `youtube.com/channel/`, `youtube.com/c/`, `youtu.be/`, or
@@ -223,7 +220,7 @@ Accept question → run in parallel:
 
 **Known Local Docs**: Grep these in parallel with QMD when the question matches:
 | Pattern | File |
-|---|---|
+|||
 | hook, stop, pretool, posttool, userprompt | `P:/.claude/docs/claude-hooks-v3.1.md` |
 | skill, slash command, SKILL.md | `P:/.claude/docs/claude-skills-v3.0.md` |
 | agent, subagent | `P:/.claude/docs/claude-agents-v1.0.md` |

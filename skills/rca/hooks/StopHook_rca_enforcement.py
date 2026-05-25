@@ -85,6 +85,25 @@ def is_state_stale(state: dict) -> bool:
 
 
 @hook_main
+def _normalize_stdout(data: dict) -> dict:
+    """Normalize hook output to Claude Code Zod-valid schema."""
+    if data.get('decision') == 'allow':
+        return {'decision': 'approve'}
+    if data.get('decision') == 'block':
+        return {'decision': 'block', 'reason': data.get('reason', '')}
+    if 'allow' in data:
+        if data['allow'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'continue' in data:
+        if data['continue'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'ok' in data:
+        return {'decision': 'approve'}
+    return data
+
+
 def main():
     """Entry point - enforce RCA engine execution.
 
@@ -294,7 +313,7 @@ Review investigation evidence at: {HOOK_ERROR_STATE_FILE}""",
 
         if warnings:
             result = {"message": "RCA methodology gaps (non-blocking): " + "; ".join(warnings)}
-            print(json.dumps(result))
+            print(json.dumps(_normalize_stdout(result)))
         else:
             print(json.dumps({}))
         sys.exit(0)

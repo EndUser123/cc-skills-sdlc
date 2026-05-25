@@ -377,6 +377,25 @@ def detect_diagnostic_sweep(tool_output: str) -> bool:
 
 
 @hook_main
+def _normalize_stdout(data: dict) -> dict:
+    """Normalize hook output to Claude Code Zod-valid schema."""
+    if data.get('decision') == 'allow':
+        return {'decision': 'approve'}
+    if data.get('decision') == 'block':
+        return {'decision': 'block', 'reason': data.get('reason', '')}
+    if 'allow' in data:
+        if data['allow'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'continue' in data:
+        if data['continue'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'ok' in data:
+        return {'decision': 'approve'}
+    return data
+
+
 def main():
     """Entry point - update RCA phase based on tool usage."""
     try:
@@ -488,13 +507,13 @@ def main():
             result = {
                 "message": f"📍 RCA Phase {detected_phase}: {RCA_PHASES[detected_phase]['name']}"
             }
-            print(json.dumps(result))
+            print(json.dumps(_normalize_stdout(result)))
         elif delegation_executed:
             result = {"message": "✅ RCA specialist delegation detected"}
-            print(json.dumps(result))
+            print(json.dumps(_normalize_stdout(result)))
         elif engine_executed:
             result = {"message": "✅ RCA engine execution detected"}
-            print(json.dumps(result))
+            print(json.dumps(_normalize_stdout(result)))
         elif research_trigger and research_trigger.get("should_research"):
             # Notify about research trigger
             libs = research_trigger.get("libraries", [])
@@ -502,7 +521,7 @@ def main():
             result = {
                 "message": f"🔍 Auto-research triggered: {libs_str} - Consider WebSearch for current docs"
             }
-            print(json.dumps(result))
+            print(json.dumps(_normalize_stdout(result)))
         else:
             print(json.dumps({}))
     else:

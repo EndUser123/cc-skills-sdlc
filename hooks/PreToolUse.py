@@ -26,6 +26,25 @@ SEQUENCE = [
     ("refactor_gate", refactor_gate.run),
 ]
 
+def _normalize_stdout(data: dict) -> dict:
+    """Normalize hook output to Claude Code Zod-valid schema."""
+    if data.get('decision') == 'allow':
+        return {'decision': 'approve'}
+    if data.get('decision') == 'block':
+        return {'decision': 'block', 'reason': data.get('reason', '')}
+    if 'allow' in data:
+        if data['allow'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'continue' in data:
+        if data['continue'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'ok' in data:
+        return {'decision': 'approve'}
+    return data
+
+
 def main():
     raw_input = sys.stdin.read().strip()
     if not raw_input:
@@ -45,7 +64,7 @@ def main():
                     if "additionalContext" not in result:
                         result["additionalContext"] = ""
                     result["additionalContext"] += "\n\n💡 Unexplained block? Run /doctor to check plugin connectivity."
-                    print(json.dumps(result))
+                    print(json.dumps(_normalize_stdout(result)))
                     sys.exit(2)
         except Exception as e:
             _log.error(f"PreToolUse child hook '{name}' crashed: {e}", exc_info=True)

@@ -1,6 +1,22 @@
 ---
 name: design
-description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Enhanced with Graph-of-Thought (GoT) for alternatives analysis and Hook Registration Consistency Checking."
+description: "Adaptive architecture advisor with template-based variants. Auto-routes to appropriate template based on domain and complexity. Enforces audit-first with Gap Analysis Report, contract-sensitive work emits a Contract Authority Packet."
+enforcement: advisory
+workflow_steps:
+  - id: audit-first
+    description: "Run Audit-First Protocol from resources/audit-first.md. Produce Gap Analysis Report before proceeding."
+  - id: classify-intent
+    description: "Detect domain and complexity (fast/deep)"
+  - id: claim-verification
+    description: "MANDATORY evidence check via verify_claims.py"
+  - id: template-routing
+    description: "Load and execute template from ./resources/{template}.md"
+  - id: contract-closure
+    description: "For contract-sensitive work, emit a Contract Authority Packet using resources/contract-authority-packet.md"
+  - id: critic-review
+    description: "Narrow audit for safety contradictions and packet drift"
+  - id: payload-validation
+    description: "Save result and write verification flag"
 ---
 # Architecture Advisor (Resource Router)
 
@@ -21,12 +37,14 @@ This skill routes architecture queries to specialized templates based on domain 
 
 ## Execution Workflow
 
-1. **Classify Intent**: Detect domain and complexity (fast/deep).
-2. **Claim Verification**: MANDATORY evidence check via `verify_claims.py`.
-3. **Template Routing**: Load and execute template from `./resources/{template}.md`.
-4. **Contract Closure**: For contract-sensitive work, emit a **Contract Authority Packet**.
-5. **Critic Review**: Narrow audit for safety contradictions and packet drift.
-6. **Payload Validation**: Save result and write verification flag.
+1. **Audit First (MANDATORY)**: Before routing to any template, run the Audit-First Protocol from `resources/audit-first.md`. Produce a Gap Analysis Report before proceeding.
+
+2. **Classify Intent**: Detect domain and complexity (fast/deep).
+3. **Claim Verification**: MANDATORY evidence check via `verify_claims.py`.
+4. **Template Routing**: Load and execute template from `./resources/{template}.md`.
+5. **Contract Closure**: For contract-sensitive work, emit a **Contract Authority Packet**.
+6. **Critic Review**: Narrow audit for safety contradictions and packet drift.
+7. **Payload Validation**: Save result and write verification flag.
 
 ## ADR Phase Gates
 
@@ -49,8 +67,9 @@ When evaluating Architecture Decision Records or contract-sensitive designs, app
 
 ## Strategic Reasoning
 
-- **GoT (Graph-of-Thought)**: Analysis of architecture alternatives.
-- **Strategic Questioning**: Internal blind-spot check.
+- **Enumerate alternatives**: Before committing, list 2-3 different approaches with tradeoffs
+- **State the winner and why**: Pick one option with explicit reasoning
+- **Name the falsification condition**: What would make you change your mind?
 
 See `__lib/architectural_standards.md` for implementation details.
 

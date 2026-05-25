@@ -22,6 +22,25 @@ if str(skill_guard_path) not in sys.path:
 from skill_guard.breadcrumb.tracker import initialize_breadcrumb_trail
 
 
+def _normalize_stdout(data: dict) -> dict:
+    """Normalize hook output to Claude Code Zod-valid schema."""
+    if data.get('decision') == 'allow':
+        return {'decision': 'approve'}
+    if data.get('decision') == 'block':
+        return {'decision': 'block', 'reason': data.get('reason', '')}
+    if 'allow' in data:
+        if data['allow'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'continue' in data:
+        if data['continue'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'ok' in data:
+        return {'decision': 'approve'}
+    return data
+
+
 def main():
     """Initialize breadcrumb trail for /code skill."""
     try:
@@ -31,7 +50,7 @@ def main():
         initialize_breadcrumb_trail("code")
 
         # Allow session to continue
-        print(json.dumps({"continue": True}))
+        print(json.dumps({"decision": "approve"}))
         sys.exit(0)
 
     except Exception as e:

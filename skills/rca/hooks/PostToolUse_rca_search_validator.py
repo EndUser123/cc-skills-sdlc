@@ -308,6 +308,25 @@ See SKILL.md Step 1.5: Multi-Angle Search templates for examples."""
 
 
 @hook_main
+def _normalize_stdout(data: dict) -> dict:
+    """Normalize hook output to Claude Code Zod-valid schema."""
+    if data.get('decision') == 'allow':
+        return {'decision': 'approve'}
+    if data.get('decision') == 'block':
+        return {'decision': 'block', 'reason': data.get('reason', '')}
+    if 'allow' in data:
+        if data['allow'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'continue' in data:
+        if data['continue'] is False:
+            return {'decision': 'block', 'reason': data.get('reason', '')}
+        return {'decision': 'approve'}
+    if 'ok' in data:
+        return {'decision': 'approve'}
+    return data
+
+
 def main():
     """Entry point - validate search patterns and warn if needed."""
     # Read and validate stdin
@@ -397,7 +416,7 @@ def main():
             print(f"[CKS] Failed to store pattern: {e}", file=sys.stderr)
 
     # Also print JSON result
-    print(json.dumps(result))
+    print(json.dumps(_normalize_stdout(result)))
     sys.exit(0)
 
 
