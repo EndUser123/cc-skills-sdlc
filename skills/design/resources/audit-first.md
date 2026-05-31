@@ -106,6 +106,31 @@ If a design proposal arrives without a Gap Analysis Report, **reject it** and re
 - New cache management
 - New file-editing mechanisms
 
+## Feed-Forward (Downstream Integration)
+
+Every design output should be consumable by downstream orchestrators: `/go`, `/go-ct`, `/go-pi`, `/go-ef`, `/planning`, `/executing-plans`, `/writing-plans`.
+
+**Machine-readable stub** — write this to `.claude/design/pending/{slug}.json`:
+
+```json
+{
+  "title": "{title}",
+  "status": "proposed",
+  "reuse_decision": "reuse|refactor|build",
+  "gaps": ["gap description"],
+  "affected_systems": ["path/to/file"],
+  "contract_path": ".claude/design/contracts/{slug}.md"
+}
+```
+
+**What downstream skills do with it:**
+- Scan `.claude/design/pending/` on startup
+- Create task items from pending designs
+- Check `affected_systems` before operating on those files
+- Move to `.claude/design/contracts/` when the design is accepted and implemented
+
+This means `/design` doesn't need to know which orchestrator will be used — any of them can find and consume the output.
+
 ## Fast Path
 
 For **fast** queries (single file, clear scope), the audit may be minimal:

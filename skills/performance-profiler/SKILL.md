@@ -1,3 +1,8 @@
+---
+name: performance-profiler
+description: Static performance analysis — detect bottlenecks, O(n^2) loops, duplicate calculations, and synchronous blocking in code without running it. For runtime tracing use /perf; for speed measurement use /profile.
+---
+
 # Performance Profiler
 
 ## Overview

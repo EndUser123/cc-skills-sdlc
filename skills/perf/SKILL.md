@@ -1,3 +1,8 @@
+---
+name: perf
+description: Performance tracing wrapper — detect runtime anti-patterns (nested pools, resource waste) in running Python code via execution tracing. Use to trace a script or test run and find performance issues. For static analysis use /performance-profiler; for speed measurement use /profile.
+---
+
 # /perf - Performance Tracing Wrapper
 
 ## Overview

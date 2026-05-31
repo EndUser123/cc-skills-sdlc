@@ -1,3 +1,8 @@
+---
+name: profile
+description: Performance baseline and comparison — measure execution time, import time, peak memory, and complexity; establish a baseline and compare after optimization. For finding issues use /perf; for static analysis use /performance-profiler.
+---
+
 # /profile - Performance Baseline & Comparison
 
 ## Overview

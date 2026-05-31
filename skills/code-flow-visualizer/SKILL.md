@@ -1,3 +1,8 @@
+---
+name: code-flow-visualizer
+description: Convert a function into a Mermaid flowchart to visualize control-flow and logic structure. Use when the user asks to visualize logic or generate a flowchart for a specific function.
+---
+
 # Code Flow Visualizer
 
 ## Overview

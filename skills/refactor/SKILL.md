@@ -14,12 +14,52 @@ Orchestrate complex, multi-file refactoring while maintaining safety and TDD dis
 
 ## Workflow Summary
 
-1. **Preflight & Discovery**: Identify hotspots and parallel agent analysis.
-2. **Analysis**: Deduplicate findings and verify P0/P1 defects via targeted reads.
-3. **Planning**: Create a plan with tiny commits and migration shims.
-4. **RED Phase**: Characterization tests MUST be created and verified FAILING.
-5. **Execution**: AST-based refactoring (LibCST) with LSP validation.
-6. **Closing**: Regression testing, simplification polish, and reporting metrics.
+1. **Preflight**: Scope the diff, identify changed files.
+2. **Correctness Sweep**: Line-by-line bug scan BEFORE architecture analysis (see below).
+3. **Architecture Discovery**: Parallel agent analysis for hotspots, redundancy, coupling.
+4. **Synthesis**: Consolidate findings, calculate Health Score, deduplicate.
+5. **Analysis**: Verify P0/P1 defects via targeted reads.
+6. **Planning**: Create a plan with tiny commits and migration shims.
+7. **RED Phase**: Characterization tests MUST be created and verified FAILING.
+8. **Execution**: AST-based refactoring (LibCST) with LSP validation.
+9. **Closing**: Regression testing, simplification polish, and reporting metrics.
+
+## Correctness Sweep (Step 2)
+
+**Mandatory.** Before looking at architecture, scan every changed line for correctness bugs. This is the step that catches what architecture-focused agents miss.
+
+Launch one dedicated agent that reads every hunk in the diff and checks for these patterns:
+
+| Correctness Pattern | What to check |
+|---------------------|---------------|
+| Inverted/wrong conditions | `if not x` where `if x` was intended; `==` vs `!=` |
+| Null/undefined deref | Accessing `.field` on Optional without guard |
+| Missing `await` | Async function called without await |
+| Falsy-zero confusion | `if not count` when `count == 0` is valid |
+| Wrong-variable copy-paste | Variable name from adjacent code used by mistake |
+| Swallowed exceptions | `except Exception: pass` or bare `except: return 0` |
+| Silent failure | `except: return 0` with no logging or stderr output |
+| API escaping mismatches | `re.escape()` used where SQL LIKE escaping is needed |
+| Expression-eval bugs | `x or True` / `x and False` / `dict.get(k) or default` — always truthy |
+| Cross-file interface mismatch | Caller passes args callee no longer accepts; other callers use different escaping |
+| Assumption assertions | `table_a.rowid == table_b.id` without verification |
+| Hook output pollution | `sys.stderr.write()` on success/error paths in hooks — corrupts hook JSON output |
+| Cross-component escaping | Backend escaping differs from router/other caller escaping; query reaches backend untransformed |
+| Platform shebang | `#!/usr/bin/env` on Windows (non-functional); missing shebang on Unix |
+| Platform-specific paths | Backslash handling, `$VAR` expansion differences, junction vs symlink |
+
+**Extended correctness patterns** (from /simplify and /code-review):
+- Redundant state: state that duplicates existing state, cached values derivable
+- Parameter sprawl: adding params instead of generalizing
+- Stringly-typed code: raw strings where constants or enums exist
+- Nested conditionals: ternary chains or nested if/else 3+ levels deep
+- Unnecessary comments: narrating what the code does instead of why
+
+**Agent output:** Each finding as `{file, line, summary, failure_scenario}`. Maximum 10 findings, ranked by severity.
+
+**Why this step exists:** Architecture agents optimize for patterns and structure. They miss subtle per-line bugs like an extra backslash in a JSON string or `re.escape()` not covering LIKE wildcards. The correctness sweep catches what architecture analysis cannot.
+
+**Reference:** See `references/code-review-integration.md` for the full design rationale.
 
 ## Quick Start
 

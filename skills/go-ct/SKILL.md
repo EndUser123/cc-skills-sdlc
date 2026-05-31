@@ -1,6 +1,6 @@
 ---
 name: go-ct
-description: Execute a task from user input, plan file, or tasks.json queue and drive to completion
+description: Thin orchestrator using the shared enforce layer (Gen 2 phase-gate artifacts) to execute tasks with unified schema validation and phase enforcement
 ---
 # /go v3.0 — Thin Orchestrator (Shared Enforce Layer)
 

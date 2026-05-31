@@ -9,7 +9,7 @@ sys.path.insert(0, str(_PLUGIN_ROOT / "__lib"))
 from _bootstrap import bootstrap; _hd = bootstrap(__file__)
 
 from pathlib import Path as _P
-_hook = _P(r"P:\packages\cc-aca-reasoning\hooks\\stop\\StopHook_rca_reflector.py")
+_hook = Path(r"P:\packages\cc-aca-reasoning\hooks\\stop\\StopHook_rca_reflector.py")
 if not _hook.exists():
     raise ImportError(f"Plugin hook not found: {_hook}")
 

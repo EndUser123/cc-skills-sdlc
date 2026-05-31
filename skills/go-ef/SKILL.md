@@ -258,12 +258,12 @@ STATUS=$?
 
 Output: `model-selection_{RUN_ID}.json` with `{tier, model, confidence, signals}`.
 
-| Tier | Model | Task types |
-|------|-------|------------|
-| T1-T3 | `M27` | implementation, refactor, config |
-| T4 | `GLM-5.1` | design, planning |
+| Tier | Model Selection | Task types |
+|------|---------------|------------|
+| T1-T3 | PI routing (see `/ai-cli --pi-model`) | implementation, refactor, config |
+| T4 | PI routing (see `/ai-cli --pi-model`) | design, planning |
 
-Override: `GO_MODEL_OVERRIDE` env var bypasses classification.
+Override: `GO_MODEL_OVERRIDE` env var bypasses classification (use PI model format).
 
 ---
 
