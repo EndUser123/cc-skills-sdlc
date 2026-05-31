@@ -158,6 +158,10 @@ def evaluate_gates(
     terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
     fast_mode = env.get("CLAUDE_CODE_FAST_MODE", "").lower() in ("1", "true", "yes")
 
+    # Manual override: set GO_EF_SKIP=1 to bypass all go-ef enforcement
+    if env.get("GO_EF_SKIP") == "1":
+        return 0, ""
+
     hard_missing: list[str] = []
     advisory_missing: list[str] = []
     has_any_evidence = False
