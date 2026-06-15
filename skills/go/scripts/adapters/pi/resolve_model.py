@@ -20,7 +20,7 @@ from typing import Any
 
 # Classifier model name -> pi CLI --model flag
 MODEL_MAP: dict[str, str] = {
-    "M27": "minimax/MiniMax-M2.7",
+    "M3": "minimax/MiniMax-M3",
     "GLM-5.1": "zai/glm-5.1",
 }
 

@@ -7,16 +7,27 @@ make gate decisions — that's the subagent's job.
 from __future__ import annotations
 
 import json
+import importlib.util
 import pathlib
-import textwrap
+import sys
 
-import pytest
 
-# Allow importing from scripts/
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+def _load_module(name: str, path: pathlib.Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
-from review_transcript import parse_transcript, extract_tool_events, review
+
+PACKAGE = pathlib.Path(__file__).resolve().parents[1]
+_REVIEW_TRANSCRIPT = _load_module(
+    "go_pi_review_transcript",
+    PACKAGE / "scripts" / "adapters" / "pi" / "review_transcript.py",
+)
+parse_transcript = _REVIEW_TRANSCRIPT.parse_transcript
+extract_tool_events = _REVIEW_TRANSCRIPT.extract_tool_events
+review = _REVIEW_TRANSCRIPT.review
 
 
 def _make_session_header() -> str:

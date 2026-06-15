@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stop hook for /go-ef — shared enforce layer.
+Stop hook for /go — shared enforce layer.
 """
 
 import os
@@ -15,7 +15,7 @@ from enforce.stop_gate import load_config_for_skill, evaluate_gates
 
 
 def main() -> None:
-    skill_id = "go-ef"
+    skill_id = "go"
     try:
         config = load_config_for_skill(skill_id)
     except KeyError:

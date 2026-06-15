@@ -1,17 +1,60 @@
 ---
 name: go
-description: Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Handles intent parsing, task selection, worktree enforcement, verification, simplification, 7-pass review, and local artifact generation. Not for architecture, design, or refactoring — use /planning, /design_1.0, or /refactor instead.
+version: 2.0.0
+description: Evidence-first SDLC orchestrator. Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion with selectable dispatch mode. Defaults to pi dispatch; use --dispatch claude or --dispatch local when needed.
+category: execution
+enforcement: strict
+dispatch_default: pi
+dispatch_modes:
+  - pi
+  - claude
+  - local
+hooks:
+  Stop:
+    - matcher: .*
+      hooks:
+        - type: command
+          command: python "$CLAUDE_PLUGIN_ROOT"/skills/go/hooks/Stop_enforce_gate.py
+          description: Verify /go phase gates via shared enforce layer
 ---
-# /go — Thin Orchestrator
+# /go - Evidence-First SDLC Orchestrator
 
-**Role:** `/go` is a **thin orchestrator** that stay on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), routes it to the correct SDLC skill, and records the outcome.
+**Role:** `/go` is a **thin orchestrator** that stays on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), dispatches the worker through the selected backend, and records the outcome.
 
-**Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `__lib/sdlc_schemas.py`.
+**Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `schemas/` and shared helper contracts.
 
-**MANDATORY SEQUENCE:** Worktree Check → Task Selection → Classify → Verify → Simplify → 7-Pass Review → QA Verification → PR Artifacts → Loop Check
+**MANDATORY SEQUENCE:** Worktree Check -> Task Selection -> Classify -> Dispatch -> Verify -> Simplify -> 7-Pass Review -> QA Verification -> PR Artifacts -> Loop Check
 
 **State root:** `.claude/.artifacts/{TERMINAL_ID}/go/`
 
+**Orchestrator:** `scripts/orchestrate.py`
+
+---
+
+## Dispatch Contract
+
+Default dispatch is `pi`.
+
+```bash
+/go "fix the failing tests"
+/go --dispatch pi "fix the failing tests"
+/go --dispatch claude "fix the failing tests"
+/go --dispatch local "verify config-only changes"
+```
+
+Dispatch precedence:
+
+1. `--dispatch`
+2. `GO_DISPATCH`
+3. `pi`
+
+Valid modes:
+
+| Mode | Worker |
+|------|--------|
+| `pi` | External pi harness via `pi --model <resolved>` |
+| `claude` | Claude Code/native worker path described by this skill |
+| `local` | Orchestrator-only verification path for direct config or artifact work |
 
 ---
 
@@ -20,7 +63,7 @@ description: Execute a task from user input, plan file, or tasks.json queue and 
 1. Enforce worktree + branch preconditions (auto-create if on main)
 2. Acquire a task from one of three input sources
 3. Classify task complexity → select model via Bifrost
-4. Route to the correct SDLC skill based on task type and diff
+4. Dispatch through the selected backend (`pi`, `claude`, or `local`)
 5. Run verification commands from the task contract
 6. Run `/simplify` if code changed
 7. Run 7-pass review at the appropriate depth
@@ -33,6 +76,19 @@ description: Execute a task from user input, plan file, or tasks.json queue and 
 - Replace `/planning` task breakdown
 - Use `plan.md` as a scheduler source
 - Auto-push or create remote PRs
+
+---
+
+## Pi Dispatch Mode
+
+When dispatch is `pi`, the classifier output is resolved through `scripts/adapters/pi/resolve_model.py`.
+
+| Classifier Output | pi --model flag | Provider |
+|---|---|---|
+| `M3` | `minimax/MiniMax-M3` | MiniMax |
+| `GLM-5.1` | `zai/glm-5.1` | Z.ai |
+
+`GO_MODEL_OVERRIDE` bypasses classification and is passed through as the pi model flag.
 
 ---
 
@@ -51,6 +107,7 @@ description: Execute a task from user input, plan file, or tasks.json queue and 
 export TERMINAL_ID="${TERMINAL_ID:-$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')}"
 export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
+export GO_DISPATCH="${GO_DISPATCH:-pi}"
 export GO_STATE_DIR=".claude/.artifacts/${TERMINAL_ID}/go"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
 export GO_PROMPT="${GO_PROMPT:-}"
@@ -117,7 +174,9 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
 }
 ```
 
-**Allowed `task_type` values:** `implementation`, `refactor`, `design`, `planning`
+**Allowed `task_type` values:** `implementation`, `refactor`, `design`, `planning`, `testing`
+
+(`testing` routes to `/t` — use for mutation audits, coverage strategy, or test architecture work. `/tdd --phase mutation --module <dotted>` is the **execution-side** route used during a TDD run as a side-channel quality gate; it writes a signed `MutationReceipt` that `validate_tdd.py` and `verification_result.mutation` both consume.)
 
 ---
 
@@ -130,6 +189,8 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
 | Architecture or contract unclear | `/design_1.0` |
 | Scope unclear or decomposition needed | `/planning` |
 | Config/infra only | direct verify → reviews |
+| Mutation testing or test audit (planning) | `/t --mode mutation` |
+| Mutation gate during a TDD run (side-channel) | `/tdd --phase mutation --module <dotted.name>` |
 
 ---
 
@@ -313,6 +374,33 @@ Output: `qa-verdict-{RUN_ID}.json` with `qa_status` in `{accept, accept-with-con
 
 ---
 
+## STEP 6.5: Mutation Gate (Critical-Path Modules)
+
+For `implementation` tasks, check if any modified module is declared `tier: critical` in `quality_gates.json`. If so, mutation testing is **mandatory** before PR artifacts.
+
+```bash
+python ".claude/skills/go/scripts/mutation-gate.py"
+STATUS=$?
+if [ "$STATUS" -ne 0 ]; then
+  echo "ERROR: Mutation gate failed — critical-path module did not meet mutation score threshold."
+  ATTEMPT_NEXT=$(find "$GO_STATE_DIR" -maxdepth 1 -type f -name ".attempt_*_$RUN_ID" | wc -l | tr -d ' ')
+  [ "$ATTEMPT_NEXT" -ge "$MAX_ATTEMPTS" ] && touch "$GO_STATE_DIR/.blocked_$RUN_ID" && echo "<promise>BLOCKED</promise>" && exit 1
+  exit 1
+fi
+touch "$GO_STATE_DIR/.mutation-passed_$RUN_ID"
+```
+
+Script logic:
+1. Read `diff-summary_{RUN_ID}.json` to get modified files.
+2. Cross-reference with `quality_gates.json` modules. If `task_type` is not `implementation`, emit `skipped` and exit 0.
+3. For each critical-tier modified module, invoke `/t --mode mutation --target <file>` (planning-side audit) **or** delegate to `/tdd --phase mutation --module <dotted.name>` (execution-side gate, writes a signed `MutationReceipt`).
+4. Score verdict comes from the **shared** `mutation_config.evaluate_mutation_run()` scorer — the same function `/t`, `/tdd`, and `/go` all call, so target thresholds, status enums (`passed|failed|skipped|timeout|blocked|not-run`), and equivalent-mutant handling stay consistent across skills.
+5. If any module scores below its target, exit 1. On pass, write `mutation-gate-{RUN_ID}.json` with `{status, modules_checked, modules_passed, modules_failed, receipts[]}`.
+
+**Result ingestion:** the per-run `verification-result.mutation` block (see `schemas/verification-result.schema.json`) carries the latest gate summary into the readiness object, and `run-status.active_route` may be set to `"mutation"` while a mutation phase is executing (returns to `"code"` on completion). Mutation is a **side-channel** quality gate — it does not block the TDD lifecycle phase machine, so `validate_tdd.py` and `verify-task.py` both consult `evidence.mutation` / `verification_result.mutation` independently of `phase`.
+
+---
+
 ## STEP 7: Local PR Artifacts
 
 Generate commit message, PR title, PR body, PR-ready report.
@@ -325,7 +413,7 @@ echo "<promise>PR_READY</promise>"
 
 ---
 
-## STEP 7: Loop Check
+## STEP 8: Loop Check
 
 Check if more eligible tasks remain.
 

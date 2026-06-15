@@ -1,16 +1,33 @@
 """Tests for resolve_model.py."""
 
 import json
+import importlib.util
 import pathlib
+import sys
 
-from skills.go_pi.scripts.resolve_model import resolve, MODEL_MAP
+
+def _load_module(name: str, path: pathlib.Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+PACKAGE = pathlib.Path(__file__).resolve().parents[1]
+_RESOLVE_MODEL = _load_module(
+    "go_pi_resolve_model",
+    PACKAGE / "scripts" / "adapters" / "pi" / "resolve_model.py",
+)
+resolve = _RESOLVE_MODEL.resolve
+MODEL_MAP = _RESOLVE_MODEL.MODEL_MAP
 
 
 class TestModelResolution:
     """Classifier model names map to correct pi CLI flags."""
 
-    def test_m27_resolves_to_minimax(self):
-        assert resolve("M27") == "minimax/MiniMax-M2.7"
+    def test_m3_resolves_to_minimax(self):
+        assert resolve("M3") == "minimax/MiniMax-M3"
 
     def test_glm51_resolves_to_zai(self):
         assert resolve("GLM-5.1") == "zai/glm-5.1"
@@ -23,7 +40,11 @@ class TestModelResolution:
 
     def test_model_map_covers_all_tiers(self):
         """Every tier model in classify_complexity TIER_MODEL_MAP has a pi mapping."""
-        from skills.go.scripts.classify_complexity import TIER_MODEL_MAP
+        classify = _load_module(
+            "go_classify_complexity",
+            PACKAGE / "scripts" / "classify_complexity.py",
+        )
+        TIER_MODEL_MAP = classify.TIER_MODEL_MAP
         for model in TIER_MODEL_MAP.values():
             assert model in MODEL_MAP, f"No pi mapping for classifier model '{model}'"
 
@@ -38,7 +59,7 @@ class TestResolverScript:
         # Write model-selection input
         selection = {
             "tier": "T3",
-            "model": "M27",
+            "model": "M3",
             "confidence": "high",
             "score": 8,
             "max_possible": 12,
@@ -49,13 +70,12 @@ class TestResolverScript:
             json.dumps(selection) + "\n", encoding="utf-8"
         )
 
-        from skills.go_pi.scripts.resolve_model import main
-        main()
+        _RESOLVE_MODEL.main()
 
         out = tmp_path / "pi-model_test-run.json"
         result = json.loads(out.read_text())
-        assert result["classifier_model"] == "M27"
-        assert result["pi_model"] == "minimax/MiniMax-M2.7"
+        assert result["classifier_model"] == "M3"
+        assert result["pi_model"] == "minimax/MiniMax-M3"
         assert result["tier"] == "T3"
 
     def test_override_tier_passes_through(self, tmp_path, monkeypatch):
@@ -75,8 +95,7 @@ class TestResolverScript:
             json.dumps(selection) + "\n", encoding="utf-8"
         )
 
-        from skills.go_pi.scripts.resolve_model import main
-        main()
+        _RESOLVE_MODEL.main()
 
         out = tmp_path / "pi-model_override-run.json"
         result = json.loads(out.read_text())
@@ -87,9 +106,8 @@ class TestResolverScript:
         monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
         monkeypatch.setenv("RUN_ID", "missing")
 
-        from skills.go_pi.scripts.resolve_model import main
         try:
-            main()
+            _RESOLVE_MODEL.main()
             assert False, "Should have exited"
         except SystemExit as e:
             assert e.code == 1

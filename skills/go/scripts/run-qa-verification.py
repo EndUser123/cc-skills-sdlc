@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run-qa-verification.py — GTO QA verdict integration for go/go-ef/go-pi.
+run-qa-verification.py — GTO QA verdict integration for /go.
 
 Consumes:
   - GTO orchestrator (direct import) + quality gates
@@ -41,7 +41,7 @@ SKILLS_ANALYSIS = Path(os.environ.get(
     "P:/packages/cc-skills-analysis",
 ))
 
-# State root for go/go-ef/go-pi is the same convention
+# State root for /go.
 GO_STATE_DIR = Path(os.environ.get("GO_STATE_DIR", Path.home() / ".claude" / ".artifacts" / "temp" / "go"))
 TERMINAL_ID = os.environ.get("TERMINAL_ID", "unknown")
 RUN_ID = os.environ.get("RUN_ID", os.environ.get("GO_RUN_ID", ""))
@@ -146,7 +146,7 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="Emit dummy verdict without running GTO")
     parser.add_argument("--skill", default="go",
-                        help="Skill variant (go, go-ef, go-pi)")
+                        help="Skill name recorded in QA artifacts")
     args = parser.parse_args(argv)
 
     if not RUN_ID:

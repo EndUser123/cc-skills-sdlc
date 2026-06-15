@@ -218,7 +218,7 @@ Pattern Coverage:
   P5 ADR matrix ..........  MISSING  (no forensic diff artifact)
   P6 Success criteria ....  PARTIAL  (numbered list exists, no failure conditions)
   P7 RCA trace ...........  MISSING  (no F1/Fn numbering)
-  P8 External judge ......  PRESENT  (go-pi STEP 2.5 references external review)
+  P8 External judge ......  PRESENT  (/go pi dispatch transcript review references external review)
 
 Full artifact: prompt-audit_{TARGET_SKILL}_{RUN_ID}.json
 ```

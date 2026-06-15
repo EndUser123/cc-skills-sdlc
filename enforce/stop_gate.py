@@ -8,7 +8,7 @@ Exit semantics:
   0 = clean (all hard satisfied; advisory either satisfied or allowed to skip)
 
 Usage:
-  config = load_config_for_skill("code-ef")   # or "go-ef" (backward compat: "code_v4.0", "go_v3.0")
+  config = load_config_for_skill("code-ef")   # or "go" (backward compat: "code_v4.0", "go-ef", "go_v3.0")
   exit_code, message = evaluate_gates("code-ef", config, os.environ)
   if message:
       print(message, file=sys.stderr)
@@ -158,8 +158,9 @@ def evaluate_gates(
     terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
     fast_mode = env.get("CLAUDE_CODE_FAST_MODE", "").lower() in ("1", "true", "yes")
 
-    # Manual override: set GO_EF_SKIP=1 to bypass all go-ef enforcement
-    if env.get("GO_EF_SKIP") == "1":
+    # Manual override: set GO_SKIP=1 to bypass all go enforcement.
+    # GO_EF_SKIP remains accepted for older local sessions.
+    if env.get("GO_SKIP") == "1" or env.get("GO_EF_SKIP") == "1":
         return 0, ""
 
     hard_missing: list[str] = []

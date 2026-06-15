@@ -72,9 +72,9 @@ CODE_EF_PHASES: list[dict[str, Any]] = [
 
 
 # ---------------------------------------------------------------------------
-# go-ef — evidence-first thin orchestrator (canonical name)
+# go — evidence-first thin orchestrator (canonical name)
 # evidence-first: hard gates only when backed by concrete machine-checkable evidence
-# Backward-compat alias: go_v3.0
+# Backward-compat aliases: go-ef, go_v3.0
 # State: .claude/.artifacts/{TERMINAL_ID}/go/
 # Artifact convention: flags like .verified_{RUN_ID}, JSON files like
 # task-result_{RUN_ID}.json
@@ -209,9 +209,10 @@ GO_EF_PHASES: list[dict[str, Any]] = [
 ENFORCE_CONFIGS: dict[str, list[dict[str, Any]]] = {
     # Canonical evidence-first names
     "code-ef": CODE_EF_PHASES,
-    "go-ef": GO_EF_PHASES,
+    "go": GO_EF_PHASES,
     # Consolidated skill aliases
     "code": CODE_EF_PHASES,
+    "go-ef": GO_EF_PHASES,
     # Backward-compat aliases (numeric version naming)
     "code_v4.0": CODE_EF_PHASES,
     "go_v3.0": GO_EF_PHASES,

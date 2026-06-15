@@ -108,7 +108,7 @@ If a design proposal arrives without a Gap Analysis Report, **reject it** and re
 
 ## Feed-Forward (Downstream Integration)
 
-Every design output should be consumable by downstream orchestrators: `/go`, `/go-ct`, `/go-pi`, `/go-ef`, `/planning`, `/executing-plans`, `/writing-plans`.
+Every design output should be consumable by downstream orchestrators: `/go`, `/planning`, `/executing-plans`, `/writing-plans`.
 
 **Machine-readable stub** — write this to `.claude/design/pending/{slug}.json`:
 

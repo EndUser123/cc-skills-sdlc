@@ -151,7 +151,7 @@ class TestStopGateEnforce:
         run_id = "TEST123"
 
         for flag in [".worktree-ready", ".task-selected", ".coded", ".verified",
-                      ".simplified", ".reviews-passed", ".pr-ready"]:
+                      ".simplified", ".reviews-passed", ".qa-passed", ".pr-ready"]:
             (state_dir / f"{flag}_{run_id}").touch()
         (state_dir / "pr-body_TEST123.md").touch()
         (state_dir / "pr-title_TEST123.txt").touch()
@@ -195,7 +195,7 @@ class TestStopGateEnforce:
         run_id = "TEST789"
 
         for flag in [".worktree-ready", ".task-selected", ".coded", ".verified",
-                      ".simplified", ".reviews-passed", ".pr-ready"]:
+                      ".simplified", ".reviews-passed", ".qa-passed", ".pr-ready"]:
             (state_dir / f"{flag}_{run_id}").touch()
 
         env = {
@@ -269,7 +269,7 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_no_flags_exit_2(self) -> None:
         """go_v3 Stop hook when no Gen 2 flag files exist → exit 2."""
-        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         env = {
@@ -286,14 +286,14 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_all_flags_exit_0(self) -> None:
         """go_v3 Stop hook when all Gen 2 flag files exist → exit 0."""
-        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-hook-terminal" / "go"
         state_dir.mkdir(parents=True, exist_ok=True)
         run_id = "R999"
         for flag in [".worktree-ready", ".task-selected", ".coded", ".verified",
-                     ".simplified", ".reviews-passed", ".pr-ready"]:
+                     ".simplified", ".reviews-passed", ".qa-passed", ".pr-ready"]:
             (state_dir / f"{flag}_{run_id}").touch()
         (state_dir / "pr-body_R999.md").touch()
 
@@ -310,14 +310,14 @@ class TestStopHookScriptsEnforce:
 
     def test_go_v3_stop_missing_advisory_exit_0(self) -> None:
         """go_v3 Stop hook: advisory placeholders treated as satisfied → exit 0."""
-        script = _sdlc_root / "skills" / "go-ct" / "hooks" / "Stop_enforce_gate.py"
+        script = _sdlc_root / "skills" / "go" / "hooks" / "Stop_enforce_gate.py"
         if not script.exists():
             pytest.skip("Stop hook script not found")
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-hook-terminal" / "go"
         state_dir.mkdir(parents=True, exist_ok=True)
         run_id = "R888"
         for flag in [".worktree-ready", ".task-selected", ".coded", ".verified",
-                     ".simplified", ".reviews-passed", ".pr-ready"]:
+                     ".simplified", ".reviews-passed", ".qa-passed", ".pr-ready"]:
             (state_dir / f"{flag}_{run_id}").touch()
         (state_dir / "pr-body_R888.md").touch()
 
@@ -338,7 +338,7 @@ class TestStopHookScriptsEnforce:
 # ---------------------------------------------------------------------------
 
 class TestEnforceConfigs:
-    """Verify configs for code-ef and go-ef meet the always-advisory rule."""
+    """Verify configs for code-ef and go meet the always-advisory rule."""
 
     def test_no_prose_only_hard_gates(self) -> None:
         """No hard gate may lack a concrete evidence field."""
@@ -358,15 +358,15 @@ class TestEnforceConfigs:
         for p in hard:
             assert p["evidence"]["type"] == "ledger_only"
 
-    def test_go_ef_hard_gates_all_have_file_flag(self) -> None:
-        go_config = ENFORCE_CONFIGS["go-ef"]
+    def test_go_hard_gates_all_have_file_flag(self) -> None:
+        go_config = ENFORCE_CONFIGS["go"]
         hard = [p for p in go_config if p["gate_type"] == "hard"]
-        assert len(hard) == 7
+        assert len(hard) == 8
         for p in hard:
             ev = p["evidence"]
             items = ev if isinstance(ev, list) else [ev]
             types = [e["type"] for e in items]
-            assert "file_flag" in types, f"go-ef:{p['name']} hard gate has no file_flag evidence"
+            assert "file_flag" in types, f"go:{p['name']} hard gate has no file_flag evidence"
 
     def test_advisory_phases_present(self) -> None:
         """Both canonical -ef skills must have at least one advisory phase."""
@@ -377,11 +377,11 @@ class TestEnforceConfigs:
 
 
 # ---------------------------------------------------------------------------
-# Canonical -ef name + backward-compat alias tests
+# Canonical name + backward-compat alias tests
 # ---------------------------------------------------------------------------
 
 class TestCanonicalEENames:
-    """Test that -ef names are canonical and numeric versions are aliases."""
+    """Test that consolidated skill names are canonical and older names are aliases."""
 
     def test_code_ef_and_code_v4_load_same_phases(self) -> None:
         """code-ef and code_v4.0 resolve to identical phase lists."""
@@ -390,10 +390,12 @@ class TestCanonicalEENames:
         assert canonical is alias  # same list object
         assert [p["name"] for p in canonical] == [p["name"] for p in alias]
 
-    def test_go_ef_and_go_v3_load_same_phases(self) -> None:
-        """go-ef and go_v3.0 resolve to identical phase lists."""
-        canonical = ENFORCE_CONFIGS["go-ef"]
+    def test_go_aliases_load_same_phases(self) -> None:
+        """go, go-ef, and go_v3.0 resolve to identical phase lists."""
+        canonical = ENFORCE_CONFIGS["go"]
+        ef_alias = ENFORCE_CONFIGS["go-ef"]
         alias = ENFORCE_CONFIGS["go_v3.0"]
+        assert canonical is ef_alias
         assert canonical is alias  # same list object
         assert [p["name"] for p in canonical] == [p["name"] for p in alias]
 
@@ -402,10 +404,10 @@ class TestCanonicalEENames:
         hard = [p for p in config if p["gate_type"] == "hard"]
         assert len(hard) == 4
 
-    def test_load_config_for_skill_resolves_go_ef(self) -> None:
-        config = load_config_for_skill("go-ef")
+    def test_load_config_for_skill_resolves_go(self) -> None:
+        config = load_config_for_skill("go")
         hard = [p for p in config if p["gate_type"] == "hard"]
-        assert len(hard) == 7
+        assert len(hard) == 8
 
     def test_load_config_for_skill_resolves_code_v4_backward_compat(self) -> None:
         config = load_config_for_skill("code_v4.0")
@@ -415,4 +417,4 @@ class TestCanonicalEENames:
     def test_load_config_for_skill_resolves_go_v3_backward_compat(self) -> None:
         config = load_config_for_skill("go_v3.0")
         hard = [p for p in config if p["gate_type"] == "hard"]
-        assert len(hard) == 7
+        assert len(hard) == 8
