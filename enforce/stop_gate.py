@@ -81,6 +81,24 @@ def _evidence_type(phase: dict[str, Any]) -> str:
     return ev.get("type", "ledger_only")
 
 
+def _evidence_items(phase: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize a phase's evidence config to a list."""
+    evidence = phase.get("evidence", {})
+    return evidence if isinstance(evidence, list) else [evidence]
+
+
+def _requires_run_id(phase: dict[str, Any]) -> bool:
+    """Return True when a phase's evidence is scoped to {run_id} artifacts."""
+    for ev in _evidence_items(phase):
+        if ev.get("type") == "file_flag":
+            if any("{run_id}" in f for f in ev.get("files", [])):
+                return True
+        elif ev.get("type") == "json_file":
+            if "{run_id}" in ev.get("path", ""):
+                return True
+    return False
+
+
 def _check_file_flags(
     files: list[str],
     require_all: bool,
@@ -179,6 +197,15 @@ def evaluate_gates(
     if ledger is None and any_hard_gate_uses_ledger:
         return 0, ""
 
+    # Run-scoped skills such as /go should only enforce after a run has been
+    # initialized. Without a run id there is no concrete artifact set to check.
+    any_hard_gate_requires_run_id = any(
+        p["gate_type"] == "hard" and _requires_run_id(p)
+        for p in config
+    )
+    if not run_id and any_hard_gate_requires_run_id:
+        return 0, ""
+
     for phase in config:
         name = phase["name"]
         gate_type = phase["gate_type"]
@@ -242,13 +269,8 @@ def _evaluate_phase(
     env: dict[str, str],
     session_id: str | None = None,
 ) -> bool:
-    evidence = phase.get("evidence", {})
-
-    # Normalize: evidence can be a dict (single) or a list (any-of-them)
-    items: list[dict[str, Any]] = evidence if isinstance(evidence, list) else [evidence]
-
     # For a phase with multiple evidence sources: ANY one passing = phase passed
-    for ev in items:
+    for ev in _evidence_items(phase):
         ev_type = ev.get("type", "ledger_only")
 
         if ev_type == "ledger_only":

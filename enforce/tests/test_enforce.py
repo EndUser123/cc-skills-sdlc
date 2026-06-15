@@ -188,6 +188,21 @@ class TestStopGateEnforce:
         assert "BLOCKED" in msg
         assert "code_completed" in msg
 
+    def test_go_without_run_id_is_cold_start_exit_0(self) -> None:
+        """No run id means /go has not initialized a run, so Stop must not block."""
+        env = {
+            **os.environ,
+            "CLAUDE_TERMINAL_ID": "test-enforce-terminal",
+        }
+        env.pop("RUN_ID", None)
+        env.pop("CLAUDE_GO_RUN_ID", None)
+
+        go_config = load_config_for_skill("go_v3.0")
+        exit_code, msg = evaluate_gates("go_v3.0", go_config, env)
+
+        assert exit_code == 0
+        assert msg == ""
+
     def test_go_advisory_missing_exit_0(self) -> None:
         """All hard flags present, advisory phases are placeholders = exit 0."""
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-enforce-terminal" / "go"
@@ -283,6 +298,26 @@ class TestStopHookScriptsEnforce:
         )
         assert r.returncode == 2, f"Expected exit 2, got {r.returncode}: {r.stderr}"
         assert "BLOCKED" in r.stderr
+
+    def test_go_v3_stop_no_run_id_exit_0(self) -> None:
+        """go_v3 Stop hook cold-starts cleanly when no /go run id exists."""
+        script = _sdlc_root / "skills" / "go" / "hooks" / "Stop_enforce_gate.py"
+        if not script.exists():
+            pytest.skip("Stop hook script not found")
+        env = {
+            **os.environ,
+            "CLAUDE_TERMINAL_ID": "test-hook-terminal",
+        }
+        env.pop("RUN_ID", None)
+        env.pop("CLAUDE_GO_RUN_ID", None)
+
+        r = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True, text=True, env=env,
+        )
+
+        assert r.returncode == 0, f"Expected exit 0, got {r.returncode}: {r.stderr}"
+        assert r.stderr == ""
 
     def test_go_v3_stop_all_flags_exit_0(self) -> None:
         """go_v3 Stop hook when all Gen 2 flag files exist → exit 0."""
