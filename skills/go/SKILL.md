@@ -1,7 +1,7 @@
 ---
 name: go
 version: 2.0.0
-description: Evidence-first SDLC orchestrator. Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion with selectable dispatch mode. Defaults to pi dispatch; use --dispatch claude or --dispatch local when needed.
+description: Evidence-first SDLC orchestrator. Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Defaults to pi dispatch; local is verification-only; claude is currently blocked until a real non-interactive worker exists.
 category: execution
 enforcement: strict
 dispatch_default: pi
@@ -19,7 +19,7 @@ hooks:
 ---
 # /go - Evidence-First SDLC Orchestrator
 
-**Role:** `/go` is a **thin orchestrator** that stays on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), dispatches the worker through the selected backend, and records the outcome.
+**Role:** `/go` is a **thin orchestrator** that stays on `main`. It acquires a task (from user intent, a plan file, or a tasks.json queue), dispatches or verifies through the selected mode, and records the outcome.
 
 **Unified Schema:** All tasks and plans MUST adhere to the schemas defined in `schemas/` and shared helper contracts.
 
@@ -53,8 +53,8 @@ Valid modes:
 | Mode | Worker |
 |------|--------|
 | `pi` | External pi harness via `pi --model <resolved>` |
-| `claude` | Claude Code/native worker path described by this skill |
-| `local` | Orchestrator-only verification path for direct config or artifact work |
+| `local` | No worker; runs verification/review/artifact gates against the current checkout |
+| `claude` | Blocked with `unsupported-automated-dispatch` until a real non-interactive worker exists |
 
 ---
 
@@ -63,7 +63,7 @@ Valid modes:
 1. Enforce worktree + branch preconditions (auto-create if on main)
 2. Acquire a task from one of three input sources
 3. Classify task complexity → select model via Bifrost
-4. Dispatch through the selected backend (`pi`, `claude`, or `local`)
+4. Dispatch through `pi`, run local verification, or block unsupported `claude`
 5. Run verification commands from the task contract
 6. Run `/simplify` if code changed
 7. Run 7-pass review at the appropriate depth
@@ -196,7 +196,7 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
 
 ## STEP 0: Worktree Provisioning
 
-`/go` stays on `main`. It creates a worktree for the worker, then dispatches the worker into it.
+`/go` stays on `main`. For `pi`, it creates a worker worktree and dispatches the pi harness into it. For `local`, it skips worker creation and runs verification/review/artifact gates against the current checkout. For `claude`, it writes an unsupported-dispatch artifact and returns `<promise>BLOCKED</promise>`.
 
 **Create a worktree for the task:**
 
@@ -206,13 +206,13 @@ WORKTREE=".claude/worktrees/ai-task-$TS"
 git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 ```
 
-**Dispatch a worker into the worktree** using one of:
+**Dispatch behavior:**
 
-| Method | When to use |
-|--------|-------------|
-| `Agent` tool with `isolation: "worktree"` | Subagent does code changes |
-| `Agent` tool with prompt instructing `EnterWorktree` | Worker needs to choose its own worktree |
-| `claude -p` with `--cd "$WORKTREE"` | External CLI-based LLM |
+| Dispatch | Behavior |
+|----------|----------|
+| `pi` | Create `P:/worktrees/pi-task-*`, resolve model, run `pi --model <resolved>` |
+| `local` | Use current checkout as the worktree for verification/review/artifact gates |
+| `claude` | Write `dispatch-result_{RUN_ID}.json` with `unsupported-automated-dispatch`, then block |
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
 

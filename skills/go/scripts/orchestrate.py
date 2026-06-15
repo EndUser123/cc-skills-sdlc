@@ -290,13 +290,26 @@ def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelIn
     return True
 
 
-def dispatch_claude_or_local(dispatch: str, state_dir: Path, run_id: str) -> bool:
+def dispatch_claude(state_dir: Path, run_id: str) -> bool:
     write_json(
         state_dir / f"dispatch-result_{run_id}.json",
         {
-            "dispatch": dispatch,
-            "status": "pending-manual-worker",
-            "reason": "Claude/local dispatch is handled by the skill instructions, not a Python subprocess.",
+            "dispatch": "claude",
+            "status": "unsupported-automated-dispatch",
+            "reason": "Claude dispatch has no non-interactive worker implementation in this orchestrator.",
+        },
+    )
+    touch(state_dir / f".blocked_{run_id}")
+    return False
+
+
+def dispatch_local(state_dir: Path, run_id: str) -> bool:
+    write_json(
+        state_dir / f"dispatch-result_{run_id}.json",
+        {
+            "dispatch": "local",
+            "status": "skipped-worker",
+            "reason": "Local dispatch performs no worker step and runs verification against the current checkout.",
         },
     )
     phase_marker(state_dir, "dispatched", run_id)
@@ -353,6 +366,13 @@ def orchestrate(args: argparse.Namespace) -> str:
     if task is None:
         return "<promise>BLOCKED</promise>"
 
+    if args.dispatch == "local":
+        if not dispatch_local(state_dir, run_id):
+            return "<promise>BLOCKED</promise>"
+        if not run_common_tail(Path.cwd(), state_dir, run_id):
+            return "<promise>BLOCKED</promise>"
+        return "<promise>PR_READY</promise>"
+
     try:
         worktree = create_worktree(args.dispatch, state_dir, run_id)
     except RuntimeError as exc:
@@ -366,8 +386,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         pi_info = classify_and_resolve_pi(state_dir, run_id)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
             return "<promise>BLOCKED</promise>"
-    else:
-        if not dispatch_claude_or_local(args.dispatch, state_dir, run_id):
+    elif args.dispatch == "claude":
+        if not dispatch_claude(state_dir, run_id):
             return "<promise>BLOCKED</promise>"
 
     if not run_common_tail(worktree, state_dir, run_id):

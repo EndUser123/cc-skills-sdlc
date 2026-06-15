@@ -2,6 +2,7 @@
 """Tests for the canonical /go dispatch contract."""
 
 import importlib.util
+import json
 import pathlib
 import subprocess
 import sys
@@ -125,3 +126,43 @@ def test_orchestrate_returns_blocked_when_worktree_creation_fails(monkeypatch, t
     monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)
 
     assert _ORCHESTRATE.orchestrate(args) == "<promise>BLOCKED</promise>"
+
+
+def test_orchestrate_claude_dispatch_blocks_without_worker(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--dispatch", "claude", "--prompt", "do work"])
+
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-claude")
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", lambda dispatch, state_dir, run_id: tmp_path / "worker")
+
+    assert _ORCHESTRATE.orchestrate(args) == "<promise>BLOCKED</promise>"
+
+    result = json.loads((tmp_path / "dispatch-result_run-claude.json").read_text(encoding="utf-8"))
+    assert result["dispatch"] == "claude"
+    assert result["status"] == "unsupported-automated-dispatch"
+    assert not (tmp_path / ".dispatched_run-claude").exists()
+
+
+def test_orchestrate_local_dispatch_skips_worktree_and_worker(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--dispatch", "local", "--prompt", "verify only"])
+    calls = []
+
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-local")
+
+    def fail_worktree(dispatch, state_dir, run_id):
+        raise AssertionError("local dispatch must not create a worktree")
+
+    def fake_run_common_tail(worktree, state_dir, run_id):
+        calls.append((worktree, state_dir, run_id))
+        return True
+
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)
+    monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", fake_run_common_tail)
+
+    assert _ORCHESTRATE.orchestrate(args) == "<promise>PR_READY</promise>"
+    assert calls == [(pathlib.Path.cwd(), tmp_path, "run-local")]
+
+    result = json.loads((tmp_path / "dispatch-result_run-local.json").read_text(encoding="utf-8"))
+    assert result["dispatch"] == "local"
+    assert result["status"] == "skipped-worker"
