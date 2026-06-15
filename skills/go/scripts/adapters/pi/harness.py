@@ -168,6 +168,8 @@ def write_pi_artifacts(
             "updated_at": now_iso(),
         },
     )
+    if exit_code != 0:
+        (state_dir / f".blocked_{run_id}").touch()
     return PiHarnessResult(
         exit_code=exit_code,
         session_id=session_id,
@@ -175,6 +177,38 @@ def write_pi_artifacts(
         session_dir=session_dir,
         command=command,
     )
+
+
+def write_failed_pi_artifacts(
+    state_dir: Path,
+    run_id: str,
+    command: list[str],
+    session_dir: Path,
+    worktree: Path,
+    status: str,
+    error: BaseException,
+    stdout: str = "",
+    stderr: str = "",
+) -> PiHarnessResult:
+    """Write failure artifacts when PI cannot produce a normal result."""
+    result = write_pi_artifacts(
+        state_dir=state_dir,
+        run_id=run_id,
+        exit_code=124 if status == "timed_out" else 127,
+        stdout=stdout,
+        stderr=stderr or str(error),
+        command=command,
+        session_dir=session_dir,
+        worktree=worktree,
+    )
+    dispatch_path = state_dir / f"dispatch-result_{run_id}.json"
+    payload = json.loads(dispatch_path.read_text(encoding="utf-8"))
+    payload["status"] = status
+    payload["error_type"] = type(error).__name__
+    payload["error"] = str(error)
+    write_json(dispatch_path, payload)
+    (state_dir / f".blocked_{run_id}").touch()
+    return result
 
 
 def run_pi_harness(
@@ -200,14 +234,43 @@ def run_pi_harness(
     env["PI_CODING_AGENT_SESSION_DIR"] = str(session_dir)
 
     timeout = int(os.environ.get("GO_PI_TIMEOUT_SECONDS", "1800"))
-    proc = subprocess.run(
-        command,
-        cwd=worktree,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=worktree,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.output or ""
+        stderr = exc.stderr or ""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        return write_failed_pi_artifacts(
+            state_dir=state_dir,
+            run_id=run_id,
+            command=command,
+            session_dir=session_dir,
+            worktree=worktree,
+            status="timed_out",
+            error=exc,
+            stdout=output,
+            stderr=stderr,
+        )
+    except OSError as exc:
+        return write_failed_pi_artifacts(
+            state_dir=state_dir,
+            run_id=run_id,
+            command=command,
+            session_dir=session_dir,
+            worktree=worktree,
+            status="failed",
+            error=exc,
+        )
     return write_pi_artifacts(
         state_dir=state_dir,
         run_id=run_id,

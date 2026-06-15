@@ -35,6 +35,10 @@ class TestPhaseLedgerEnforce:
     def setup_method(self) -> None:
         os.environ["CLAUDE_TERMINAL_ID"] = "test-enforce-terminal"
         os.environ["GO_STATE_DIR"] = str(Path.home() / ".claude" / ".artifacts" / "test-enforce-terminal" / "go")
+        state_dir = Path(os.environ["GO_STATE_DIR"])
+        if state_dir.is_dir():
+            import shutil
+            shutil.rmtree(state_dir)
         reset_phase_ledger("code_v4.0")
         reset_phase_ledger("go_v3.0")
 
@@ -207,6 +211,36 @@ class TestStopGateEnforce:
         assert exit_code == 0
         assert msg == ""
 
+    def test_go_recovers_run_context_from_current_run_artifact(self, tmp_path, monkeypatch) -> None:
+        """Stop can enforce an active /go run even when env lost RUN_ID and GO_STATE_DIR."""
+        monkeypatch.chdir(tmp_path)
+        terminal_id = "artifact-terminal"
+        run_id = "artifact-run"
+        state_dir = tmp_path / ".claude" / ".artifacts" / terminal_id / "go"
+        state_dir.mkdir(parents=True, exist_ok=True)
+
+        for flag in [".worktree-ready", ".task-selected", ".coded", ".verified",
+                      ".simplified", ".reviews-passed", ".qa-passed", ".pr-ready"]:
+            (state_dir / f"{flag}_{run_id}").touch()
+        (state_dir / f"current-run_{terminal_id}.json").write_text(
+            json.dumps({
+                "run_id": run_id,
+                "terminal_id": terminal_id,
+                "go_state_dir": str(state_dir),
+                "status": "running",
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+        env = {
+            "CLAUDE_TERMINAL_ID": terminal_id,
+        }
+        go_config = load_config_for_skill("go_v3.0")
+        exit_code, msg = evaluate_gates("go_v3.0", go_config, env)
+
+        assert exit_code == 0
+        assert msg == ""
+
     def test_go_advisory_missing_exit_0(self) -> None:
         """All hard flags present, advisory phases are placeholders = exit 0."""
         state_dir = Path.home() / ".claude" / ".artifacts" / "test-enforce-terminal" / "go"
@@ -239,6 +273,10 @@ class TestStopHookScriptsEnforce:
     def setup_method(self) -> None:
         os.environ["CLAUDE_TERMINAL_ID"] = "test-hook-terminal"
         os.environ["GO_STATE_DIR"] = str(Path.home() / ".claude" / ".artifacts" / "test-hook-terminal" / "go")
+        state_dir = Path(os.environ["GO_STATE_DIR"])
+        if state_dir.is_dir():
+            import shutil
+            shutil.rmtree(state_dir)
         reset_phase_ledger("code_v4.0")
         reset_phase_ledger("go_v3.0")
 

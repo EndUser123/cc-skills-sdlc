@@ -92,6 +92,21 @@ def test_common_tail_runs_simplify_before_review_and_qa(monkeypatch, tmp_path):
     ]
 
 
+def test_common_tail_blocks_when_git_diff_fails(monkeypatch, tmp_path):
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
+        return 0
+
+    def fake_subprocess_run(command, **kwargs):
+        if command[:2] == ["git", "diff"]:
+            return subprocess.CompletedProcess(command, 128, stdout="", stderr="fatal: not a git repo")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(_ORCHESTRATE.subprocess, "run", fake_subprocess_run)
+
+    assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run-diff-fail") is False
+
+
 def test_create_worktree_blocks_when_git_worktree_add_fails(monkeypatch, tmp_path):
     def fake_subprocess_run(command, **kwargs):
         return subprocess.CompletedProcess(command, 128, stdout="", stderr="fatal: branch exists")
@@ -117,6 +132,29 @@ def test_ensure_runtime_env_generates_nonconstant_run_id(monkeypatch):
     assert run_id != "run"
     assert len(run_id) >= 8
     assert pathlib.Path(_ORCHESTRATE.os.environ["GO_STATE_DIR"]).is_absolute()
+
+
+def test_prompt_task_gets_default_verification_command(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--prompt", "fix parser"])
+    monkeypatch.setenv("GO_DEFAULT_VERIFICATION_COMMANDS", "python -m pytest -q;ruff check .")
+
+    task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-verify")
+
+    assert task is not None
+    active = json.loads((tmp_path / "active-task_run-verify.json").read_text(encoding="utf-8"))
+    assert active["task"]["verification_commands"] == ["python -m pytest -q", "ruff check ."]
+
+
+def test_prompt_task_can_require_explicit_verification(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--prompt", "fix parser"])
+    monkeypatch.delenv("GO_DEFAULT_VERIFICATION_COMMANDS", raising=False)
+    monkeypatch.setenv("GO_REQUIRE_EXPLICIT_VERIFICATION", "1")
+
+    task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-missing-verify")
+
+    assert task is None
+    blocked = json.loads((tmp_path / "blocked_run-missing-verify.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "missing_verification_commands"
 
 
 def test_orchestrate_returns_blocked_when_worktree_creation_fails(monkeypatch, tmp_path):

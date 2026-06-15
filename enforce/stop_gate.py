@@ -99,6 +99,35 @@ def _requires_run_id(phase: dict[str, Any]) -> bool:
     return False
 
 
+def _read_current_run(env: dict[str, str]) -> dict[str, Any] | None:
+    terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
+    candidates: list[Path] = []
+
+    go_state_dir = env.get("GO_STATE_DIR", "")
+    if go_state_dir:
+        state_dir = Path(go_state_dir)
+        if terminal_id:
+            candidates.append(state_dir / f"current-run_{terminal_id}.json")
+        candidates.append(state_dir / "current-run.json")
+
+    artifact_root = Path.cwd() / ".claude" / ".artifacts"
+    if terminal_id:
+        state_dir = artifact_root / terminal_id / "go"
+        candidates.append(state_dir / f"current-run_{terminal_id}.json")
+        candidates.append(state_dir / "current-run.json")
+    candidates.extend(sorted(artifact_root.glob("*/go/current-run*.json"), key=lambda p: p.stat().st_mtime, reverse=True))
+
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and data.get("run_id"):
+                    return data
+        except (OSError, json.JSONDecodeError):
+            continue
+    return None
+
+
 def _check_file_flags(
     files: list[str],
     require_all: bool,
@@ -188,9 +217,17 @@ def evaluate_gates(
     run_id = env.get("RUN_ID", env.get("CLAUDE_GO_RUN_ID", ""))
     session_id = env.get("CLAUDE_SESSION_ID")
     terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
+    current_run = None
+    if not run_id or not env.get("GO_STATE_DIR"):
+        current_run = _read_current_run(env)
+    if not run_id and current_run is not None:
+        run_id = str(current_run.get("run_id", ""))
+    if not terminal_id and current_run is not None:
+        terminal_id = str(current_run.get("terminal_id", ""))
     go_state_dir = env.get(
         "GO_STATE_DIR",
-        str(Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go"),
+        str(current_run.get("go_state_dir")) if current_run and current_run.get("go_state_dir")
+        else str(Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go"),
     )
     fast_mode = env.get("CLAUDE_CODE_FAST_MODE", "").lower() in ("1", "true", "yes")
 

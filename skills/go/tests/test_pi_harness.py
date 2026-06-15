@@ -8,6 +8,7 @@ import json
 import os
 import pathlib
 import stat
+import subprocess
 import sys
 
 
@@ -104,3 +105,131 @@ def test_pi_harness_runs_json_mode_and_writes_artifacts(tmp_path, monkeypatch):
     assert "--session-dir" in dispatch["command"]
     assert "--no-extensions" in dispatch["command"]
     assert "--no-skills" in dispatch["command"]
+
+
+def test_pi_harness_passes_required_child_env(tmp_path, monkeypatch):
+    state_dir = tmp_path / "state"
+    worktree = tmp_path / "worktree"
+    state_dir.mkdir()
+    worktree.mkdir()
+    (state_dir / "active-task_run-env.json").write_text("{}\n", encoding="utf-8")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        captured["cwd"] = kwargs["cwd"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout='{"type":"session","id":"sess-env"}\n',
+            stderr="",
+        )
+
+    monkeypatch.setattr(_PI_HARNESS.subprocess, "run", fake_run)
+
+    _PI_HARNESS.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id="run-env",
+        pi_model="minimax/MiniMax-M3",
+        prompt="Task",
+    )
+
+    assert captured["cwd"] == worktree.resolve()
+    assert captured["env"]["RUN_ID"] == "run-env"
+    assert captured["env"]["GO_STATE_DIR"] == str(state_dir.resolve())
+    assert captured["env"]["WORKTREE"] == str(worktree.resolve())
+    assert captured["env"]["PI_CODING_AGENT_SESSION_DIR"] == str((state_dir / "pi-sessions" / "run-env").resolve())
+    assert "--tools" in captured["command"]
+    assert "--system-prompt" in captured["command"]
+
+
+def test_pi_harness_nonzero_with_partial_json_blocks(tmp_path, monkeypatch):
+    state_dir = tmp_path / "state"
+    worktree = tmp_path / "worktree"
+    state_dir.mkdir()
+    worktree.mkdir()
+    (state_dir / "active-task_run-nonzero.json").write_text("{}\n", encoding="utf-8")
+
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            7,
+            stdout='{"type":"session","id":"sess-partial"}\n{"type":"message_update","delta":"started"}\n',
+            stderr="model failed",
+        )
+
+    monkeypatch.setattr(_PI_HARNESS.subprocess, "run", fake_run)
+
+    result = _PI_HARNESS.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id="run-nonzero",
+        pi_model="minimax/MiniMax-M3",
+        prompt="Task",
+    )
+
+    assert result.exit_code == 7
+    assert result.session_id == "sess-partial"
+    dispatch = json.loads((state_dir / "dispatch-result_run-nonzero.json").read_text(encoding="utf-8"))
+    assert dispatch["status"] == "failed"
+    assert dispatch["session_id"] == "sess-partial"
+    assert (state_dir / "resume_run-nonzero.txt").exists()
+    assert (state_dir / ".blocked_run-nonzero").exists()
+
+
+def test_pi_harness_writes_failed_artifacts_when_binary_missing(tmp_path, monkeypatch):
+    state_dir = tmp_path / "state"
+    worktree = tmp_path / "worktree"
+    state_dir.mkdir()
+    worktree.mkdir()
+    (state_dir / "active-task_run-missing.json").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(_PI_HARNESS.shutil, "which", lambda name: None)
+
+    def fail_run(*args, **kwargs):
+        raise FileNotFoundError("pi not found")
+
+    monkeypatch.setattr(_PI_HARNESS.subprocess, "run", fail_run)
+
+    result = _PI_HARNESS.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id="run-missing",
+        pi_model="minimax/MiniMax-M3",
+        prompt="Task",
+    )
+
+    assert result.exit_code != 0
+    dispatch = json.loads((state_dir / "dispatch-result_run-missing.json").read_text(encoding="utf-8"))
+    assert dispatch["status"] == "failed"
+    assert dispatch["error_type"] == "FileNotFoundError"
+    assert (state_dir / ".blocked_run-missing").exists()
+
+
+def test_pi_harness_writes_timeout_artifacts(tmp_path, monkeypatch):
+    state_dir = tmp_path / "state"
+    worktree = tmp_path / "worktree"
+    state_dir.mkdir()
+    worktree.mkdir()
+    (state_dir / "active-task_run-timeout.json").write_text("{}\n", encoding="utf-8")
+
+    def timeout_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, timeout=3, output='{"type":"session","id":"late"}\n')
+
+    monkeypatch.setattr(_PI_HARNESS.subprocess, "run", timeout_run)
+
+    result = _PI_HARNESS.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id="run-timeout",
+        pi_model="minimax/MiniMax-M3",
+        prompt="Task",
+    )
+
+    assert result.exit_code != 0
+    dispatch = json.loads((state_dir / "dispatch-result_run-timeout.json").read_text(encoding="utf-8"))
+    assert dispatch["status"] == "timed_out"
+    assert dispatch["error_type"] == "TimeoutExpired"
+    assert (state_dir / ".blocked_run-timeout").exists()

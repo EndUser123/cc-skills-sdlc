@@ -154,6 +154,21 @@ def phase_marker(state_dir: Path, phase: str, run_id: str) -> Path:
     return p
 
 
+def write_current_run(state_dir: Path, run_id: str, status: str, dispatch: str) -> None:
+    terminal_id = os.environ.get("CLAUDE_TERMINAL_ID") or os.environ.get("TERMINAL_ID", "default")
+    payload = {
+        "schema_version": "go.current-run.v1",
+        "run_id": run_id,
+        "terminal_id": terminal_id,
+        "go_state_dir": str(state_dir.resolve()),
+        "dispatch": dispatch,
+        "status": status,
+        "updated_at": now_iso(),
+    }
+    write_json(state_dir / "current-run.json", payload)
+    write_json(state_dir / f"current-run_{terminal_id}.json", payload)
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="/go orchestrator")
     parser.add_argument(
@@ -168,6 +183,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
     parser.add_argument("--forbidden", nargs="*", default=[], help="Forbidden files")
     return parser.parse_args(argv)
+
+
+def default_verification_commands() -> list[str]:
+    raw = os.environ.get("GO_DEFAULT_VERIFICATION_COMMANDS", "python -m pytest -q")
+    return [part.strip() for part in raw.split(";") if part.strip()]
 
 
 def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
@@ -187,6 +207,19 @@ def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
 
 def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     if args.prompt:
+        explicit_verification = os.environ.get("GO_DEFAULT_VERIFICATION_COMMANDS", "").strip()
+        verification_commands = default_verification_commands()
+        if os.environ.get("GO_REQUIRE_EXPLICIT_VERIFICATION") == "1" and not explicit_verification:
+            write_json(
+                state_dir / f"blocked_{run_id}.json",
+                {
+                    "phase": "task-selection",
+                    "reason_code": "missing_verification_commands",
+                    "message": "Prompt task requires explicit verification commands before dispatch.",
+                },
+            )
+            touch(state_dir / f".blocked_{run_id}")
+            return None
         task_data: dict[str, Any] = {
             "run_id": run_id,
             "source": "cli",
@@ -197,7 +230,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                 "scope_in": args.scope_in or [],
                 "scope_out": [],
                 "acceptance_criteria": [],
-                "verification_commands": [],
+                "verification_commands": verification_commands,
                 "forbidden_files": args.forbidden or [],
             },
         }
@@ -343,6 +376,17 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         capture_output=True,
         text=True,
     )
+    if diff.returncode != 0:
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "phase": "diff",
+                "reason_code": "git_diff_failed",
+                "stderr": (diff.stderr or diff.stdout or "").strip(),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return False
     if diff.stdout and not any(diff.stdout.startswith(prefix) for prefix in ["0 files", "no changes", "???"]):
         simplify_script = script_path("scripts", "validate_go_contracts.py")
         rc = run_script(simplify_script, [], state_dir, run_id, cwd=worktree)
@@ -376,16 +420,24 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
 
 def orchestrate(args: argparse.Namespace) -> str:
     state_dir, run_id = ensure_runtime_env(args.dispatch)
+    write_current_run(state_dir, run_id, "running", args.dispatch)
+
+    def finish(status: str) -> str:
+        write_current_run(state_dir, run_id, status, args.dispatch)
+        if status == "pr_ready":
+            return "<promise>PR_READY</promise>"
+        return "<promise>BLOCKED</promise>"
+
     task = load_or_create_task(args, state_dir, run_id)
     if task is None:
-        return "<promise>BLOCKED</promise>"
+        return finish("blocked")
 
     if args.dispatch == "local":
         if not dispatch_local(state_dir, run_id):
-            return "<promise>BLOCKED</promise>"
+            return finish("blocked")
         if not run_common_tail(Path.cwd(), state_dir, run_id):
-            return "<promise>BLOCKED</promise>"
-        return "<promise>PR_READY</promise>"
+            return finish("blocked")
+        return finish("pr_ready")
 
     try:
         worktree = create_worktree(args.dispatch, state_dir, run_id)
@@ -395,18 +447,18 @@ def orchestrate(args: argparse.Namespace) -> str:
             {"phase": "worktree", "error": str(exc), "dispatch": args.dispatch},
         )
         touch(state_dir / f".blocked_{run_id}")
-        return "<promise>BLOCKED</promise>"
+        return finish("blocked")
     if args.dispatch == "pi":
         pi_info = classify_and_resolve_pi(state_dir, run_id)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
-            return "<promise>BLOCKED</promise>"
+            return finish("blocked")
     elif args.dispatch == "claude":
         if not dispatch_claude(state_dir, run_id):
-            return "<promise>BLOCKED</promise>"
+            return finish("blocked")
 
     if not run_common_tail(worktree, state_dir, run_id):
-        return "<promise>BLOCKED</promise>"
-    return "<promise>PR_READY</promise>"
+        return finish("blocked")
+    return finish("pr_ready")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

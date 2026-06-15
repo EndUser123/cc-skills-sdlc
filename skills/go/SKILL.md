@@ -109,6 +109,7 @@ export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 export GO_DISPATCH="${GO_DISPATCH:-pi}"
 export GO_STATE_DIR="$(pwd)/.claude/.artifacts/${TERMINAL_ID}/go"
+export GO_DEFAULT_VERIFICATION_COMMANDS="${GO_DEFAULT_VERIFICATION_COMMANDS:-python -m pytest -q}"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
 export GO_PROMPT="${GO_PROMPT:-}"
 export HANDOFF_TRANSCRIPT="${HANDOFF_TRANSCRIPT:-}"
@@ -222,8 +223,10 @@ PI dispatch is headless and artifact-first:
 - Transcript/events: `$GO_STATE_DIR/pi-events_$RUN_ID.jsonl` and `$GO_STATE_DIR/pi-transcript_$RUN_ID.jsonl`
 - Resume hint: `$GO_STATE_DIR/resume_$RUN_ID.txt`
 - Dispatch artifact: `$GO_STATE_DIR/dispatch-result_$RUN_ID.json`
+- Active run pointer: `$GO_STATE_DIR/current-run_$TERMINAL_ID.json`
 - Conservative flags: `--no-context-files --no-extensions --no-skills --no-prompt-templates --no-themes`
 - Tool allowlist: `GO_PI_TOOLS`, defaulting to `read,grep,find,ls,edit,write,bash`
+- Timeout/binary/nonzero failures write `dispatch-result_$RUN_ID.json` and `.blocked_$RUN_ID`
 
 ---
 
@@ -250,6 +253,7 @@ If no transcript path is found or the transcript cannot be read, fall back to `H
 ## STEP 1: Task Acquisition
 
 **From intent (GO_PROMPT / HANDOFF_TRANSCRIPT / GO_PLAN_FILE):** Parse intent and synthesize a task contract. Write `active-task_{RUN_ID}.json`.
+Prompt-synthesized tasks use `GO_DEFAULT_VERIFICATION_COMMANDS` split on `;` for verification. Set `GO_REQUIRE_EXPLICIT_VERIFICATION=1` to block prompt tasks unless that env var is explicitly set.
 
 **From queue (GO_TASKS_FILE):** Select the first task with `status` in `{ready, queued, approved}`.
 
