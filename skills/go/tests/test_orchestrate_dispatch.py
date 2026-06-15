@@ -18,6 +18,10 @@ def _load_module(name: str, path: pathlib.Path):
 
 PACKAGE = pathlib.Path(__file__).resolve().parents[1]
 _ORCHESTRATE = _load_module("go_orchestrate", PACKAGE / "scripts" / "orchestrate.py")
+_ROOT = PACKAGE.parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from enforce.stop_gate import evaluate_gates, load_config_for_skill
 
 
 def test_default_dispatch_is_pi(monkeypatch):
@@ -65,7 +69,7 @@ def test_script_path_resolves_inside_go_skill():
 def test_common_tail_runs_simplify_before_review_and_qa(monkeypatch, tmp_path):
     calls = []
 
-    def fake_run_script(script, args, state_dir, run_id):
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
         calls.append(pathlib.Path(script).name)
         return 0
 
@@ -112,6 +116,7 @@ def test_ensure_runtime_env_generates_nonconstant_run_id(monkeypatch):
     assert run_id
     assert run_id != "run"
     assert len(run_id) >= 8
+    assert pathlib.Path(_ORCHESTRATE.os.environ["GO_STATE_DIR"]).is_absolute()
 
 
 def test_orchestrate_returns_blocked_when_worktree_creation_fails(monkeypatch, tmp_path):
@@ -166,3 +171,78 @@ def test_orchestrate_local_dispatch_skips_worktree_and_worker(monkeypatch, tmp_p
     result = json.loads((tmp_path / "dispatch-result_run-local.json").read_text(encoding="utf-8"))
     assert result["dispatch"] == "local"
     assert result["status"] == "skipped-worker"
+    assert (tmp_path / ".worktree-ready_run-local").exists()
+    assert (tmp_path / ".task-selected_run-local").exists()
+
+
+def test_run_script_passes_absolute_state_env_and_worktree_cwd(monkeypatch, tmp_path):
+    captured = {}
+    script = tmp_path / "helper.py"
+    script.write_text("print('ok')\n", encoding="utf-8")
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["cwd"] = kwargs["cwd"]
+        captured["env"] = kwargs["env"]
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(_ORCHESTRATE.subprocess, "run", fake_run)
+
+    rc = _ORCHESTRATE.run_script(script, [], tmp_path, "run-env", cwd=worktree)
+
+    assert rc == 0
+    assert captured["cwd"] == worktree
+    assert captured["env"]["RUN_ID"] == "run-env"
+    assert captured["env"]["GO_STATE_DIR"] == str(tmp_path.resolve())
+    assert captured["env"]["WORKTREE"] == str(worktree.resolve())
+
+
+def test_local_dispatch_outputs_satisfy_stop_gate(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--dispatch", "local", "--prompt", "verify config"])
+    run_id = "run-local-stop"
+
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", run_id)
+    monkeypatch.setenv("TERMINAL_ID", "test-local-stop")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "test-local-stop")
+
+    def fake_run_script(script, args, state_dir, current_run_id, **kwargs):
+        name = pathlib.Path(script).name
+        if name == "verify-task.py":
+            (state_dir / f"verification-summary_{current_run_id}.json").write_text(
+                json.dumps({"verified": True}) + "\n",
+                encoding="utf-8",
+            )
+        elif name == "run-qa-verification.py":
+            (state_dir / f"qa-verdict-{current_run_id}.json").write_text(
+                json.dumps({"qa_status": "skipped"}) + "\n",
+                encoding="utf-8",
+            )
+        elif name == "pr-artifacts.py":
+            (state_dir / f"task-result_{current_run_id}.json").write_text(
+                json.dumps({"status": "pr_ready"}) + "\n",
+                encoding="utf-8",
+            )
+            (state_dir / f"pr-title_{current_run_id}.txt").write_text("Title\n", encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(
+        _ORCHESTRATE.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    assert _ORCHESTRATE.orchestrate(args) == "<promise>PR_READY</promise>"
+
+    env = {
+        "RUN_ID": run_id,
+        "CLAUDE_TERMINAL_ID": "test-local-stop",
+        "GO_STATE_DIR": str(tmp_path),
+    }
+    exit_code, message = evaluate_gates("go", load_config_for_skill("go"), env)
+
+    assert exit_code == 0
+    assert message == ""

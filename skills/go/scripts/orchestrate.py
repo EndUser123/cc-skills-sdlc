@@ -9,6 +9,7 @@ Default dispatch is pi. Override with:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
@@ -101,6 +102,14 @@ def script_path(*parts: str) -> Path:
     return SKILL_DIR / Path(*parts)
 
 
+def load_script_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
@@ -117,10 +126,23 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def run_script(script: Path, args: list[str], state_dir: Path, run_id: str) -> int:
+def run_script(
+    script: Path,
+    args: list[str],
+    state_dir: Path,
+    run_id: str,
+    cwd: Path | None = None,
+) -> int:
+    env = os.environ.copy()
+    env["RUN_ID"] = run_id
+    env["GO_RUN_ID"] = run_id
+    env["GO_STATE_DIR"] = str(state_dir.resolve())
+    if cwd is not None:
+        env["WORKTREE"] = str(cwd.resolve())
     result = subprocess.run(
         [sys.executable, str(script), *args],
-        cwd=state_dir,
+        cwd=cwd or state_dir,
+        env=env,
         capture_output=False,
     )
     return result.returncode
@@ -150,14 +172,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
     terminal_id = os.environ.get("TERMINAL_ID", "default")
+    os.environ["TERMINAL_ID"] = terminal_id
+    os.environ.setdefault("CLAUDE_TERMINAL_ID", terminal_id)
     run_id = os.environ.get("RUN_ID") or os.environ.get("GO_RUN_ID") or str(uuid.uuid4())
     os.environ["RUN_ID"] = run_id
+    os.environ["GO_RUN_ID"] = run_id
     os.environ.setdefault("MAX_ATTEMPTS", "3")
-    os.environ.setdefault(
-        "GO_STATE_DIR",
-        str(Path(".claude") / ".artifacts" / terminal_id / "go"),
-    )
-    state_dir = Path(os.environ["GO_STATE_DIR"])
+    default_state_dir = Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go"
+    state_dir = Path(os.environ.get("GO_STATE_DIR", str(default_state_dir))).resolve()
+    os.environ["GO_STATE_DIR"] = str(state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir, run_id
 
@@ -179,6 +202,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             },
         }
         write_json(state_dir / f"active-task_{run_id}.json", task_data)
+        phase_marker(state_dir, "task-selected", run_id)
     else:
         select_script = script_path("scripts", "select-task.py")
         rc = run_script(select_script, [], state_dir, run_id)
@@ -209,7 +233,7 @@ def create_worktree(dispatch: str, state_dir: Path, run_id: str) -> Path:
         detail = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"git worktree add failed for {worktree}: {detail}")
     write_json(state_dir / f"worktree-{run_id}.json", {"worktree": str(worktree)})
-    phase_marker(state_dir, "worktree", run_id)
+    phase_marker(state_dir, "worktree-ready", run_id)
     return worktree
 
 
@@ -244,32 +268,19 @@ def task_prompt(task_file: Path) -> str:
 
 
 def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelInfo) -> bool:
-    dispatch_script = script_path("scripts", "write_dispatch_result.py")
-    subprocess.run([sys.executable, str(dispatch_script)], cwd=state_dir, capture_output=False)
-
-    pi_sessions = state_dir / "pi-sessions"
-    pi_sessions.mkdir(parents=True, exist_ok=True)
     task_file = state_dir / f"active-task_{run_id}.json"
-    rc = subprocess.run(
-        [
-            "pi",
-            "--model",
-            pi_info.pi_model,
-            "--print",
-            "--session-dir",
-            str(pi_sessions),
-            "--no-context-files",
-            "--system-prompt",
-            "You are a coding agent. Complete the task. Use read/edit/write/bash tools. "
-            "Run verification commands after writing code.",
-            "-p",
-            f"@{task_file}",
-            task_prompt(task_file),
-        ],
-        cwd=worktree,
-        capture_output=False,
-    ).returncode
-    if rc != 0:
+    harness = load_script_module(
+        "go_pi_harness_runtime",
+        script_path("scripts", "adapters", "pi", "harness.py"),
+    )
+    result = harness.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id=run_id,
+        pi_model=pi_info.pi_model,
+        prompt=task_prompt(task_file),
+    )
+    if result.exit_code != 0:
         return False
     phase_marker(state_dir, "dispatched", run_id)
 
@@ -280,13 +291,15 @@ def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelIn
     phase_marker(state_dir, "transcript-reviewed", run_id)
 
     verdict_file = state_dir / f"pi-review_{run_id}.json"
+    critical: list[str] = []
     if verdict_file.exists():
         review_data = json.loads(verdict_file.read_text(encoding="utf-8"))
         warnings = review_data.get("warnings", [])
         critical = [w for w in warnings if w.startswith(("BLIND_WRITE", "FORBIDDEN_FILE", "NO_FILES_WRITTEN"))]
-        if critical:
-            return False
+    if critical:
+        return False
     phase_marker(state_dir, "transcript-verdict", run_id)
+    phase_marker(state_dir, "coded", run_id)
     return True
 
 
@@ -312,13 +325,14 @@ def dispatch_local(state_dir: Path, run_id: str) -> bool:
             "reason": "Local dispatch performs no worker step and runs verification against the current checkout.",
         },
     )
+    phase_marker(state_dir, "worktree-ready", run_id)
     phase_marker(state_dir, "dispatched", run_id)
     return True
 
 
 def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     verify_script = script_path("scripts", "verify-task.py")
-    rc = run_script(verify_script, [], state_dir, run_id)
+    rc = run_script(verify_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "verified", run_id)
@@ -331,32 +345,32 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     )
     if diff.stdout and not any(diff.stdout.startswith(prefix) for prefix in ["0 files", "no changes", "???"]):
         simplify_script = script_path("scripts", "validate_go_contracts.py")
-        rc = run_script(simplify_script, [], state_dir, run_id)
+        rc = run_script(simplify_script, [], state_dir, run_id, cwd=worktree)
         if rc != 0:
             return False
     phase_marker(state_dir, "simplified", run_id)
 
     review_script = script_path("scripts", "review-passes.py")
-    rc = run_script(review_script, [], state_dir, run_id)
+    rc = run_script(review_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "reviews-passed", run_id)
 
     qa_script = script_path("scripts", "run-qa-verification.py")
-    rc = run_script(qa_script, [], state_dir, run_id)
+    rc = run_script(qa_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "qa-passed", run_id)
 
     pr_script = script_path("scripts", "pr-artifacts.py")
-    rc = run_script(pr_script, [], state_dir, run_id)
+    rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     touch(state_dir / f".pr-ready_{run_id}")
     phase_marker(state_dir, "pr-ready", run_id)
 
     loop_script = script_path("scripts", "loop-check.py")
-    run_script(loop_script, [], state_dir, run_id)
+    run_script(loop_script, [], state_dir, run_id, cwd=worktree)
     return True
 
 

@@ -89,6 +89,36 @@ class TestExtractToolEvents:
         events = extract_tool_events([msg])
         assert events == []
 
+    def test_extracts_pi_json_mode_tool_events(self) -> None:
+        messages = [
+            {
+                "type": "tool_execution_start",
+                "toolName": "read",
+                "input": {"path": "src/a.py"},
+                "id": "c1",
+            },
+            {
+                "type": "tool_execution_start",
+                "toolName": "edit",
+                "input": {"path": "src/a.py", "old": "x", "new": "y"},
+                "id": "c2",
+            },
+            {
+                "type": "tool_execution_result",
+                "toolName": "edit",
+                "id": "c2",
+                "isError": False,
+                "content": [{"type": "text", "text": "ok"}],
+            },
+        ]
+
+        events = extract_tool_events(messages)
+
+        assert events[0]["role"] == "toolCall"
+        assert events[0]["name"] == "read"
+        assert events[1]["name"] == "edit"
+        assert events[2]["role"] == "toolResult"
+
 
 class TestReview:
     def test_clean_transcript_no_warnings(self, tmp_path: pathlib.Path) -> None:
@@ -185,4 +215,19 @@ class TestReview:
             + _make_tool_result("edit", "c2")
         )
         result = review(transcript, {})
+        assert "a.py" in result["files_written"]
+
+    def test_pi_json_mode_events_count_as_read_and_write(self, tmp_path: pathlib.Path) -> None:
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text(
+            json.dumps({"type": "session", "id": "sess"}) + "\n"
+            + json.dumps({"type": "tool_execution_start", "toolName": "read", "input": {"path": "a.py"}}) + "\n"
+            + json.dumps({"type": "tool_execution_start", "toolName": "edit", "input": {"path": "a.py"}}) + "\n",
+            encoding="utf-8",
+        )
+
+        result = review(transcript, {})
+
+        assert result["warnings"] == []
+        assert "a.py" in result["files_read"]
         assert "a.py" in result["files_written"]

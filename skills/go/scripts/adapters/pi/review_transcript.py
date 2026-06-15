@@ -42,6 +42,25 @@ def extract_tool_events(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Extract tool call/result pairs from transcript."""
     events: list[dict[str, Any]] = []
     for msg in messages:
+        if msg.get("type") == "tool_execution_start":
+            events.append({
+                "role": "toolCall",
+                "name": msg.get("toolName", msg.get("tool", "")),
+                "arguments": msg.get("input", msg.get("arguments", {})),
+                "id": msg.get("id", msg.get("toolCallId", "")),
+            })
+            continue
+
+        if msg.get("type") == "tool_execution_result":
+            events.append({
+                "role": "toolResult",
+                "toolName": msg.get("toolName", msg.get("tool", "")),
+                "isError": msg.get("isError", msg.get("is_error", False)),
+                "content": msg.get("content", []),
+                "toolCallId": msg.get("toolCallId", msg.get("id", "")),
+            })
+            continue
+
         if msg.get("type") != "message":
             continue
         inner = msg.get("message", {})

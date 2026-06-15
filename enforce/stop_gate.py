@@ -104,11 +104,17 @@ def _check_file_flags(
     require_all: bool,
     run_id: str,
     terminal_id: str,
+    go_state_dir: str,
 ) -> bool:
-    base = Path.home()
+    base = Path.cwd()
     def expand(pattern: str) -> Path:
-        # Resolve relative paths from home directory
-        p = pattern.replace("{run_id}", run_id).replace("{terminal_id}", terminal_id)
+        # Resolve relative paths from the hook working directory.
+        p = (
+            pattern
+            .replace("{run_id}", run_id)
+            .replace("{terminal_id}", terminal_id)
+            .replace("{go_state_dir}", go_state_dir)
+        )
         path = Path(p)
         return path if path.is_absolute() else base / p
 
@@ -124,9 +130,17 @@ def _check_json_file(
     key: str,
     expected: str | int | bool,
     run_id: str,
+    terminal_id: str,
+    go_state_dir: str,
 ) -> bool:
     try:
-        full_path = Path(path.replace("{run_id}", run_id).replace("{terminal_id}", os.environ.get("CLAUDE_TERMINAL_ID", "")))
+        expanded = (
+            path
+            .replace("{run_id}", run_id)
+            .replace("{terminal_id}", terminal_id)
+            .replace("{go_state_dir}", go_state_dir)
+        )
+        full_path = Path(expanded)
         if not full_path.exists():
             return False
         data = json.loads(full_path.read_text(encoding="utf-8"))
@@ -174,6 +188,10 @@ def evaluate_gates(
     run_id = env.get("RUN_ID", env.get("CLAUDE_GO_RUN_ID", ""))
     session_id = env.get("CLAUDE_SESSION_ID")
     terminal_id = env.get("CLAUDE_TERMINAL_ID", "")
+    go_state_dir = env.get(
+        "GO_STATE_DIR",
+        str(Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go"),
+    )
     fast_mode = env.get("CLAUDE_CODE_FAST_MODE", "").lower() in ("1", "true", "yes")
 
     # Manual override: set GO_SKIP=1 to bypass all go enforcement.
@@ -223,7 +241,7 @@ def evaluate_gates(
             has_any_evidence = True
             continue
 
-        passed = _evaluate_phase(skill_id, phase, run_id, terminal_id, env, session_id)
+        passed = _evaluate_phase(skill_id, phase, run_id, terminal_id, go_state_dir, env, session_id)
 
         if not passed:
             if gate_type == "hard":
@@ -266,6 +284,7 @@ def _evaluate_phase(
     phase: dict[str, Any],
     run_id: str,
     terminal_id: str,
+    go_state_dir: str,
     env: dict[str, str],
     session_id: str | None = None,
 ) -> bool:
@@ -280,7 +299,7 @@ def _evaluate_phase(
         elif ev_type == "file_flag":
             files = ev.get("files", [])
             require_all = ev.get("all", False)
-            if _check_file_flags(files, require_all, run_id, terminal_id):
+            if _check_file_flags(files, require_all, run_id, terminal_id, go_state_dir):
                 return True
 
         elif ev_type == "json_file":
@@ -289,6 +308,8 @@ def _evaluate_phase(
                 ev.get("key", ""),
                 ev.get("expected"),
                 run_id,
+                terminal_id,
+                go_state_dir,
             ):
                 return True
 

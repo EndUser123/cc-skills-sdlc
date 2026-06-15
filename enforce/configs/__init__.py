@@ -75,7 +75,7 @@ CODE_EF_PHASES: list[dict[str, Any]] = [
 # go — evidence-first thin orchestrator (canonical name)
 # evidence-first: hard gates only when backed by concrete machine-checkable evidence
 # Backward-compat aliases: go-ef, go_v3.0
-# State: .claude/.artifacts/{TERMINAL_ID}/go/
+# State: {go_state_dir}
 # Artifact convention: flags like .verified_{RUN_ID}, JSON files like
 # task-result_{RUN_ID}.json
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "gate_type": "hard",
         "evidence": {
             "type": "file_flag",
-            "files": [".claude/.artifacts/{terminal_id}/go/.worktree-ready_{run_id}"],
+            "files": ["{go_state_dir}/.worktree-ready_{run_id}"],
             "all": True,
         },
     },
@@ -95,7 +95,7 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "gate_type": "hard",
         "evidence": {
             "type": "file_flag",
-            "files": [".claude/.artifacts/{terminal_id}/go/.task-selected_{run_id}"],
+            "files": ["{go_state_dir}/.task-selected_{run_id}"],
             "all": True,
         },
     },
@@ -105,12 +105,12 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "evidence": [
             {
                 "type": "file_flag",
-                "files": [".claude/.artifacts/{terminal_id}/go/.coded_{run_id}"],
+                "files": ["{go_state_dir}/.coded_{run_id}"],
                 "all": True,
             },
             {
                 "type": "json_file",
-                "path": ".claude/.artifacts/{terminal_id}/go/task-result_{run_id}.json",
+                "path": "{go_state_dir}/task-result_{run_id}.json",
                 "key": "status",
                 "expected": "pr_ready",
             },
@@ -122,12 +122,12 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "evidence": [
             {
                 "type": "file_flag",
-                "files": [".claude/.artifacts/{terminal_id}/go/.verified_{run_id}"],
+                "files": ["{go_state_dir}/.verified_{run_id}"],
                 "all": True,
             },
             {
                 "type": "json_file",
-                "path": ".claude/.artifacts/{terminal_id}/go/verification-summary_{run_id}.json",
+                "path": "{go_state_dir}/verification-summary_{run_id}.json",
                 "key": "verified",
                 "expected": True,
             },
@@ -138,7 +138,7 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "gate_type": "hard",
         "evidence": {
             "type": "file_flag",
-            "files": [".claude/.artifacts/{terminal_id}/go/.simplified_{run_id}"],
+            "files": ["{go_state_dir}/.simplified_{run_id}"],
             "all": True,
         },
     },
@@ -147,7 +147,7 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "gate_type": "hard",
         "evidence": {
             "type": "file_flag",
-            "files": [".claude/.artifacts/{terminal_id}/go/.reviews-passed_{run_id}"],
+            "files": ["{go_state_dir}/.reviews-passed_{run_id}"],
             "all": True,
         },
     },
@@ -157,12 +157,12 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "evidence": [
             {
                 "type": "file_flag",
-                "files": [".claude/.artifacts/{terminal_id}/go/.qa-passed_{run_id}"],
+                "files": ["{go_state_dir}/.qa-passed_{run_id}"],
                 "all": True,
             },
             {
                 "type": "json_file",
-                "path": ".claude/.artifacts/{terminal_id}/go/qa-verdict-{run_id}.json",
+                "path": "{go_state_dir}/qa-verdict-{run_id}.json",
                 "key": "qa_status",
                 "expected": "skipped",
             },
@@ -174,14 +174,14 @@ GO_EF_PHASES: list[dict[str, Any]] = [
         "evidence": [
             {
                 "type": "file_flag",
-                "files": [".claude/.artifacts/{terminal_id}/go/.pr-ready_{run_id}"],
+                "files": ["{go_state_dir}/.pr-ready_{run_id}"],
                 "all": True,
             },
             {
                 "type": "file_flag",
                 "files": [
-                    ".claude/.artifacts/{terminal_id}/go/pr-body_{run_id}.md",
-                    ".claude/.artifacts/{terminal_id}/go/pr-title_{run_id}.txt",
+                    "{go_state_dir}/pr-body_{run_id}.md",
+                    "{go_state_dir}/pr-title_{run_id}.txt",
                 ],
                 "all": False,  # ANY artifact suffices to confirm PR context
             },

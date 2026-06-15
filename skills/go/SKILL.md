@@ -52,7 +52,7 @@ Valid modes:
 
 | Mode | Worker |
 |------|--------|
-| `pi` | External pi harness via `pi --model <resolved>` |
+| `pi` | External pi harness via `pi -p --mode json --model <resolved>` |
 | `local` | No worker; runs verification/review/artifact gates against the current checkout |
 | `claude` | Blocked with `unsupported-automated-dispatch` until a real non-interactive worker exists |
 
@@ -108,7 +108,7 @@ export TERMINAL_ID="${TERMINAL_ID:-$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[
 export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 export GO_DISPATCH="${GO_DISPATCH:-pi}"
-export GO_STATE_DIR=".claude/.artifacts/${TERMINAL_ID}/go"
+export GO_STATE_DIR="$(pwd)/.claude/.artifacts/${TERMINAL_ID}/go"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
 export GO_PROMPT="${GO_PROMPT:-}"
 export HANDOFF_TRANSCRIPT="${HANDOFF_TRANSCRIPT:-}"
@@ -210,11 +210,20 @@ git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 
 | Dispatch | Behavior |
 |----------|----------|
-| `pi` | Create `P:/worktrees/pi-task-*`, resolve model, run `pi --model <resolved>` |
+| `pi` | Create `P:/worktrees/pi-task-*`, resolve model, run `pi -p --mode json --model <resolved>` |
 | `local` | Use current checkout as the worktree for verification/review/artifact gates |
 | `claude` | Write `dispatch-result_{RUN_ID}.json` with `unsupported-automated-dispatch`, then block |
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
+
+PI dispatch is headless and artifact-first:
+
+- Session dir: `$GO_STATE_DIR/pi-sessions/$RUN_ID`
+- Transcript/events: `$GO_STATE_DIR/pi-events_$RUN_ID.jsonl` and `$GO_STATE_DIR/pi-transcript_$RUN_ID.jsonl`
+- Resume hint: `$GO_STATE_DIR/resume_$RUN_ID.txt`
+- Dispatch artifact: `$GO_STATE_DIR/dispatch-result_$RUN_ID.json`
+- Conservative flags: `--no-context-files --no-extensions --no-skills --no-prompt-templates --no-themes`
+- Tool allowlist: `GO_PI_TOOLS`, defaulting to `read,grep,find,ls,edit,write,bash`
 
 ---
 
