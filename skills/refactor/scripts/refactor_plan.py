@@ -10,7 +10,38 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+# Synthesis module is optional — degrade gracefully if unavailable
+if TYPE_CHECKING:
+    from synthesize_findings import (
+        calculate_health_score,
+        group_by_severity,
+    )
+    _SYNTHESIS_AVAILABLE = True
+else:
+    try:
+        from synthesize_findings import (
+            calculate_health_score,
+            group_by_severity,
+        )
+        _SYNTHESIS_AVAILABLE = True
+    except ImportError:
+        calculate_health_score = None  # type: ignore[assignment]
+        group_by_severity = None  # type: ignore[assignment]
+        _SYNTHESIS_AVAILABLE = False
+
+# Priority → severity mapping for synthesis integration
+# P0 (bugs/race conditions) → CRITICAL
+# P1 (error handling)       → HIGH
+# P2 (DRY violations)       → MEDIUM
+# P3 (conventions)          → LOW
+_PRIORITY_TO_SEVERITY = {
+    "P0": "CRITICAL",
+    "P1": "HIGH",
+    "P2": "MEDIUM",
+    "P3": "LOW",
+}
 
 
 def create_refactor_plan(
@@ -79,6 +110,9 @@ def create_refactor_plan(
             "validation_tools": ["pytest", "py_compile"],
         },
     }
+
+    # Attach synthesis (Health Score + severity counts) if module is importable
+    plan["overview"]["synthesis"] = _attach_synthesis(findings)
 
     # Add changes by priority
     for priority in ["P0", "P1", "P2", "P3"]:
@@ -183,6 +217,48 @@ def _suggest_rollback(finding: dict[str, Any]) -> str:
     return "Git revert on test failure. Create characterization test before change."
 
 
+def _attach_synthesis(findings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Attach synthesis block (Health Score + severity counts) to the plan.
+
+    Maps priority-based findings to severity-based synthesis:
+        P0 → CRITICAL, P1 → HIGH, P2 → MEDIUM, P3 → LOW
+
+    Args:
+        findings: Original findings (with 'priority' field)
+
+    Returns:
+        Synthesis dict with 'health_score', 'severity_counts', and
+        'module_available' keys. When synthesize_findings is not importable,
+        module_available is False and counts are zero.
+    """
+    if not _SYNTHESIS_AVAILABLE:
+        return {
+            "module_available": False,
+            "health_score": None,
+            "severity_counts": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+        }
+
+    # Translate priority → severity for synthesis
+    severity_findings = [
+        {"severity": _PRIORITY_TO_SEVERITY.get(f.get("priority", "P3"), "LOW")}
+        for f in findings
+    ]
+
+    health_score = calculate_health_score(severity_findings)
+    by_severity = group_by_severity(severity_findings)
+
+    return {
+        "module_available": True,
+        "health_score": health_score,
+        "severity_counts": {
+            "CRITICAL": len(by_severity["CRITICAL"]),
+            "HIGH": len(by_severity["HIGH"]),
+            "MEDIUM": len(by_severity["MEDIUM"]),
+            "LOW": len(by_severity["LOW"]),
+        },
+    }
+
+
 def plan_to_markdown(plan: dict[str, Any]) -> str:
     """Convert plan dict to markdown format for display.
 
@@ -209,6 +285,18 @@ def plan_to_markdown(plan: dict[str, Any]) -> str:
     lines.append(f"- **Priority breakdown**: P0: {overview['priority_breakdown']['P0']}, P1: {overview['priority_breakdown']['P1']}, P2: {overview['priority_breakdown']['P2']}, P3: {overview['priority_breakdown']['P3']}")
     lines.append(f"- **Estimated effort**: {overview['estimated_effort_hours']} hours")
     lines.append(f"- **Risk level**: {overview['risk_level'].upper()}")
+
+    # Synthesis block (Health Score + severity counts) if available
+    synthesis = overview.get("synthesis", {})
+    if synthesis.get("module_available") and synthesis.get("health_score") is not None:
+        lines.append(f"- **Health Score**: {synthesis['health_score']}/100")
+        counts = synthesis.get("severity_counts", {})
+        lines.append(
+            f"- **Severity counts**: CRITICAL: {counts.get('CRITICAL', 0)}, "
+            f"HIGH: {counts.get('HIGH', 0)}, "
+            f"MEDIUM: {counts.get('MEDIUM', 0)}, "
+            f"LOW: {counts.get('LOW', 0)}"
+        )
     lines.append("")
 
     # Changes by priority

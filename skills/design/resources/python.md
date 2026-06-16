@@ -229,3 +229,54 @@ async def fetch_with_retry(url: str) -> dict:
 
 ---
 *End of Python template. Falls back to generic decision format.*
+
+
+## Test Tooling Selection
+
+When the design introduces a Python module that will be unit-tested, evaluate **mutation testing** alongside coverage. Coverage tells you which lines were executed; mutation score tells you whether the tests would have caught a fault.
+
+### Decision tree
+
+1. Will this module be unit-tested?
+   - No  -> skip mutation testing selection
+   - Yes -> continue
+2. Is this module on a critical path?
+   (security, payment, auth, data integrity, business-rule evaluator, skill classification, enforcement layer, hook wiring)
+   - Yes -> mutation score target = 80%
+   - No  -> mutation score target = 60%
+3. Is mutmut 3.x installable in this env?
+   - No  -> record as ADR gap; do not skip silently
+   - Yes -> use mutmut 3.x with --use-coverage
+4. Equivalent-mutant budget?
+   - 15% default; override per-module in quality_gates.json
+   - Beyond threshold, surviving mutants count as real gaps
+
+### Quality gate config
+
+Single source of truth: `P:/.claude/quality_gates.json`. Reader: `skills/__lib/mutation_config.py`.
+
+```json
+{
+  "version": 1,
+  "default_mutation_score": 60,
+  "critical_path_mutation_score": 80,
+  "equivalent_mutant_threshold": 15,
+  "modules": {
+    "module.path": {"tier": "critical|standard", "target": 80, "skip_equivalent_threshold": 15}
+  },
+  "tool": {"name": "mutmut", "version": ">=3.0,<4", "coverage_guided": true}
+}
+```
+
+### When to emit a CAP
+
+- New critical-path module being added: CAP must declare the mutation score target and the waiver criteria if target is not met.
+- Existing critical module being refactored: CAP must declare whether mutation score target is preserved, raised, or temporarily waived.
+- Mutation test config change: CAP required only if the change affects enforcement (e.g. `block_pr_on_failure` flipped).
+
+### Selection rationale: why mutmut 3.x
+
+- Coverage-guided mode (`--use-coverage`) skips lines never executed -> 5-10x speedup on real codebases.
+- LibCST-based mutations are robust to formatting changes (re-running mutmut on whitespace-only diffs produces 0 false mutants).
+- Native pytest integration; no separate test runner to maintain.
+- Active 2024-2025 release cadence (3.6.0 at time of writing).

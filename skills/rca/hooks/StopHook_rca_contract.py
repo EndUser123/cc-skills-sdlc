@@ -146,6 +146,17 @@ BLOCK_REASONS = {
     "zero-tool-calls-for-confirmed-root-cause": (
         "Confirmed Root Cause declared with zero tool calls - no investigation occurred"
     ),
+    # ANTI-PATTERN-4: Hedged root cause - "most likely"/"probably" without
+    # running the discriminating test. The rca iron law forbids emitting
+    # a Root Cause qualified by hedge language when the next test is one
+    # Bash call away. Enforced alongside zero-tool-calls rule.
+    "hedged-root-cause-no-discriminating-test": (
+        "Root Cause contains hedge language (e.g. 'most likely', 'probably', "
+        "'I think', 'I believe', 'likely cause') AND no discriminating test "
+        "was run this turn. Per the rca iron law: run the smallest test that "
+        "falsifies your top hypothesis, then write Root Cause. If you wrote "
+        "'likely', you stopped one Bash call short."
+    ),
     # ANTI-PATTERN-1: Single-hypothesis-lock - overfits to first plausible explanation
     "single-hypothesis-lock": (
         "Only one hypothesis presented before declaring root cause. "
@@ -634,6 +645,61 @@ def _contains_unverified_token(text: str) -> bool:
     return bool(re.search(r"\bUNVERIFIED\b", text, re.IGNORECASE))
 
 
+# Hedge tokens that signal "I have not actually run the discriminating test".
+# Per the rca iron law, Root Cause must be a verified conclusion, not a
+# hypothesis hedged into a "most likely" verdict. If any of these tokens
+# appear in the Root Cause section AND no discriminating-test tool (Bash
+# with `python ...` or `cat`/file inspection commands) was run this turn,
+# the response is blocked. Pattern is bounded on both sides to avoid
+# matching unrelated prose like "this looks like a likely" or "probability".
+_HEDGE_TOKEN_RE = re.compile(
+    r"\b("
+    r"most\s+likely|very\s+likely|highly\s+likely|"
+    r"probably|seems\s+likely|appears\s+likely|"
+    r"i\s+think|i\s+believe|i\s+guess|"
+    r"presumably|supposedly|allegedly|"
+    r"likely\s+(cause|root|hypothesis|explanation)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _contains_hedge_token(text: str) -> bool:
+    """Return True if Root Cause text contains hedge language.
+
+    Hedges indicate the model has not yet run the discriminating test for
+    its top hypothesis. The rca iron law forbids emitting a Root Cause
+    qualified by "likely" / "probably" when the next test is one Bash call
+    away. The caller must verify the corresponding tool was actually
+    invoked this turn.
+    """
+    return bool(_HEDGE_TOKEN_RE.search(text))
+
+
+# Tools that count as having "run the discriminating test" for a hedge
+# claim. A Bash invocation that exercises the failing hook path (or its
+# proxy) is the canonical mitigation. Read of the target file is also
+# acceptable as a discriminating read.
+_DISCRIMINATING_TOOLS = frozenset({
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "WebSearch",
+    "WebFetch",
+})
+
+
+def _ran_discriminating_test(tool_events: list[dict]) -> bool:
+    """True if the current turn invoked at least one tool that could
+    discriminate between the leading hypothesis and its falsifier.
+
+    Used by the hedge-in-root-cause rule: if the model wrote "most likely"
+    in Root Cause, it must have run at least one verifying tool this turn.
+    """
+    return bool(_get_current_turn_tools(tool_events) & _DISCRIMINATING_TOOLS)
+
+
 def _detect_single_rc_escape(response: str) -> bool:
     return bool(SINGLE_RC_ESCAPE.search(response))
 
@@ -956,6 +1022,13 @@ def _validate_rca_contract(
     root_cause_confirmed = bool(root_cause) and not _contains_unverified_token(root_cause)
     if root_cause_confirmed and not tool_events:
         unique_reasons.append(BLOCK_REASONS["zero-tool-calls-for-confirmed-root-cause"])
+    # Hedged root cause without discriminating test: catches the "I wrote
+    # 'most likely' before running the next test" failure mode. Only fires
+    # when the Root Cause section is present (matches the same gate as
+    # zero-tool-calls) AND hedge tokens are present AND no tool that
+    # could discriminate was run this turn.
+    if root_cause_confirmed and _contains_hedge_token(root_cause) and not _ran_discriminating_test(tool_events):
+        unique_reasons.append(BLOCK_REASONS["hedged-root-cause-no-discriminating-test"])
 
     return len(unique_reasons) == 0, unique_reasons
 

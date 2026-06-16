@@ -91,3 +91,16 @@ When invoked without a path argument (e.g., just `/refactor`):
 ---
 
 **Note**: `/refactor` uses staggered Discovery agents (30s apart) to avoid context flooding.
+
+## Where to Look
+
+- `docs/planning/pytest-repair-strategy.md` — design rationale for the pytest repair tiers (C1 classify → C2 design → C3 repair) and the safety rails for cache drift, allowlist gaps, and cross-worktree path resolution.
+- `refactor-workspace/refactor-enhancements-report.md` — scope inventory of the v1.1.0 enhancement series (synthesis module, 5-agent configuration, GTO direct-import refactor, RNS migration, characterization tests). Includes "Pending" callouts for items not yet wired.
+- `CHANGELOG.md` — version-by-version changelog with the same scope, in the Keep-a-Changelog format.
+- `references/agent-configs.md` — the 5-agent configuration (Lead, Finder, Critic, Refactorer, Verifier) that backs the refactor dispatch.
+- `scripts/synthesize_findings.py` — synthesis module that produces the Health Score. Imported by `refactor_plan.py` and surfaced in every plan's `overview.synthesis` block.
+- `scripts/refactor_plan.py` — main orchestrator. `create_refactor_plan()` now returns a plan with `overview.synthesis = {module_available, health_score, severity_counts}`.
+
+## Artifacts
+
+Plans are written to `refactor-workspace/refactor_plan_<YYYYMMDD>_<HHMMSS>.json`. Each plan file is a single-source handoff for downstream `/executor` or `/code` skills.

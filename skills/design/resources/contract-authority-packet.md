@@ -101,3 +101,77 @@ This path is auto-scannable by other skills that need to verify existing contrac
 A CAP without `reversal_criteria` is **invalid** — return it for completion before proceeding past Step 5.
 
 A CAP without `audit_summary` is **invalid** — the audit-first step must precede contract closure.
+
+---
+
+## Worked Example: Mutation Testing CAP
+
+```markdown
+# Contract Authority Packet: Add mutation testing for skill_guard.breadcrumb.inference
+
+**Status:** accepted
+**Date:** 2026-06-06
+**Authority:** solo
+
+## Problem Statement
+
+The skill-guard inference module classifies user intent into skills. A bug in
+this classifier silently misroutes user requests to the wrong skill. Unit tests
+with 95% line coverage are not the same as tested behavior — we need to measure
+fault-detection strength, not just execution coverage.
+
+## Audit Summary
+
+Audited coverage of skill_guard.breadcrumb.inference: 95% line, 88% branch.
+Audited mutation-testing landscape: mutmut 3.x selected (see selection rationale
+in `design/resources/python.md`). Confirmed mutmut 3.6.0 is installable in
+Python 3.14 + pip 26.0.1. No equivalent tool (cosmic-ray, mutpy) is actively
+maintained for 2025+ Python.
+
+## Reuse Decision
+
+**Decision:** reuse (build on existing mutmut 3.x)
+**Justification:** No custom mutation harness needed. mutmut supports
+coverage-guided mode and pytest integration natively. Reusing avoids the
+maintenance burden of a custom tool.
+
+## Affected Systems
+
+- P:/.claude/quality_gates.json (new — single source of truth for mutation targets)
+- skills/__lib/mutation_config.py (new — shared reader across 5 SDLC skills)
+- skills/__lib/tests/test_mutation_config.py (new — 17 tests, all passing)
+- skills/design/resources/python.md (updated — Test Tooling Selection section)
+
+## Conventions Introduced
+
+- Mutation score target: 60% default, 80% for critical-path modules
+- Equivalent-mutant budget: 15% of total mutants per module
+- Module tiers: `critical` and `standard`
+- Waiver required for sub-target scores on critical modules
+- Single source of truth: P:/.claude/quality_gates.json (v1 schema)
+
+## Reversal Criteria
+
+- mutmut 3.x becomes unmaintained → migrate to next-generation tool; the
+  quality_gates.json `tool.version` block encodes the version constraint
+- Mutation testing slows CI by >2x → drop coverage-guided mode, or drop
+  below-critical modules from mandatory mutation testing
+- Equivalent-mutant budget proves unworkable in practice → re-tune threshold
+  based on 90 days of real data
+
+## Verification Evidence
+
+- `python -c "import mutation_config"` → success
+- `pytest skills/__lib/tests/test_mutation_config.py` → 17 passed in 0.22s
+- `mutmut 3.6.0` installed and importable
+
+## Gaps Addressed
+
+- Gap M-001: Unit tests covered lines, not behavior. Now measured by mutation score.
+- Gap M-002: No critical-path weighting. Now enforced via quality_gates.json.
+- Gap M-003: No equivalent-mutant policy. Now explicit 15% threshold per module.
+```
+
+This example demonstrates how a CAP binds a tool-selection decision (mutmut 3.x)
+to its evidence chain (installation, schema, unit tests) and the conventions it
+introduces (single source of truth, tier-based targets).

@@ -34,6 +34,7 @@ This skill routes architecture queries to specialized templates based on domain 
 | Python | `python` | python, asyncio, type hint, pydantic, fastapi |
 | Data Pipeline | `data-pipeline` | etl, pipeline, streaming, kafka, spark |
 | ADR | `precedent` | adr, decision record, precedent |
+| Testing Architecture | `testing` | mutation, test architecture, coverage strategy, test isolation, tdd design, mutation strategy |
 
 ## Execution Workflow
 
@@ -41,10 +42,16 @@ This skill routes architecture queries to specialized templates based on domain 
 
 2. **Classify Intent**: Detect domain and complexity (fast/deep).
 3. **Claim Verification**: MANDATORY evidence check via `verify_claims.py`.
+
+   > **Benchmark-Truth Guard:** Any claim about comparative system performance (e.g., "model X outperforms Y on domain Z", "approach A is faster than B") MUST cite a concrete artifact from `.data/ai-api/benchmarks/` or `domain-model-weights.json`. Claims sourced only from narrative memory (e.g., `model_competence_memory.md`) are **prohibited** as design grounds.
+
 4. **Template Routing**: Load and execute template from `./resources/{template}.md`.
 5. **Contract Closure**: For contract-sensitive work, emit a **Contract Authority Packet**.
 6. **Critic Review**: Narrow audit for safety contradictions and packet drift.
 7. **Payload Validation**: Save result and write verification flag.
+
+   > **Testability Contract (implementation-bound designs):** If the design will be implemented as code, include a `testability_contract` section listing: (a) the critical-path behaviors that mutation testing must cover, (b) their target module paths, and (c) whether they qualify as `tier: critical` for `quality_gates.json`. Designs without this section cannot be handed off to `/go` or `/code`.
+
 
 ## ADR Phase Gates
 

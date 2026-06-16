@@ -224,7 +224,7 @@ Read the triage prompt, classify the work, select specialists, dispatch in paral
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p1_initial_review.md`
-Read the work: cat "P://{session_dir}/work.md"
+Read the work using the **Read tool** (not cat): P://{session_dir}/work.md
 Follow the triage and dispatch instructions in p1_initial_review.md
 Write consolidated findings to: P://{session_dir}/p1_findings.md
 Output ONLY the path P://{session_dir}/p1_findings.md
@@ -242,8 +242,8 @@ After Phase 1 specialists complete:
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p2_meta_critique.md`
-Read: cat "P://{session_dir}/work.md"
-Read: cat "P://{session_dir}/p1_findings.md"
+Read using the **Read tool** (not cat): P://{session_dir}/work.md
+Read using the **Read tool** (not cat): P://{session_dir}/p1_findings.md
 Follow the meta-critique instructions
 Write meta-critique to: P://{session_dir}/p2.md
 Output ONLY the path P://{session_dir}/p2.md
@@ -255,9 +255,9 @@ After Phase 2 complete:
 
 ```
 Read `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p3_synthesis.md`
-Read: cat "P://{session_dir}/work.md"
-Read: cat "P://{session_dir}/p1_findings.md"
-Read: cat "P://{session_dir}/p2.md"
+Read using the **Read tool** (not cat): P://{session_dir}/work.md
+Read using the **Read tool** (not cat): P://{session_dir}/p1_findings.md
+Read using the **Read tool** (not cat): P://{session_dir}/p2.md
 Follow the synthesis instructions
 Write final critique to: P://{session_dir}/p3.md
 Output ONLY the path P://{session_dir}/p3.md
@@ -435,3 +435,19 @@ After all domain 1 items complete, proceed through domain 2, etc.
 - `/reflect` when the pre-mortem exposed reusable workflow lessons
 
 `/pre-mortem` should not rewrite architecture, plans, or implementation ownership boundaries implicitly.
+
+## Artifact I/O — Bash Fallback
+
+When writing the pre-mortem result file, use the **Write tool**. If the Write tool reports a CROSS-WORKTREE error, fall back to Bash with `python -c` using a temp variable for content (NOT inline JSON — nested quoting breaks on Windows/bash):
+
+```bash
+CONTENT='[the JSON content as a string]'
+python -c "
+from pathlib import Path
+Path('P:/.claude/.artifacts/${TERMINAL_ID}/pre-mortem/result.json').write_text('''$CONTENT''', encoding='utf-8')
+"
+```
+
+`${TERMINAL_ID}` is a stable per-terminal identifier resolved by `P:/packages/search-research/core/terminal_id.py:canonical_terminal_id()` from the `WT_SESSION` env var (with a hostname+pid fallback). The same value is the directory name under `P:/.claude/.artifacts/` where phase outputs land. Use the literal `${TERMINAL_ID}` — do not substitute a different path; downstream consumers (handoff, GTO coverage) key off this exact name.
+
+Read artifact files using the **Read tool** (not `cat` or `python -c`). For pre-written helper scripts, use the scripts in `__lib/`.
