@@ -5,7 +5,7 @@ Reads active-task JSON, computes complexity tier from heuristic signals,
 and outputs a model-selection JSON for /go Step 2 dispatch.
 
 Tier map:
-  T1-T3 (standard) -> M27
+  T1-T3 (standard) -> M3
   T4    (architectural) -> GLM-5.1
 
 Override: GO_MODEL_OVERRIDE env var bypasses classification entirely.
@@ -21,9 +21,9 @@ from typing import Any
 
 
 TIER_MODEL_MAP: dict[str, str] = {
-    "T1": "M27",
-    "T2": "M27",
-    "T3": "M27",
+    "T1": "M3",
+    "T2": "M3",
+    "T3": "M3",
     "T4": "GLM-5.1",
 }
 
@@ -121,7 +121,7 @@ def classify(task: dict[str, Any]) -> dict[str, Any]:
     tier = _score_to_tier(score, max_possible)
 
     # Only design/planning tasks can reach T4 (GLM-5.1).
-    # Implementation/refactor/config cap at T3 (M27).
+    # Implementation/refactor/config cap at T3 (M3).
     if task_type in ("implementation", "refactor", "config") and tier == "T4":
         tier = "T3"
 

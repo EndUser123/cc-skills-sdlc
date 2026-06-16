@@ -5,7 +5,7 @@ Usage:
     python pi_dispatch.py --model <model> --prompt "<prompt>" --output <path>
 
 Example:
-    python pi_dispatch.py --model minimax-coding-plan/MiniMax-M2.7 --prompt "Review..." --output findings.json
+    python pi_dispatch.py --model minimax/MiniMax-M3 --prompt "Review..." --output findings.json
 """
 
 import argparse
@@ -103,7 +103,7 @@ def run_dispatch(model: str, prompt: str, output_path: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="opencode multi-LLM dispatch")
-    parser.add_argument("--model", required=True, help="Model name (e.g. minimax-coding-plan/MiniMax-M2.7)")
+    parser.add_argument("--model", required=True, help="Model name (e.g. minimax/MiniMax-M3)")
     parser.add_argument("--prompt", required=True, help="Prompt text")
     parser.add_argument("--output", required=True, help="Output JSON file path")
     args = parser.parse_args()

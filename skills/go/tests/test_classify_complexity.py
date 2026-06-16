@@ -33,10 +33,10 @@ class TestPresetComplexity:
         assert result["tier"] == "T4"
         assert result["model"] == "GLM-5.1"
 
-    def test_low_preset_returns_t1_m27(self):
+    def test_low_preset_returns_t1_m3(self):
         result = classify(_make_task(estimated_complexity="low"))
         assert result["tier"] == "T1"
-        assert result["model"] == "M27"
+        assert result["model"] == "M3"
 
 
 class TestConfigTasks:
@@ -49,7 +49,7 @@ class TestConfigTasks:
             verification_commands=["pytest -q"],
         ))
         assert result["tier"] == "T1"
-        assert result["model"] == "M27"
+        assert result["model"] == "M3"
 
     def test_config_with_no_verification(self):
         result = classify(_make_task(task_type="config", verification_commands=[]))
@@ -67,7 +67,7 @@ class TestImplementationTasks:
             verification_commands=["pytest -q"],
         ))
         assert result["tier"] == "T1"
-        assert result["model"] == "M27"
+        assert result["model"] == "M3"
 
     def test_complex_implementation_t3(self):
         result = classify(_make_task(
@@ -80,7 +80,7 @@ class TestImplementationTasks:
             verification_commands=["pytest", "ruff check", "mypy", "bandit"],
             forbidden_files=["secrets.env"],
         ))
-        assert result["model"] == "M27"
+        assert result["model"] == "M3"
 
 
 class TestDesignTasks:
@@ -127,9 +127,9 @@ class TestConfidence:
 class TestTierModelMap:
     """Verify tier -> model mapping."""
 
-    def test_t1_t2_t3_all_m27(self):
+    def test_t1_t2_t3_all_m3(self):
         for tier in ("T1", "T2", "T3"):
-            assert TIER_MODEL_MAP[tier] == "M27"
+            assert TIER_MODEL_MAP[tier] == "M3"
 
     def test_t4_is_glm51(self):
         assert TIER_MODEL_MAP["T4"] == "GLM-5.1"
