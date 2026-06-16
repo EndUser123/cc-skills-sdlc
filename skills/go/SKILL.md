@@ -1,7 +1,7 @@
 ---
 name: go
 version: 2.0.0
-description: Evidence-first SDLC orchestrator. Execute a task from user input, plan file, or tasks.json queue and drive it to PR-ready completion. Defaults to pi dispatch; local is verification-only; claude is currently blocked until a real non-interactive worker exists.
+description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
 dispatch_default: pi

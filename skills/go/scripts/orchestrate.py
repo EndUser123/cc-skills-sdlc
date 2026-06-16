@@ -513,6 +513,10 @@ def orchestrate(args: argparse.Namespace) -> str:
             return finish("blocked")
         return finish("pr_ready")
 
+    if args.dispatch == "claude":
+        if not dispatch_claude(state_dir, run_id):
+            return finish("blocked")
+
     try:
         worktree = create_worktree(args.dispatch, state_dir, run_id)
     except RuntimeError as exc:
@@ -525,9 +529,6 @@ def orchestrate(args: argparse.Namespace) -> str:
     if args.dispatch == "pi":
         pi_info = classify_and_resolve_pi(state_dir, run_id)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
-            return finish("blocked")
-    elif args.dispatch == "claude":
-        if not dispatch_claude(state_dir, run_id):
             return finish("blocked")
 
     if not run_common_tail(worktree, state_dir, run_id):

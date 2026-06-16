@@ -213,7 +213,11 @@ def test_orchestrate_claude_dispatch_blocks_without_worker(monkeypatch, tmp_path
 
     monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
     monkeypatch.setenv("RUN_ID", "run-claude")
-    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", lambda dispatch, state_dir, run_id: tmp_path / "worker")
+
+    def fail_worktree(dispatch, state_dir, run_id):
+        raise AssertionError("unsupported claude dispatch must not create a worktree")
+
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)
 
     assert _ORCHESTRATE.orchestrate(args) == "<promise>BLOCKED</promise>"
 
