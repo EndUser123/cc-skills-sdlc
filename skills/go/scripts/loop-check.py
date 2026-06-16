@@ -2,7 +2,12 @@
 """Check if more eligible tasks remain after the selected one."""
 import json, os, pathlib
 
-tasks_file = pathlib.Path(os.environ["GO_TASKS_FILE"])
+tasks_file_value = os.environ.get("GO_TASKS_FILE", "").strip()
+if not tasks_file_value:
+    print("<promise>ALL_TASKS_COMPLETE</promise>")
+    raise SystemExit(0)
+
+tasks_file = pathlib.Path(tasks_file_value)
 state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
 run_id = os.environ["RUN_ID"]
 

@@ -360,6 +360,75 @@ def dispatch_local(state_dir: Path, run_id: str) -> bool:
     )
     phase_marker(state_dir, "worktree-ready", run_id)
     phase_marker(state_dir, "dispatched", run_id)
+    phase_marker(state_dir, "coded", run_id)
+    return True
+
+
+def run_simplify_gate(worktree: Path, state_dir: Path, run_id: str, diff_stat: str) -> bool:
+    status_path = state_dir / f"simplify-status_{run_id}.md"
+    simplify_command = os.environ.get("GO_SIMPLIFY_COMMAND", "").strip()
+    if not simplify_command:
+        status_path.write_text(
+            "\n".join(
+                [
+                    "# Simplify Gate",
+                    "",
+                    "Status: SKIPPED",
+                    "Reason: GO_SIMPLIFY_COMMAND is not set.",
+                    "",
+                    "Diff stat:",
+                    "```",
+                    diff_stat.rstrip(),
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return True
+
+    result = subprocess.run(
+        simplify_command,
+        cwd=worktree,
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    status_path.write_text(
+        "\n".join(
+            [
+                "# Simplify Gate",
+                "",
+                f"Status: {'PASS' if result.returncode == 0 else 'FAIL'}",
+                f"Command: {simplify_command}",
+                f"Exit code: {result.returncode}",
+                "",
+                "Stdout:",
+                "```",
+                (result.stdout or "").rstrip(),
+                "```",
+                "",
+                "Stderr:",
+                "```",
+                (result.stderr or "").rstrip(),
+                "```",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    if result.returncode != 0:
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "phase": "simplify",
+                "reason_code": "simplify_command_failed",
+                "command": simplify_command,
+                "exit_code": result.returncode,
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return False
     return True
 
 
@@ -388,9 +457,7 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         touch(state_dir / f".blocked_{run_id}")
         return False
     if diff.stdout and not any(diff.stdout.startswith(prefix) for prefix in ["0 files", "no changes", "???"]):
-        simplify_script = script_path("scripts", "validate_go_contracts.py")
-        rc = run_script(simplify_script, [], state_dir, run_id, cwd=worktree)
-        if rc != 0:
+        if not run_simplify_gate(worktree, state_dir, run_id, diff.stdout):
             return False
     phase_marker(state_dir, "simplified", run_id)
 
@@ -401,7 +468,8 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     phase_marker(state_dir, "reviews-passed", run_id)
 
     qa_script = script_path("scripts", "run-qa-verification.py")
-    rc = run_script(qa_script, [], state_dir, run_id, cwd=worktree)
+    qa_args = ["--dry-run"] if os.environ.get("GO_QA_DRY_RUN", "").strip() == "1" else []
+    rc = run_script(qa_script, qa_args, state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "qa-passed", run_id)

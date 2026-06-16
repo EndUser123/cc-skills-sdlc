@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -66,7 +67,7 @@ def test_script_path_resolves_inside_go_skill():
     assert resolve_model.parts[-5:] == ("go", "scripts", "adapters", "pi", "resolve_model.py")
 
 
-def test_common_tail_runs_simplify_before_review_and_qa(monkeypatch, tmp_path):
+def test_common_tail_records_skipped_simplify_before_review_and_qa(monkeypatch, tmp_path):
     calls = []
 
     def fake_run_script(script, args, state_dir, run_id, **kwargs):
@@ -84,12 +85,46 @@ def test_common_tail_runs_simplify_before_review_and_qa(monkeypatch, tmp_path):
     assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run1") is True
     assert calls == [
         "verify-task.py",
-        "validate_go_contracts.py",
         "review-passes.py",
         "run-qa-verification.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
+    status = tmp_path.joinpath("simplify-status_run1.md").read_text()
+    assert "SKIPPED" in status
+    assert "GO_SIMPLIFY_COMMAND" in status
+
+
+def test_common_tail_runs_configured_simplify_command(monkeypatch, tmp_path):
+    calls = []
+    commands = []
+
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
+        calls.append(pathlib.Path(script).name)
+        return 0
+
+    def fake_subprocess_run(command, **kwargs):
+        if command[:2] == ["git", "diff"]:
+            return subprocess.CompletedProcess(command, 0, stdout=" src/app.py | 2 +\n", stderr="")
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="simplified\n", stderr="")
+
+    monkeypatch.setenv("GO_SIMPLIFY_COMMAND", "python simplify.py")
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(_ORCHESTRATE.subprocess, "run", fake_subprocess_run)
+
+    assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run1") is True
+    assert commands == ["python simplify.py"]
+    assert calls == [
+        "verify-task.py",
+        "review-passes.py",
+        "run-qa-verification.py",
+        "pr-artifacts.py",
+        "loop-check.py",
+    ]
+    status = tmp_path.joinpath("simplify-status_run1.md").read_text()
+    assert "PASS" in status
+    assert "python simplify.py" in status
 
 
 def test_common_tail_blocks_when_git_diff_fails(monkeypatch, tmp_path):
@@ -210,6 +245,7 @@ def test_orchestrate_local_dispatch_skips_worktree_and_worker(monkeypatch, tmp_p
     assert result["dispatch"] == "local"
     assert result["status"] == "skipped-worker"
     assert (tmp_path / ".worktree-ready_run-local").exists()
+    assert (tmp_path / ".coded_run-local").exists()
     assert (tmp_path / ".task-selected_run-local").exists()
 
 
@@ -235,6 +271,47 @@ def test_run_script_passes_absolute_state_env_and_worktree_cwd(monkeypatch, tmp_
     assert captured["env"]["RUN_ID"] == "run-env"
     assert captured["env"]["GO_STATE_DIR"] == str(tmp_path.resolve())
     assert captured["env"]["WORKTREE"] == str(worktree.resolve())
+
+
+def test_common_tail_passes_qa_dry_run_when_requested(monkeypatch, tmp_path):
+    qa_args = None
+
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
+        nonlocal qa_args
+        name = pathlib.Path(script).name
+        if name == "run-qa-verification.py":
+            qa_args = args
+        return 0
+
+    monkeypatch.setenv("GO_QA_DRY_RUN", "1")
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(
+        _ORCHESTRATE.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run-qa-dry") is True
+    assert qa_args == ["--dry-run"]
+
+
+def test_loop_check_skips_when_tasks_file_missing(tmp_path):
+    script = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "loop-check.py"
+    env = os.environ.copy()
+    env.pop("GO_TASKS_FILE", None)
+    env["GO_STATE_DIR"] = str(tmp_path)
+    env["RUN_ID"] = "run-loop"
+
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "ALL_TASKS_COMPLETE" in result.stdout
+    assert "Traceback" not in result.stderr
 
 
 def test_local_dispatch_outputs_satisfy_stop_gate(monkeypatch, tmp_path):
