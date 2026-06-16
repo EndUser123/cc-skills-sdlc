@@ -47,6 +47,12 @@ def module_to_path_fragment(module: str) -> str:
     return module.replace(".", "/")
 
 
+def path_matches_module(path: str, module: str) -> bool:
+    normalized = path.replace("\\", "/")
+    module_file = module_to_path_fragment(module) + ".py"
+    return normalized == module_file or normalized.endswith("/" + module_file)
+
+
 def changed_files(worktree: Path) -> list[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", "HEAD"],
@@ -72,8 +78,7 @@ def select_modules(gates: Any, worktree: Path) -> list[str]:
 
     selected: list[str] = []
     for module in gates.list_critical_modules():
-        fragment = module_to_path_fragment(module)
-        if any(fragment in path or path.endswith(fragment + ".py") for path in changed):
+        if any(path_matches_module(path, module) for path in changed):
             selected.append(module)
     return selected
 

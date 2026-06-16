@@ -286,6 +286,9 @@
         },
         "mutation_gate": {
           "type": "string"
+        },
+        "pr_ready": {
+          "type": "string"
         }
       }
     }

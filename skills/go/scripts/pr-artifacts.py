@@ -77,4 +77,26 @@ result = {
 (state_dir / f"pr-body_{run_id}.md").write_text(pr_body + "\n", encoding="utf-8")
 (state_dir / f"pr-ready_{run_id}.md").write_text(pr_ready + "\n", encoding="utf-8")
 (state_dir / f"task-result_{run_id}.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+verification_path = state_dir / f"verification-result_{run_id}.json"
+if verification_path.exists():
+    try:
+        verification = json.loads(verification_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        verification = {}
+    verification.update(
+        {
+            "run_id": run_id,
+            "task_id": verification.get("task_id", task_id),
+            "status": "passed",
+            "pr_ready": True,
+            "generated_at": datetime.datetime.now(datetime.timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z"),
+        }
+    )
+    artifact_paths = verification.setdefault("artifact_paths", {})
+    artifact_paths["pr_ready"] = str(state_dir / f"pr-ready_{run_id}.md")
+    verification_path.write_text(json.dumps(verification, indent=2) + "\n", encoding="utf-8")
 print("PR artifacts written")

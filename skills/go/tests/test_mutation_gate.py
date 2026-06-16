@@ -94,3 +94,20 @@ def test_mutation_gate_blocks_failed_explicit_module(monkeypatch, tmp_path):
     assert verification["status"] == "failed"
     assert blocked["reason_code"] == "mutation_failed"
     assert (tmp_path / f".blocked_{run_id}").exists()
+
+
+def test_select_modules_does_not_overmatch_prefix_paths(monkeypatch, tmp_path):
+    gates = SimpleNamespace(list_critical_modules=lambda: ["pkg.critical"])
+    changed = ["src/pkg/critical_extra.py", "src/pkg/critical/submodule.py"]
+
+    monkeypatch.setattr(MUTATION_GATE, "changed_files", lambda _worktree: changed)
+
+    assert MUTATION_GATE.select_modules(gates, tmp_path) == []
+
+
+def test_select_modules_matches_exact_module_file(monkeypatch, tmp_path):
+    gates = SimpleNamespace(list_critical_modules=lambda: ["pkg.critical"])
+
+    monkeypatch.setattr(MUTATION_GATE, "changed_files", lambda _worktree: ["src/pkg/critical.py"])
+
+    assert MUTATION_GATE.select_modules(gates, tmp_path) == ["pkg.critical"]
