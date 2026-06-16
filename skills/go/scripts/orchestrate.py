@@ -114,6 +114,10 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def now_utc_z() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def touch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
@@ -190,6 +194,59 @@ def default_verification_commands() -> list[str]:
     return [part.strip() for part in raw.split(";") if part.strip()]
 
 
+def _heading_or_stem(path: Path, text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            title = stripped.lstrip("#").strip()
+            if title:
+                return title[:80]
+    return path.stem.replace("-", " ").replace("_", " ").strip().title() or "Plan task"
+
+
+def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
+    plan_path = Path(args.plan).expanduser().resolve()
+    if not plan_path.exists():
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "phase": "task-selection",
+                "reason_code": "plan_file_not_found",
+                "path": str(plan_path),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return None
+
+    plan_text = plan_path.read_text(encoding="utf-8")
+    title = _heading_or_stem(plan_path, plan_text)
+    terminal_id = os.environ.get("TERMINAL_ID", "default")
+    selected_at = now_utc_z()
+    task_data: dict[str, Any] = {
+        "run_id": run_id,
+        "terminal_id": terminal_id,
+        "selected_at": selected_at,
+        "source": "plan-md",
+        "source_ref": str(plan_path),
+        "task": {
+            "id": f"plan-{run_id[:8]}",
+            "title": title,
+            "objective": plan_text.strip() or title,
+            "status": "selected",
+            "priority": "P1",
+            "scope_in": args.scope_in or [],
+            "scope_out": [],
+            "acceptance_criteria": [line.strip("- ").strip() for line in plan_text.splitlines() if line.strip().startswith("- ")],
+            "verification_commands": default_verification_commands(),
+            "forbidden_files": args.forbidden or [],
+            "task_type": "implementation",
+        },
+    }
+    write_json(state_dir / f"active-task_{run_id}.json", task_data)
+    phase_marker(state_dir, "task-selected", run_id)
+    return TaskContract.from_active_task(task_data)
+
+
 def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
     terminal_id = os.environ.get("TERMINAL_ID", "default")
     os.environ["TERMINAL_ID"] = terminal_id
@@ -220,24 +277,42 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             )
             touch(state_dir / f".blocked_{run_id}")
             return None
+        selected_at = now_utc_z()
+        terminal_id = os.environ.get("TERMINAL_ID", "default")
         task_data: dict[str, Any] = {
             "run_id": run_id,
+            "terminal_id": terminal_id,
+            "selected_at": selected_at,
             "source": "cli",
+            "source_ref": "cli",
             "task": {
                 "id": f"prompt-{run_id[:8]}",
                 "title": args.prompt[:60],
                 "objective": args.prompt,
+                "status": "selected",
+                "priority": "P1",
                 "scope_in": args.scope_in or [],
                 "scope_out": [],
                 "acceptance_criteria": [],
                 "verification_commands": verification_commands,
                 "forbidden_files": args.forbidden or [],
+                "task_type": "implementation",
             },
         }
         write_json(state_dir / f"active-task_{run_id}.json", task_data)
         phase_marker(state_dir, "task-selected", run_id)
+    elif args.plan:
+        task = create_plan_task(args, state_dir, run_id)
+        if task is None:
+            return None
+        write_json(state_dir / f"task-contract-{run_id}.json", task.raw)
+        return task
     else:
         select_script = script_path("scripts", "select-task.py")
+        if args.tasks:
+            os.environ["GO_TASKS_FILE"] = str(Path(args.tasks).expanduser().resolve())
+        else:
+            os.environ.setdefault("GO_TASKS_FILE", str((Path.cwd() / ".claude" / "tasks" / "tasks.json").resolve()))
         rc = run_script(select_script, [], state_dir, run_id)
         if rc != 0:
             return None
@@ -253,11 +328,13 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
 def create_worktree(dispatch: str, state_dir: Path, run_id: str) -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     prefix = "pi" if dispatch == "pi" else "ai"
+    run_suffix_source = run_id[4:] if run_id.startswith("run-") else run_id
+    suffix = "".join(ch for ch in run_suffix_source if ch.isalnum())[:8] or uuid.uuid4().hex[:8]
     root = Path("P:/worktrees")
-    worktree = root / f"{prefix}-task-{ts}"
+    worktree = root / f"{prefix}-task-{ts}-{suffix}"
     root.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["git", "worktree", "add", "-b", f"{prefix}/{prefix}-task-{ts}", str(worktree), "HEAD"],
+        ["git", "worktree", "add", "-b", f"{prefix}/{prefix}-task-{ts}-{suffix}", str(worktree), "HEAD"],
         check=False,
         capture_output=True,
         text=True,

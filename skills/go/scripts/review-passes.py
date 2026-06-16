@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate 7-pass review files at the appropriate depth."""
-import json, os, pathlib, sys
+import json, os, pathlib, subprocess, sys
 
 state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
 run_id = os.environ["RUN_ID"]
@@ -30,8 +30,65 @@ ADVERSARIAL_PATTERNS = [
 ]
 
 
-def _build_pass_content(pass_name: str, depth: str) -> str:
-    parts = [f"# Review Pass: {pass_name}\n", f"Status: PASS\n"]
+def _load_active_task() -> dict:
+    active = state_dir / f"active-task_{run_id}.json"
+    if not active.exists():
+        return {}
+    try:
+        payload = json.loads(active.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return payload.get("task", payload)
+
+
+def _changed_files() -> tuple[list[str], list[str]]:
+    errors = []
+    changed: set[str] = set()
+    for command in (
+        ["git", "diff", "--name-only", "HEAD", "--"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        proc = subprocess.run(command, shell=False, text=True, capture_output=True)
+        if proc.returncode != 0:
+            errors.append((proc.stderr or proc.stdout or "").strip() or f"command failed: {' '.join(command)}")
+            continue
+        changed.update(line.strip() for line in proc.stdout.splitlines() if line.strip())
+    return sorted(changed), errors
+
+
+def _matches(pattern: str, filename: str) -> bool:
+    normalized_pattern = pattern.replace("\\", "/").strip("/")
+    normalized_file = filename.replace("\\", "/").strip("/")
+    return (
+        normalized_file == normalized_pattern
+        or normalized_file.endswith("/" + normalized_pattern)
+        or normalized_file.startswith(normalized_pattern.rstrip("/") + "/")
+    )
+
+
+def _review_findings(task: dict, changed: list[str], errors: list[str]) -> list[str]:
+    findings = [f"review diff collection failed: {error}" for error in errors]
+    forbidden = task.get("forbidden_files", [])
+    for pattern in forbidden:
+        for filename in changed:
+            if _matches(pattern, filename):
+                findings.append(f"Forbidden file changed: {filename} matches {pattern}")
+
+    scope_in = task.get("scope_in", [])
+    if scope_in and changed:
+        out_of_scope = [
+            filename
+            for filename in changed
+            if not any(_matches(pattern, filename) for pattern in scope_in)
+        ]
+        for filename in out_of_scope:
+            findings.append(f"Changed file outside scope_in: {filename}")
+    return findings
+
+
+def _build_pass_content(pass_name: str, depth: str, findings: list[str], changed: list[str]) -> str:
+    status = "REVIEW_REQUIRED" if findings else "PASS"
+    parts = [f"# Review Pass: {pass_name}\n", f"Status: {status}\n"]
 
     if pass_name == "correctness":
         parts.append("## Checklist\n- Code behaves as specified in acceptance criteria\n- No obvious logic errors\n- Edge cases handled\n")
@@ -52,7 +109,19 @@ def _build_pass_content(pass_name: str, depth: str) -> str:
     elif pass_name == "pr-ready":
         parts.append("## Checklist\n- Commit message follows conventional-commits\n- PR title and body artifacts generated\n- No secrets or credentials in diff\n")
 
-    parts.append("\n## Findings\n- No blocking findings recorded\n")
+    parts.append("\n## Changed Files\n")
+    if changed:
+        for filename in changed:
+            parts.append(f"- {filename}\n")
+    else:
+        parts.append("- No changed files detected\n")
+
+    parts.append("\n## Findings\n")
+    if findings:
+        for finding in findings:
+            parts.append(f"- REVIEW_REQUIRED: {finding}\n")
+    else:
+        parts.append("- No blocking findings recorded\n")
     return "".join(parts)
 
 
@@ -63,10 +132,14 @@ elif depth == "standard":
 else:
     passes = PASSES_FULL
 
-failed = False
+task = _load_active_task()
+changed_files, collection_errors = _changed_files()
+findings = _review_findings(task, changed_files, collection_errors)
+failed = bool(findings)
 for pass_name in passes:
     pass_file = state_dir / f"review-pass-{pass_name}_{run_id}.md"
-    content = _build_pass_content(pass_name, depth)
+    pass_findings = findings if pass_name in {"correctness", "scope", "pr-ready"} else []
+    content = _build_pass_content(pass_name, depth, pass_findings, changed_files)
     pass_file.write_text(content, encoding="utf-8")
     if "REVIEW_REQUIRED" in content:
         failed = True
@@ -75,6 +148,8 @@ summary = {
     "run_id": run_id,
     "review_depth": depth,
     "review_passes": passes,
+    "changed_files": changed_files,
+    "findings": findings,
     "failed": failed
 }
 summary_path = state_dir / f"review-summary_{run_id}.json"

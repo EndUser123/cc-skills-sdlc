@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Generate local PR artifacts from the selected task."""
-import json, os, pathlib, datetime
+"""Generate local PR artifacts from verified gate evidence."""
+import json, os, pathlib, datetime, sys
 
 state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
 run_id = os.environ["RUN_ID"]
@@ -12,6 +12,37 @@ task_id = task.get("id", "TASK")
 title = task.get("title", "Untitled task")
 objective = task.get("objective", "")
 review_depth = os.environ.get("REVIEW_DEPTH", "full")
+
+
+def _read_json(path: pathlib.Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _gate_errors() -> list[str]:
+    errors = []
+    verification_summary = _read_json(state_dir / f"verification-summary_{run_id}.json")
+    review_summary = _read_json(state_dir / f"review-summary_{run_id}.json")
+    qa_verdict = _read_json(state_dir / f"qa-verdict-{run_id}.json")
+    mutation_gate = _read_json(state_dir / f"mutation-gate-{run_id}.json")
+
+    if verification_summary.get("verified") is not True:
+        errors.append("verification-summary missing or not verified")
+    if review_summary.get("failed") is not False:
+        errors.append("review-summary missing or failed")
+    if qa_verdict.get("qa_status") not in {"accept", "accept-with-concerns", "skipped"}:
+        errors.append("qa verdict missing or blocking")
+    if mutation_gate.get("status") not in {"passed", "skipped"}:
+        errors.append("mutation gate missing or blocking")
+    return errors
+
+
+errors = _gate_errors()
+if errors:
+    print("ERROR: missing required gate evidence: " + "; ".join(errors), file=sys.stderr)
+    sys.exit(1)
 
 commit_msg = f"""feat: complete {task_id.lower()} {title.lower()}
 

@@ -131,7 +131,7 @@ mkdir -p "$GO_STATE_DIR"
 
 Priority: `GO_PROMPT` > **current session transcript** > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
 
-When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, the first task with `status` in `{ready, queued, approved}` is selected.
+When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, `/go` selects the eligible task with the lowest numeric `priority` value (`P1` before `P2`); file order breaks ties.
 
 ---
 
@@ -255,7 +255,7 @@ If no transcript path is found or the transcript cannot be read, fall back to `H
 **From intent (GO_PROMPT / HANDOFF_TRANSCRIPT / GO_PLAN_FILE):** Parse intent and synthesize a task contract. Write `active-task_{RUN_ID}.json`.
 Prompt-synthesized tasks use `GO_DEFAULT_VERIFICATION_COMMANDS` split on `;` for verification. Set `GO_REQUIRE_EXPLICIT_VERIFICATION=1` to block prompt tasks unless that env var is explicitly set.
 
-**From queue (GO_TASKS_FILE):** Select the first task with `status` in `{ready, queued, approved}`.
+**From queue (GO_TASKS_FILE):** Select the highest-priority task with `status` in `{ready, queued, approved}`. Claiming uses a `tasks.json.lock` sidecar, writes `active-task_{RUN_ID}.json` before mutating the queue, then marks the source task `selected` with `selected_by` and `selected_at`. Stale locks older than `GO_TASK_LOCK_TTL_SECONDS` are recovered; default TTL is 3600 seconds.
 
 ```bash
 python ".claude/skills/go/scripts/select-task.py"

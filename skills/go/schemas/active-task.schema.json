@@ -23,6 +23,14 @@
       "type": "string",
       "format": "date-time"
     },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
     "task": {
       "type": "object",
       "additionalProperties": false,
@@ -94,6 +102,23 @@
             "type": "string"
           },
           "default": []
+        },
+        "task_type": {
+          "type": "string",
+          "enum": ["planning", "design", "implementation", "refactor", "unknown"],
+          "default": "implementation"
+        },
+        "selected_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "default": false
         },
         "estimated_complexity": {
           "type": "string",

@@ -67,6 +67,14 @@
             "type": "boolean",
             "default": false
           },
+          "selected_by": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
           "notes": {
             "type": "string"
           }

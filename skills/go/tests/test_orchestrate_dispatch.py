@@ -157,6 +157,22 @@ def test_create_worktree_blocks_when_git_worktree_add_fails(monkeypatch, tmp_pat
         assert "git worktree add failed" in str(exc)
 
 
+def test_create_worktree_names_include_run_id_suffix(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_subprocess_run(command, **kwargs):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(_ORCHESTRATE.subprocess, "run", fake_subprocess_run)
+
+    worktree = _ORCHESTRATE.create_worktree("pi", tmp_path, "run-abcdef123456")
+
+    assert "abcdef12" in str(worktree)
+    assert "abcdef12" in captured["command"][4]
+    assert "abcdef12" in captured["command"][5]
+
+
 def test_ensure_runtime_env_generates_nonconstant_run_id(monkeypatch):
     monkeypatch.delenv("RUN_ID", raising=False)
     monkeypatch.delenv("GO_RUN_ID", raising=False)
@@ -180,6 +196,64 @@ def test_prompt_task_gets_default_verification_command(monkeypatch, tmp_path):
     assert task is not None
     active = json.loads((tmp_path / "active-task_run-verify.json").read_text(encoding="utf-8"))
     assert active["task"]["verification_commands"] == ["python -m pytest -q", "ruff check ."]
+
+
+def test_tasks_argument_is_used_for_queue_selection(monkeypatch, tmp_path):
+    tasks_file = tmp_path / "custom-tasks.json"
+    tasks_file.write_text(
+        json.dumps(
+            {
+                "version": "1.0",
+                "tasks": [
+                    {
+                        "id": "CUSTOM-1",
+                        "title": "Custom queue task",
+                        "objective": "Use the custom task file",
+                        "status": "ready",
+                        "priority": "P1",
+                        "scope_in": ["src/custom.py"],
+                        "scope_out": [],
+                        "forbidden_files": [],
+                        "acceptance_criteria": ["custom queue used"],
+                        "verification_commands": ["python -m pytest tests/test_custom.py"],
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    args = _ORCHESTRATE.parse_args(["--tasks", str(tasks_file)])
+    monkeypatch.delenv("GO_TASKS_FILE", raising=False)
+    monkeypatch.setenv("TERMINAL_ID", "test-terminal")
+
+    task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-custom-tasks")
+
+    assert task is not None
+    assert task.task_id == "CUSTOM-1"
+    active = json.loads((tmp_path / "active-task_run-custom-tasks.json").read_text(encoding="utf-8"))
+    assert active["source_ref"] == str(tasks_file.resolve())
+
+
+def test_plan_argument_creates_task_from_plan_file(monkeypatch, tmp_path):
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "# Harden parser\n\n- Add regression coverage\n- Verify with `python -m pytest skills/go/tests -q`\n",
+        encoding="utf-8",
+    )
+    args = _ORCHESTRATE.parse_args(["--plan", str(plan_file)])
+    monkeypatch.setenv("GO_DEFAULT_VERIFICATION_COMMANDS", "python -m pytest skills/go/tests -q")
+
+    task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-plan")
+
+    assert task is not None
+    assert task.task_id == "plan-run-plan"
+    assert task.title == "Harden parser"
+    assert task.source == "plan-md"
+    assert task.scope_in == []
+    assert task.verification_commands == ["python -m pytest skills/go/tests -q"]
+    active = json.loads((tmp_path / "active-task_run-plan.json").read_text(encoding="utf-8"))
+    assert active["source_ref"] == str(plan_file.resolve())
 
 
 def test_prompt_task_can_require_explicit_verification(monkeypatch, tmp_path):

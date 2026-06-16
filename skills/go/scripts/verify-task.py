@@ -28,21 +28,33 @@ def _check_scope_drift(task: dict, state_dir: pathlib.Path, f) -> list[str]:
 
     try:
         proc = subprocess.run(
-            ["git", "-C", worktree, "diff", "--name-only", "HEAD~1", "HEAD"],
+            ["git", "-C", worktree, "diff", "--name-only", "HEAD", "--"],
             shell=False, text=True, capture_output=True
         )
         if proc.returncode != 0:
+            findings.append(f"scope drift check failed: {(proc.stderr or proc.stdout or '').strip()}")
             return findings
 
         changed = set(proc.stdout.strip().splitlines())
+        untracked = subprocess.run(
+            ["git", "-C", worktree, "ls-files", "--others", "--exclude-standard"],
+            shell=False, text=True, capture_output=True
+        )
+        if untracked.returncode == 0:
+            changed.update(untracked.stdout.strip().splitlines())
+        if not changed:
+            findings.append(
+                f"scope_in declares {len(scope_in)} path(s) but no files changed - possible spec drift"
+            )
+            return findings
         for scoped in scope_in:
             matched = any(scoped in f or f.endswith(scoped) for f in changed)
             if not matched and changed:
                 findings.append(
-                    f"'{scoped}' listed in scope_in but no changes detected — possible spec drift"
+                    f"'{scoped}' listed in scope_in but no changes detected - possible spec drift"
                 )
     except Exception:
-        pass
+        findings.append("scope drift check failed unexpectedly")
 
     return findings
 
@@ -117,6 +129,7 @@ with results_path.open("w", encoding="utf-8") as f:
     # Gap discovery: check scope_in vs actual changed files
     gap_findings = _check_scope_drift(task, state_dir, f)
     if gap_findings:
+        all_ok = False
         f.write("\n" + "=" * 80 + "\n")
         f.write("[FACT] Scope drift analysis run\n")
         for g in gap_findings:
@@ -127,7 +140,8 @@ summary = {
     "run_id": run_id,
     "verified": all_ok,
     "verified_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    "commands": command_results
+    "commands": command_results,
+    "scope_drift_findings": gap_findings,
 }
 summary_path.write_text(json.dumps(summary, indent=2) + "\n")
 sys.exit(0 if all_ok else 4)
