@@ -9,6 +9,8 @@ build/
 .benchmarks/
 *.json.bak
 findings/
+skills/**/hooks/state/
+skills/*/refactor-workspace/
 
 # Session state artifacts
 .claude/
