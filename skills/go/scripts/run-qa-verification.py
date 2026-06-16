@@ -36,10 +36,27 @@ from typing import Any
 
 # ─── Paths ───────────────────────────────────────────────────────────────────────
 
-SKILLS_ANALYSIS = Path(os.environ.get(
-    "SKILLS_ANALYSIS_ROOT",
-    "P:/packages/cc-skills-analysis",
-))
+
+def resolve_skills_analysis_root() -> Path:
+    """Resolve the cc-skills-analysis plugin root used for GTO imports."""
+    override = os.environ.get("SKILLS_ANALYSIS_ROOT", "").strip()
+    if override:
+        return Path(override)
+
+    script_path = Path(__file__).resolve()
+    plugin_root = script_path.parents[3]
+    marketplace_plugins = plugin_root.parent
+    candidates = [
+        marketplace_plugins / "cc-skills-analysis",
+        Path("P:/packages/cc-skills-analysis"),
+    ]
+    for candidate in candidates:
+        if candidate.joinpath("skills", "gto", "orchestrator.py").exists():
+            return candidate
+    return candidates[0]
+
+
+SKILLS_ANALYSIS = resolve_skills_analysis_root()
 
 # State root for /go.
 GO_STATE_DIR = Path(os.environ.get("GO_STATE_DIR", Path.home() / ".claude" / ".artifacts" / "temp" / "go"))
@@ -74,7 +91,7 @@ def _import_gto() -> tuple[Any, Any]:
     Adds SKILLS_ANALYSIS to sys.path so skills.gto is importable.
     Returns (orchestrator_run_fn, apply_quality_gates_fn).
     """
-    root = str(SKILLS_ANALYSIS)
+    root = str(resolve_skills_analysis_root())
     if root not in sys.path:
         sys.path.insert(0, root)
     from skills.gto.orchestrator import run as gto_run
