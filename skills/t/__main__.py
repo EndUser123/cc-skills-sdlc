@@ -43,6 +43,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
         - discovery: What tests exist? What's missing? (from /test)
         - execution: Run tests with analytics (default, current implementation)
         - bisect: When did this break? (from /test-bisect)
+        - mutation: How strong are tests at killing injected faults?
         - comprehensive: Run all modes
 
     Workflow (execution mode):
@@ -74,6 +75,7 @@ def main(target: str | None = None, force_full: bool = False, mode: str | None =
         'smart': _run_smart_mode,
         'discovery': _run_discovery_mode,
         'bisect': _run_bisect_mode,
+        'mutation': _run_mutation_mode,
         'comprehensive': _run_comprehensive_mode,
         'execution': _run_execution_mode,
     }
@@ -104,6 +106,27 @@ def _run_bisect_mode(target: str | None, _force_full: bool) -> int:
     report = format_bisect_report(result)
     print(report)
     return 0
+
+
+def _run_mutation_mode(target: str | None, _force_full: bool) -> int:
+    """Mutation mode: fault-detection strength via mutmut."""
+    from modes import format_mutation_report, run_mutation, save_mutation_report
+
+    print("Mutation mode: Fault-detection strength analysis")
+    print("=" * 60)
+
+    project_root = _resolve_target_path(None)
+    terminal_id = _get_terminal_id()
+    targets = [target] if target else None
+    report = run_mutation(targets=targets, project_root=project_root)
+    print(format_mutation_report(report))
+    try:
+        out_path = save_mutation_report(report, project_root, terminal_id)
+        print(f"\nSaved mutation report: {out_path}")
+    except Exception as e:
+        print(f"\nWarning: Failed to save mutation report: {e}")
+
+    return 1 if report.failed or report.blocked else 0
 
 
 def _run_comprehensive_mode(target: str | None, force_full: bool) -> int:
@@ -614,12 +637,14 @@ Modes:
   discovery    What tests exist? What's missing? (from /test)
   execution    Run tests with analytics
   bisect       When did this break? (from /test-bisect)
+  mutation     How strong are tests at killing injected faults?
   comprehensive Run all testing modes
 
 Examples:
   t                     Smart orchestration (default)
   t router.py           Target specific file
   t --mode discovery    Force discovery mode
+  t --mode mutation     Run mutation testing
   t --force-full        Force full test suite
         """
     )
@@ -627,7 +652,7 @@ Examples:
     parser.add_argument("--force-full", action="store_true", help="Force full test suite")
     parser.add_argument(
         "--mode",
-        choices=["smart", "discovery", "execution", "bisect", "comprehensive"],
+        choices=["smart", "discovery", "execution", "bisect", "mutation", "comprehensive"],
         help="Testing mode (default: smart)"
     )
 

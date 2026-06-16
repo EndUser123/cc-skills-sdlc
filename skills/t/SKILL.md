@@ -45,7 +45,7 @@ Adaptive testing command that automatically determines test scope and strictness
 - **Codemap reuse**: Leverages `$__CSF_ROOT/src\commands\cb\enhance_command.py::create_codemap()` for dependency analysis
 - **Health check integration**: Reuses `$CLAUDE_ROOT/skills\test_health_check.py` utilities
 - **Multi-terminal safe**: File-based locking with PID validation for concurrent sessions
-- **Test types**: Functional, unit, regression, integration, intelligent
+- **Test types**: Functional, unit, regression, integration, intelligent, mutation
 
 ### Architecture Alignment
 - Independent skill from `/test` (shares infrastructure, distinct behavior)
@@ -67,7 +67,7 @@ Choose the smallest sufficient test mix for the change:
 
 ## Modes
 
-`/t` operates in 5 different modes:
+`/t` operates in 6 different modes:
 
 | Mode | Description | When to Use |
 |------|-------------|-------------|
@@ -75,6 +75,7 @@ Choose the smallest sufficient test mix for the change:
 | **discovery** | Test coverage analysis and gap detection (from `/test`) | "What tests exist? What's missing?" |
 | **execution** | Adaptive testing with risk scoring and analytics | Quick test run with incremental scope |
 | **bisect** | Regression hunting via git bisect (from `/test-bisect`) | "When did this break?" Find bad commit |
+| **mutation** | Mutation testing (mutmut 3.x) for fault-detection strength | "Are my tests strong enough to catch real bugs?" — measures killed mutants vs targets from `P:/.claude/quality_gates.json` |
 | **comprehensive** | Run all testing modes | Full analysis across all dimensions |
 
 ## Your Workflow
@@ -129,9 +130,45 @@ For targeted testing without full discovery. 15 steps from context extraction th
 
 > See `references/execution-mode.md` for the full 15-step execution pipeline, validation rules, file listing, testing instructions, and success criteria.
 
+### Mutation Mode (Fault-Detection Strength)
+
+For measuring whether the test suite actually catches injected faults — coverage only tells you the tests *ran*, mutation score tells you they *meant something*.
+
+**When to use:** Before merging a feature, after fixing a bug, when coverage looks "good" but the team still ships regressions. Critical-path modules (tier `critical` in `quality_gates.json`) require 80% mutation score; standard modules require 60%.
+
+**Pre-Mutation Audit (MANDATORY before running mutmut):**
+
+1. **Subprocess-avoidance check:** Scan test files for `subprocess.run(["pytest"` or `subprocess.Popen(["pytest"`. If found, block mutation and emit: `ERROR: Test file invokes pytest via subprocess — replace with in-process calls (e.g., pytest.main() or importlib). Subprocess invocations produce timeout mutants, not killed mutants.`
+2. **Namespace-shadow check:** Scan the target module for any function defined with the same name as a symbol imported at module level from a sub-package. If found, emit: `WARNING: <function_name> in <module> shadows the imported version from <sub_module>. The import is dead code. Mutation will find zero kills. Resolve the naming conflict before running mutation.`
+
+**Workflow:**
+
+1. Read targets from `P:/.claude/quality_gates.json` (modules section) — or pass a path as `target`.
+2. For each target, run `mutmut run --use-coverage --runner '<pytest runner>' --target <target>`.
+3. Parse mutmut summary (killed / survived / skipped / timeout / no_tests).
+4. Apply equivalent-mutant budget (15% of total mutants per module, configurable in `quality_gates.json`): skipped mutants under the budget count as killed.
+5. Compute mutation score = effective_killed / total × 100. Compare against the module's `target` (80% critical, 60% default).
+6. Emit per-module status: `passed` / `failed` / `skipped` / `timeout` / `blocked`.
+7. Write report to `.claude/state/mutation_runs/{terminal_id}_mutation.json`.
+
+**Invocation:**
+
+```bash
+# All modules declared in quality_gates.json
+/t --mode mutation
+
+# Specific module
+/t --mode mutation --target src/skill_guard/breadcrumb/inference.py
+```
+
+**Output:** Markdown table with module / killed / survived / skipped / timeout / score / target / status. Failed critical-path modules require an explicit waiver (see `/planning` Test Quality section).
+
+> See `modes/mutation_mode.py` for the implementation. Router keywords: `mutation`, `mutmut`, `kill mutants`, `survived`, `mutation score`, `mutation testing`, `fault detection`, `test strength`, `equivalent mutants`.
+
 ## Validation Rules
 
 - **Before testing**: Verify target files exist, validate paths are in project root
+- **Before mutation**: Run Pre-Mutation Audit (subprocess-avoidance + namespace-shadow checks) — block if either fails
 - **During testing**: All test execution must produce actual output (no synthesis)
 - **After testing**: Verify test results before caching (no corrupted cache entries)
 - **Multi-terminal**: Always acquire lock before cache operations, release after
@@ -161,6 +198,7 @@ python __main__.py --force-full  # Override: force full suite
 /t --mode discovery      # Test coverage analysis only
 /t --mode execution       # Direct testing with analytics
 /t --mode bisect         # Regression hunting
+/t --mode mutation        # Mutation testing (fault-detection strength)
 /t --mode comprehensive   # Run all testing modes
 
 # Target specific file or module

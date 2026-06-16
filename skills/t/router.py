@@ -6,6 +6,8 @@ Detects whether the user wants:
 - Discovery mode: What tests exist? What's missing?
 - Execution mode: Run tests with analytics (default)
 - Bisect mode: When did this break?
+- Mutation mode: How strong are the tests at killing injected faults?
+- Comprehensive mode: Run all of the above
 """
 
 
@@ -18,12 +20,21 @@ def detect_mode_from_prompt(user_input: str) -> str:
         user_input: The user's natural language prompt
 
     Returns:
-        'smart' | 'discovery' | 'execution' | 'bisect' | 'comprehensive'
+        'smart' | 'discovery' | 'execution' | 'bisect' | 'mutation' | 'comprehensive'
     """
     if not user_input:
         return 'smart'  # Smart orchestration by default if no prompt context
 
     input_lower = user_input.lower()
+
+    # Mutation keywords (highest priority — most specific intent)
+    mutation_keywords = [
+        'mutation', 'mutmut', 'kill mutants', 'survived', 'surviving',
+        'mutation score', 'mutation testing', 'fault detection',
+        'test strength', 'test effectiveness', 'equivalent mutants',
+    ]
+    if any(kw in input_lower for kw in mutation_keywords):
+        return 'mutation'
 
     # Discovery keywords (highest priority)
     discovery_keywords = [
@@ -92,6 +103,9 @@ if __name__ == "__main__":
         ("run tests", "execution"),
         ("", "smart"),  # Fixed: empty input defaults to smart mode
         ("comprehensive analysis", "comprehensive"),
+        ("mutation score for skill_guard", "mutation"),
+        ("mutmut run", "mutation"),
+        ("test strength / fault detection", "mutation"),
     ]
 
     print("Testing router mode detection:")

@@ -8,6 +8,12 @@ from .discovery_mode import (  # noqa: F401
     format_discovery_report,
     save_test_gaps,
 )
+from .mutation_mode import (  # noqa: F401
+    format_mutation_report,
+    run_mutation,
+    run_mutation_for_module,
+    save_mutation_report,
+)
 
 __all__ = [
     "discover_tests",
@@ -17,4 +23,8 @@ __all__ = [
     "save_test_gaps",
     "_get_terminal_id",
     "_resolve_target_path",
+    "run_mutation",
+    "run_mutation_for_module",
+    "format_mutation_report",
+    "save_mutation_report",
 ]

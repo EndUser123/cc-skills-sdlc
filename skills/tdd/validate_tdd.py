@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "__lib"))
 from session_models import SessionState, TddEvidence, PhaseReceipt  # type: ignore
+import session_models  # type: ignore
 from pydantic import ValidationError
 import sdlc_state
 
@@ -195,6 +196,51 @@ def validate_run(run_id: str) -> None:
                     "REFACTOR: stdout identical to GREEN. "
                     "You must re-run tests after refactor, not reuse GREEN output."
                 )
+
+    # MUTATION (optional side-channel quality gate).  When evidence.mutation
+    # is present, verify the receipt signature, status, and target.
+    _mut = evidence.mutation
+    if _mut is not None:
+        _mp = run_dir / _mut.receipt_path
+        if not _mp.exists():
+            errors.append(
+                f"MUTATION: Receipt not found: {_mp}. "
+                "Re-run with --phase mutation to regenerate."
+            )
+        else:
+            try:
+                _mr = session_models.MutationReceipt.model_validate_json(
+                    _mp.read_text(encoding="utf-8")
+                )
+            except ValidationError as _e:
+                errors.append(f"MUTATION: Schema invalid.\n{_e}")
+            else:
+                if not _mr.verify_signature(session.hmac_secret):
+                    errors.append(
+                        "MUTATION: Signature INVALID. "
+                        "Receipt tampered with or fabricated."
+                    )
+                elif _mr.module != _mut.module:
+                    errors.append(
+                        f"MUTATION: module mismatch — receipt "
+                        f"'{_mr.module}' vs evidence '{_mut.module}'."
+                    )
+                elif _mr.status in {"failed", "timeout", "blocked"}:
+                    errors.append(
+                        f"MUTATION: status='{_mr.status}'. "
+                        f"killed={_mr.killed} survived={_mr.survived} "
+                        f"score={_mr.mutation_score} target={_mr.target_score}"
+                    )
+                elif (
+                    _mr.target_score is not None
+                    and _mr.mutation_score is not None
+                    and _mr.mutation_score < _mr.target_score
+                ):
+                    errors.append(
+                        f"MUTATION: score {_mr.mutation_score}% < "
+                        f"target {_mr.target_score}% "
+                        f"({_mr.survived} mutants survived)."
+                    )
 
     if errors:
         fail_with_errors(errors)

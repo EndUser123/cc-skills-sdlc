@@ -125,3 +125,12 @@ You MUST complete this step before stopping. No exceptions.
 3. **Never skip RED.** Wrapper and validator assume RED happened before GREEN.
 4. **Never exceed 3 validation attempts.** After 3 failures, STOP and ask for help.
 5. **If you claim refactor work, you must prove it.** Distinct stdout from GREEN required.
+6. **Never allow tests to scan `WORKSPACE_ROOT`.** Tests MUST NOT trigger recursive filesystem walks, live network calls, or unguarded subprocess invocations (e.g., `subprocess.run(["pytest", ...])`). Mock these at the test boundary.
+7. **Never shadow an imported name in a facade module.** If a function with the same name is already imported from a sub-module, the local definition silently overrides the import and defeats mutation testing.
+8. **Never claim completion on a critical-path module without a mutation gate.** Check `quality_gates.json`. If `tier: critical`, run `/t --mode mutation` before drafting `evidence.json`.
+
+## Performance Contract
+
+- Unit tests (GREEN) must complete in **under 5 seconds**.
+- Integration tests (GREEN) must complete in **under 30 seconds**.
+- Exceeding these limits is evidence of a missing mock or a subprocess boundary leak, not of test quality.

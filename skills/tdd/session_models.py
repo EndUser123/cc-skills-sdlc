@@ -91,6 +91,65 @@ class PhaseReceiptRef(BaseModel):
     receipt_path: str = Field(..., min_length=1)
 
 
+class MutationReceiptRef(BaseModel):
+    """Pointer to a mutation-testing receipt (mutmut 3.x run)."""
+
+    phase: Literal["mutation"] = "mutation"
+    receipt_path: str = Field(..., min_length=1)
+    module: str = Field(..., min_length=1)
+    target_score: Optional[int] = None
+    mutation_score: Optional[float] = None
+    status: Literal["passed", "failed", "waived", "skipped", "timeout", "blocked"] = "blocked"
+
+
+class MutationReceipt(BaseModel):
+    """HMAC-signed receipt for a single mutation-testing run.
+
+    Written and signed by run_phase.py when invoked with --phase mutation.
+    Mirrors PhaseReceipt's signature model so the audit chain covers mutation
+    runs with the same rigor as red/green/refactor.
+    """
+
+    phase: Literal["mutation"] = "mutation"
+    run_id: str
+    test_command: str  # the mutmut invocation, e.g. "mutmut run --use-coverage ..."
+    cwd: str
+    exit_code: int
+    started_at: str
+    finished_at: str
+    stdout_path: str
+    stderr_path: Optional[str] = None
+    stdout_sha256: str
+    stderr_sha256: Optional[str] = None
+    module: str = Field(..., min_length=1)
+    target_score: Optional[int] = None
+    mutation_score: Optional[float] = None
+    killed: int = 0
+    survived: int = 0
+    skipped: int = 0
+    timeout: int = 0
+    status: Literal["passed", "failed", "waived", "skipped", "timeout", "blocked"] = "blocked"
+    signature: str = Field(..., min_length=1)
+
+    def compute_signature(self, secret: str) -> str:
+        """Compute HMAC over the deterministic content of this receipt."""
+        content = (
+            f"{self.phase}|{self.run_id}|{self.test_command}|{self.cwd}|"
+            f"{self.exit_code}|{self.started_at}|{self.finished_at}|"
+            f"{self.stdout_sha256}|{self.stderr_sha256 or ''}|"
+            f"{self.module}|{self.target_score}|{self.mutation_score}|"
+            f"{self.killed}|{self.survived}|{self.skipped}|{self.timeout}|"
+            f"{self.status}"
+        )
+        return hmac.new(
+            secret.encode(), content.encode(), hashlib.sha256
+        ).hexdigest()
+
+    def verify_signature(self, secret: str) -> bool:
+        expected = self.compute_signature(secret)
+        return hmac.compare_digest(self.signature, expected)
+
+
 class RunMetadata(BaseModel):
     run_id: str = Field(..., min_length=1)
     mode: Literal["feature", "bugfix", "refactor"]
@@ -113,6 +172,7 @@ class TddEvidence(BaseModel):
     red: PhaseReceiptRef
     green: PhaseReceiptRef
     refactor: Optional[PhaseReceiptRef] = None
+    mutation: Optional[MutationReceiptRef] = None
 
     failure_summary: List[str] = Field(default_factory=list)
 
