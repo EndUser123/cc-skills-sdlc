@@ -474,6 +474,12 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         return False
     phase_marker(state_dir, "qa-passed", run_id)
 
+    mutation_script = script_path("scripts", "mutation-gate.py")
+    rc = run_script(mutation_script, [], state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    phase_marker(state_dir, "mutation-passed", run_id)
+
     pr_script = script_path("scripts", "pr-artifacts.py")
     rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:

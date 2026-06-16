@@ -77,6 +77,7 @@
         "code",
         "refactor",
         "tdd",
+        "mutation",
         null
       ]
     },
@@ -154,7 +155,8 @@
               "risk-review",
               "architecture-spike",
               "stakeholder-sync",
-              "tdd-debug"
+              "tdd-debug",
+              "mutation-test"
             ]
           },
           "evidence": {

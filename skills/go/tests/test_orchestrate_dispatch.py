@@ -87,6 +87,7 @@ def test_common_tail_records_skipped_simplify_before_review_and_qa(monkeypatch, 
         "verify-task.py",
         "review-passes.py",
         "run-qa-verification.py",
+        "mutation-gate.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
@@ -119,6 +120,7 @@ def test_common_tail_runs_configured_simplify_command(monkeypatch, tmp_path):
         "verify-task.py",
         "review-passes.py",
         "run-qa-verification.py",
+        "mutation-gate.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
@@ -293,6 +295,51 @@ def test_common_tail_passes_qa_dry_run_when_requested(monkeypatch, tmp_path):
 
     assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run-qa-dry") is True
     assert qa_args == ["--dry-run"]
+
+
+def test_common_tail_runs_mutation_gate_before_pr_artifacts(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
+        calls.append(pathlib.Path(script).name)
+        if pathlib.Path(script).name == "mutation-gate.py":
+            (state_dir / f"mutation-gate-{run_id}.json").write_text(
+                json.dumps({"status": "skipped"}) + "\n",
+                encoding="utf-8",
+            )
+        return 0
+
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(
+        _ORCHESTRATE.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run-mutation") is True
+    assert calls.index("mutation-gate.py") < calls.index("pr-artifacts.py")
+    assert (tmp_path / ".mutation-passed_run-mutation").exists()
+
+
+def test_common_tail_blocks_when_mutation_gate_fails(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_script(script, args, state_dir, run_id, **kwargs):
+        name = pathlib.Path(script).name
+        calls.append(name)
+        if name == "mutation-gate.py":
+            return 1
+        return 0
+
+    monkeypatch.setattr(_ORCHESTRATE, "run_script", fake_run_script)
+    monkeypatch.setattr(
+        _ORCHESTRATE.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run-mutation-fail") is False
+    assert "pr-artifacts.py" not in calls
 
 
 def test_loop_check_skips_when_tasks_file_missing(tmp_path):

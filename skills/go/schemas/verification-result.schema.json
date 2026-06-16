@@ -196,6 +196,54 @@
         }
       }
     },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional side-channel mutation-testing block (mutmut 3.x). Present when the run executed a mutation phase for a target module.",
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["critical", "standard", "best-effort"]
+        },
+        "target_score": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "mutation_score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "killed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "survived": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "waived", "skipped", "timeout", "blocked", "not-run"]
+        },
+        "receipt_path": {
+          "type": "string"
+        }
+      }
+    },
     "integration_verification": {
       "type": "object",
       "additionalProperties": false,
@@ -234,6 +282,9 @@
           "type": "string"
         },
         "tdd_receipt": {
+          "type": "string"
+        },
+        "mutation_gate": {
           "type": "string"
         }
       }

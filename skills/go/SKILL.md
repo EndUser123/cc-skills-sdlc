@@ -404,11 +404,13 @@ touch "$GO_STATE_DIR/.mutation-passed_$RUN_ID"
 ```
 
 Script logic:
-1. Read `diff-summary_{RUN_ID}.json` to get modified files.
-2. Cross-reference with `quality_gates.json` modules. If `task_type` is not `implementation`, emit `skipped` and exit 0.
-3. For each critical-tier modified module, invoke `/t --mode mutation --target <file>` (planning-side audit) **or** delegate to `/tdd --phase mutation --module <dotted.name>` (execution-side gate, writes a signed `MutationReceipt`).
-4. Score verdict comes from the **shared** `mutation_config.evaluate_mutation_run()` scorer — the same function `/t`, `/tdd`, and `/go` all call, so target thresholds, status enums (`passed|failed|skipped|timeout|blocked|not-run`), and equivalent-mutant handling stay consistent across skills.
-5. If any module scores below its target, exit 1. On pass, write `mutation-gate-{RUN_ID}.json` with `{status, modules_checked, modules_passed, modules_failed, receipts[]}`.
+1. Select modules from `GO_MUTATION_MODULES` when set; otherwise intersect `git diff --name-only HEAD` with critical-tier modules in `quality_gates.json`.
+2. If no critical mutation target is selected, emit `mutation-gate-{RUN_ID}.json` with `status: skipped`, write `verification-result_{RUN_ID}.json` with `mutation.status: not-run`, and exit 0.
+3. For each selected critical-tier module, run the shared `/t` mutation runner (`mutmut 3.x`) through `mutation_mode.run_mutation_for_module()`.
+4. Treat `passed` and `waived` as non-blocking. Treat `failed`, `timeout`, `blocked`, and selected-module `skipped` as blocking when `quality_gates.json` has `block_pr_on_failure: true`.
+5. On block, write `blocked_{RUN_ID}.json` with `reason_code: mutation_failed`, touch `.blocked_{RUN_ID}`, and exit 1.
+
+**Artifacts:** `mutation-gate-{RUN_ID}.json` contains `{schema_version, run_id, status, modules[], generated_at}` plus `blocking_modules[]` when applicable. Each module entry carries `{module, tier, target_score, mutation_score, killed, survived, skipped, timeout, status, receipt_path}`. `verification-result_{RUN_ID}.json` mirrors the latest module summary under `mutation` and records `artifact_paths.mutation_gate`; when there is no separate signed TDD receipt, `mutation.receipt_path` points to the mutation-gate artifact itself.
 
 **Result ingestion:** the per-run `verification-result.mutation` block (see `schemas/verification-result.schema.json`) carries the latest gate summary into the readiness object, and `run-status.active_route` may be set to `"mutation"` while a mutation phase is executing (returns to `"code"` on completion). Mutation is a **side-channel** quality gate — it does not block the TDD lifecycle phase machine, so `validate_tdd.py` and `verify-task.py` both consult `evidence.mutation` / `verification_result.mutation` independently of `phase`.
 
