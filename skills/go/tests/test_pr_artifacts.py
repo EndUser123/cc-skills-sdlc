@@ -91,3 +91,112 @@ def test_pr_artifacts_fail_closed_without_required_gate_evidence(tmp_path):
     assert result.returncode == 1
     assert "missing required gate evidence" in result.stderr.lower()
     assert not (state_dir / f"task-result_{run_id}.json").exists()
+
+
+def test_pr_artifacts_report_malformed_gate_evidence(tmp_path):
+    run_id = "run-pr-malformed-evidence"
+    state_dir = tmp_path
+    (state_dir / f"active-task_{run_id}.json").write_text(
+        json.dumps({"task": {"id": "TASK-1", "title": "Bad evidence", "objective": "fail closed"}}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"verification-summary_{run_id}.json").write_text("{not json\n", encoding="utf-8")
+    (state_dir / f"review-summary_{run_id}.json").write_text(
+        json.dumps({"failed": False, "findings": []}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"qa-verdict-{run_id}.json").write_text(
+        json.dumps({"qa_status": "accept"}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"mutation-gate-{run_id}.json").write_text(
+        json.dumps({"status": "skipped"}) + "\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["GO_STATE_DIR"] = str(state_dir)
+    env["RUN_ID"] = run_id
+
+    result = subprocess.run(
+        [sys.executable, str(PACKAGE / "scripts" / "pr-artifacts.py")],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "malformed gate evidence" in result.stderr.lower()
+    assert "verification-summary" in result.stderr
+    assert not (state_dir / f"task-result_{run_id}.json").exists()
+
+
+def test_pr_artifacts_block_failing_gate_evidence(tmp_path):
+    run_id = "run-pr-failing-evidence"
+    state_dir = tmp_path
+    (state_dir / f"active-task_{run_id}.json").write_text(
+        json.dumps({"task": {"id": "TASK-1", "title": "Failing evidence", "objective": "fail closed"}}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"verification-summary_{run_id}.json").write_text(
+        json.dumps({"verified": True}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"review-summary_{run_id}.json").write_text(
+        json.dumps({"failed": True, "findings": ["bug"]}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"qa-verdict-{run_id}.json").write_text(
+        json.dumps({"qa_status": "accept"}) + "\n",
+        encoding="utf-8",
+    )
+    (state_dir / f"mutation-gate-{run_id}.json").write_text(
+        json.dumps({"status": "skipped"}) + "\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["GO_STATE_DIR"] = str(state_dir)
+    env["RUN_ID"] = run_id
+
+    result = subprocess.run(
+        [sys.executable, str(PACKAGE / "scripts" / "pr-artifacts.py")],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "review-summary present but failed" in result.stderr
+    assert not (state_dir / f"task-result_{run_id}.json").exists()
+
+
+def test_pr_artifacts_block_empty_gate_evidence_objects(tmp_path):
+    run_id = "run-pr-empty-evidence"
+    state_dir = tmp_path
+    (state_dir / f"active-task_{run_id}.json").write_text(
+        json.dumps({"task": {"id": "TASK-1", "title": "Empty evidence", "objective": "fail closed"}}) + "\n",
+        encoding="utf-8",
+    )
+    for name in [
+        f"verification-summary_{run_id}.json",
+        f"review-summary_{run_id}.json",
+        f"qa-verdict-{run_id}.json",
+        f"mutation-gate-{run_id}.json",
+    ]:
+        (state_dir / name).write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["GO_STATE_DIR"] = str(state_dir)
+    env["RUN_ID"] = run_id
+
+    result = subprocess.run(
+        [sys.executable, str(PACKAGE / "scripts" / "pr-artifacts.py")],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "verification-summary present but not verified" in result.stderr
+    assert "review-summary present but failed" in result.stderr
+    assert "qa-verdict present but blocking" in result.stderr
+    assert "mutation-gate present but blocking" in result.stderr
+    assert not (state_dir / f"task-result_{run_id}.json").exists()

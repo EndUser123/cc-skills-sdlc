@@ -301,6 +301,18 @@ def test_orchestrate_claude_dispatch_blocks_without_worker(monkeypatch, tmp_path
     assert not (tmp_path / ".dispatched_run-claude").exists()
 
 
+def test_dispatch_claude_writes_blocked_contract(tmp_path):
+    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude-helper") is False
+
+    result = json.loads((tmp_path / "dispatch-result_run-claude-helper.json").read_text(encoding="utf-8"))
+    assert result == {
+        "dispatch": "claude",
+        "status": "unsupported-automated-dispatch",
+        "reason": "Claude dispatch has no non-interactive worker implementation in this orchestrator.",
+    }
+    assert (tmp_path / ".blocked_run-claude-helper").exists()
+
+
 def test_orchestrate_local_dispatch_skips_worktree_and_worker(monkeypatch, tmp_path):
     args = _ORCHESTRATE.parse_args(["--dispatch", "local", "--prompt", "verify only"])
     calls = []

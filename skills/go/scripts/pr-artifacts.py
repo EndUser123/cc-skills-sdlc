@@ -14,28 +14,39 @@ objective = task.get("objective", "")
 review_depth = os.environ.get("REVIEW_DEPTH", "full")
 
 
-def _read_json(path: pathlib.Path) -> dict:
+def _read_json(label: str, path: pathlib.Path, errors: list[str]) -> dict:
+    if not path.exists():
+        errors.append(f"{label} missing")
+        return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError as exc:
+        errors.append(f"malformed gate evidence: {label}: {exc.msg}")
         return {}
+    except OSError as exc:
+        errors.append(f"{label} unreadable: {exc}")
+        return {}
+
+
+def _missing(label: str, errors: list[str]) -> bool:
+    return any(error == f"{label} missing" for error in errors)
 
 
 def _gate_errors() -> list[str]:
     errors = []
-    verification_summary = _read_json(state_dir / f"verification-summary_{run_id}.json")
-    review_summary = _read_json(state_dir / f"review-summary_{run_id}.json")
-    qa_verdict = _read_json(state_dir / f"qa-verdict-{run_id}.json")
-    mutation_gate = _read_json(state_dir / f"mutation-gate-{run_id}.json")
+    verification_summary = _read_json("verification-summary", state_dir / f"verification-summary_{run_id}.json", errors)
+    review_summary = _read_json("review-summary", state_dir / f"review-summary_{run_id}.json", errors)
+    qa_verdict = _read_json("qa-verdict", state_dir / f"qa-verdict-{run_id}.json", errors)
+    mutation_gate = _read_json("mutation-gate", state_dir / f"mutation-gate-{run_id}.json", errors)
 
-    if verification_summary.get("verified") is not True:
-        errors.append("verification-summary missing or not verified")
-    if review_summary.get("failed") is not False:
-        errors.append("review-summary missing or failed")
-    if qa_verdict.get("qa_status") not in {"accept", "accept-with-concerns", "skipped"}:
-        errors.append("qa verdict missing or blocking")
-    if mutation_gate.get("status") not in {"passed", "skipped"}:
-        errors.append("mutation gate missing or blocking")
+    if not _missing("verification-summary", errors) and verification_summary.get("verified") is not True:
+        errors.append("verification-summary present but not verified")
+    if not _missing("review-summary", errors) and review_summary.get("failed") is not False:
+        errors.append("review-summary present but failed")
+    if not _missing("qa-verdict", errors) and qa_verdict.get("qa_status") not in {"accept", "accept-with-concerns", "skipped"}:
+        errors.append("qa-verdict present but blocking")
+    if not _missing("mutation-gate", errors) and mutation_gate.get("status") not in {"passed", "skipped"}:
+        errors.append("mutation-gate present but blocking")
     return errors
 
 
