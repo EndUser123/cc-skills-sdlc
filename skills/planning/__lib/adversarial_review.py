@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULT_ADVERSARIAL_ROOT = Path("P:\\\\\\.claude/plans/adversarial")
+# NOTE: Adversarial root is now derived from plan path's parent directory
+# at runtime in build_adversarial_review_context(). This aligns with
+# auto_verify.py's search logic which checks plan.parent / "adversarial".
+# The previous hardcoded P: path caused path mismatches when plans
+# existed in user home directories (C:/Users/brsth/.claude/plans/) rather than P:/.
 REFERENCE_PROMPTS_PATH = Path(__file__).resolve().parents[1] / "references" / "adversarial-agent-prompts.md"
 AGENT_FINDINGS_FILENAMES = {
     "compliance": "compliance-findings.json",
@@ -96,7 +100,14 @@ def build_adversarial_review_context(
     resolved_plan_path = str(Path(plan_path))
     resolved_terminal_id = terminal_id or detect_terminal_id()
     sanitized_plan_name = sanitize_plan_name(resolved_plan_path)
-    base_root = Path(root) if root is not None else DEFAULT_ADVERSARIAL_ROOT
+    # Derive default root from plan's parent directory to align with auto_verify.py's
+    # search logic which checks plan.parent / "adversarial". This prevents path mismatches
+    # when plans exist in user home directories (C:/Users/brsth/.claude/plans/) rather
+    # than P:/.claude/plans/.
+    if root is None:
+        base_root = Path(resolved_plan_path).resolve().parent / "adversarial"
+    else:
+        base_root = Path(root)
     base_dir = base_root / sanitized_plan_name / resolved_terminal_id
     findings_paths = {
         agent: base_dir / filename

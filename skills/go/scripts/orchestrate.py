@@ -427,6 +427,28 @@ def dispatch_claude(state_dir: Path, run_id: str) -> bool:
 
 
 def dispatch_local(state_dir: Path, run_id: str) -> bool:
+    # Check for local LLM dispatch path
+    local_llm = os.environ.get("GO_LOCAL_LLM", "").strip()
+    if local_llm:
+        # Dispatch to local LLM (LM Studio, Ollama, vLLM)
+        dispatch_script = script_path("scripts", "adapters", "local", "dispatch_local.py")
+        rc = run_script(dispatch_script, [], state_dir, run_id, cwd=Path.cwd())
+        if rc != 0:
+            write_json(
+                state_dir / f"dispatch-result_{run_id}.json",
+                {
+                    "dispatch": "local",
+                    "status": "failed",
+                    "reason": f"Local LLM dispatch failed: {local_llm}",
+                },
+            )
+            return False
+        phase_marker(state_dir, "worktree-ready", run_id)
+        phase_marker(state_dir, "dispatched", run_id)
+        phase_marker(state_dir, "coded", run_id)
+        return True
+
+    # Default: skipped worker (verify current checkout)
     write_json(
         state_dir / f"dispatch-result_{run_id}.json",
         {
@@ -510,12 +532,14 @@ def run_simplify_gate(worktree: Path, state_dir: Path, run_id: str, diff_stat: s
 
 
 def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
+    # Step 1: Run verification (verify-task.py)
     verify_script = script_path("scripts", "verify-task.py")
     rc = run_script(verify_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "verified", run_id)
 
+    # Step 2: Get diff for simplify gate
     diff = subprocess.run(
         ["git", "diff", "--stat", "--stat-width", "200"],
         cwd=worktree,
@@ -533,17 +557,35 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         )
         touch(state_dir / f".blocked_{run_id}")
         return False
+
+    # Step 3: Run simplify gate (if there are changes)
     if diff.stdout and not any(diff.stdout.startswith(prefix) for prefix in ["0 files", "no changes", "???"]):
         if not run_simplify_gate(worktree, state_dir, run_id, diff.stdout):
             return False
     phase_marker(state_dir, "simplified", run_id)
 
+    # Step 4: Run refactor review (between simplify and regressions)
+    refactor_script = script_path("scripts", "refactor-review.py")
+    rc = run_script(refactor_script, [], state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    phase_marker(state_dir, "refactor-reviewed", run_id)
+
+    # Step 5: Run regression tests (before verify-task)
+    regression_script = script_path("scripts", "regression-runner.py")
+    rc = run_script(regression_script, [], state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    phase_marker(state_dir, "regression-passed", run_id)
+
+    # Step 6: Run code reviews
     review_script = script_path("scripts", "review-passes.py")
     rc = run_script(review_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "reviews-passed", run_id)
 
+    # Step 7: Run QA verification
     qa_script = script_path("scripts", "run-qa-verification.py")
     qa_args = ["--dry-run"] if os.environ.get("GO_QA_DRY_RUN", "").strip() == "1" else []
     rc = run_script(qa_script, qa_args, state_dir, run_id, cwd=worktree)
@@ -551,12 +593,21 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         return False
     phase_marker(state_dir, "qa-passed", run_id)
 
+    # Step 8: Run mutation gate
     mutation_script = script_path("scripts", "mutation-gate.py")
     rc = run_script(mutation_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
         return False
     phase_marker(state_dir, "mutation-passed", run_id)
 
+    # Step 9: Run coverage gate (before pr-artifacts)
+    coverage_script = script_path("scripts", "coverage-gate.py")
+    rc = run_script(coverage_script, [], state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    phase_marker(state_dir, "coverage-passed", run_id)
+
+    # Step 10: Generate PR artifacts
     pr_script = script_path("scripts", "pr-artifacts.py")
     rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)
     if rc != 0:
@@ -564,6 +615,7 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     touch(state_dir / f".pr-ready_{run_id}")
     phase_marker(state_dir, "pr-ready", run_id)
 
+    # Step 11: Run loop check (non-blocking)
     loop_script = script_path("scripts", "loop-check.py")
     run_script(loop_script, [], state_dir, run_id, cwd=worktree)
     return True

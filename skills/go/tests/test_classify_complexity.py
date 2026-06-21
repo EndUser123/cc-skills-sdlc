@@ -31,7 +31,7 @@ class TestPresetComplexity:
     def test_high_preset_returns_t4_glm(self):
         result = classify(_make_task(estimated_complexity="high"))
         assert result["tier"] == "T4"
-        assert result["model"] == "GLM-5.1"
+        assert result["model"] == "GLM-5.2"
 
     def test_low_preset_returns_t1_m3(self):
         result = classify(_make_task(estimated_complexity="low"))
@@ -98,7 +98,7 @@ class TestDesignTasks:
             forbidden_files=["secrets.env", "config.py"],
         ))
         assert result["tier"] == "T4"
-        assert result["model"] == "GLM-5.1"
+        assert result["model"] == "GLM-5.2"
 
 
 class TestConfidence:
@@ -132,7 +132,7 @@ class TestTierModelMap:
             assert TIER_MODEL_MAP[tier] == "M3"
 
     def test_t4_is_glm51(self):
-        assert TIER_MODEL_MAP["T4"] == "GLM-5.1"
+        assert TIER_MODEL_MAP["T4"] == "GLM-5.2"
 
 
 class TestOverride:

@@ -6,7 +6,7 @@ and outputs a model-selection JSON for /go Step 2 dispatch.
 
 Tier map:
   T1-T3 (standard) -> M3
-  T4    (architectural) -> GLM-5.1
+  T4    (architectural) -> GLM-5.2
 
 Override: GO_MODEL_OVERRIDE env var bypasses classification entirely.
 """
@@ -24,7 +24,7 @@ TIER_MODEL_MAP: dict[str, str] = {
     "T1": "M3",
     "T2": "M3",
     "T3": "M3",
-    "T4": "GLM-5.1",
+    "T4": "GLM-5.2",
 }
 
 # Per-task-type signal subsets prevent config tasks from scoring high
@@ -120,7 +120,7 @@ def classify(task: dict[str, Any]) -> dict[str, Any]:
     max_possible = len(signals) * 3
     tier = _score_to_tier(score, max_possible)
 
-    # Only design/planning tasks can reach T4 (GLM-5.1).
+    # Only design/planning tasks can reach T4 (GLM-5.2).
     # Implementation/refactor/config cap at T3 (M3).
     if task_type in ("implementation", "refactor", "config") and tier == "T4":
         tier = "T3"

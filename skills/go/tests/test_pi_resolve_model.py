@@ -30,7 +30,7 @@ class TestModelResolution:
         assert resolve("M3") == "minimax/MiniMax-M3"
 
     def test_glm51_resolves_to_zai(self):
-        assert resolve("GLM-5.1") == "zai/glm-5.1"
+        assert resolve("GLM-5.2") == "zai/glm-5.2"
 
     def test_unknown_model_returns_none(self):
         assert resolve("Unknown-Model") is None

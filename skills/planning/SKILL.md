@@ -1,6 +1,8 @@
 ---
 name: planning
 description: "Build and verify implementation plans with strict readiness gating. Produces separate artifacts: plan, review results, and findings. A plan cannot be marked implementation-ready while containing placeholders, unresolved blockers, raw review output, implied producer/consumer contracts, or missing required Contract Authority Packet consumption."
+enforcement: strict
+workflow_steps: ["draft", "verify", "review", "synthesize"]
 ---
 # Plan Workflow v2
 
@@ -381,13 +383,15 @@ When `auto_verify.py` returns architecture-class blockers, `/planning` must:
 python -c "
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r'P://packages/cc-skills-sdlc/skills/planning/__lib')))
+sys.path.insert(0, str(Path(r'P://packages/.claude-marketplace/plugins/cc-skills-sdlc/skills/planning/__lib')))
 from adversarial_review import prepare_adversarial_review_context
 
 context = prepare_adversarial_review_context(sys.argv[1])
 print(json.dumps(context.as_dict(), indent=2))
 " '${PLAN_PATH}'
 ```
+
+**Note**: Adversarial root is derived from `plan_path.parent / "adversarial"` at runtime. This ensures plans in user home directories (`C:/Users/brsth/.claude/plans/`) and workspace plans (`P:/.claude/plans/`) each use their own adversarial subdirectory, aligning with `auto_verify.py`'s search logic.
 
 **Dispatch contract**:
 - Step 4a must produce a concrete `findings_dir` and concrete `findings_paths[agent]` values

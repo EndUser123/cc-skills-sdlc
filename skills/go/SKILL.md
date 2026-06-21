@@ -86,7 +86,7 @@ When dispatch is `pi`, the classifier output is resolved through `scripts/adapte
 | Classifier Output | pi --model flag | Provider |
 |---|---|---|
 | `M3` | `minimax/MiniMax-M3` | MiniMax |
-| `GLM-5.1` | `zai/glm-5.1` | Z.ai |
+| `GLM-5.2` | `zai/glm-5.2` | Z.ai |
 
 `GO_MODEL_OVERRIDE` bypasses classification and is passed through as the pi model flag.
 

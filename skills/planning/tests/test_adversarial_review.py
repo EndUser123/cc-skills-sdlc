@@ -48,7 +48,7 @@ def test_resolve_prompt_template_rejects_unresolved_dispatch_tokens() -> None:
 
 def test_reference_prompt_contract_uses_explicit_findings_paths() -> None:
     reference = Path(
-        "P:\\\\\\packages/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md"
+        "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc/skills/planning/references/adversarial-agent-prompts.md"
     ).read_text(encoding="utf-8")
 
     assert "{sanitized_plan_name}" not in reference
@@ -171,3 +171,46 @@ def test_validate_findings_file_rejects_stale_and_mismatched_payloads(
     )
     assert stale["valid"] is False
     assert stale["reason"] == "stale"
+
+
+def test_adversarial_root_derived_from_plan_path_when_root_not_provided(
+    tmp_path: Path,
+) -> None:
+    """When root=None, adversarial location is derived from plan path's parent directory.
+
+    This ensures plans in user home directories (C:/Users/brsth/.claude/plans/)
+    and workspace plans (P:/.claude/plans/) each get their own adversarial subdirectory,
+    aligning with auto_verify.py's search logic which checks plan.parent / "adversarial".
+    """
+    # Simulate plan in user home directory
+    plans_dir = tmp_path / "plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+    plan_file = plans_dir / "test-plan.md"
+    plan_file.write_text("# Plan\n", encoding="utf-8")
+
+    context = adversarial_review.build_adversarial_review_context(
+        str(plan_file),
+        root=None,  # No explicit root provided
+    )
+
+    # Adversarial dir should be plan.parent / "adversarial" / plan_name / terminal_id
+    expected_base = plans_dir / "adversarial" / "test-plan" / context.terminal_id
+    assert context.base_dir == expected_base
+    assert context.findings_paths["compliance"] == expected_base / "compliance-findings.json"
+
+    # Simulate workspace plan (different root, but same plan name)
+    workspace_plans = tmp_path / "workspace" / "plans"
+    workspace_plans.mkdir(parents=True, exist_ok=True)
+    workspace_plan = workspace_plans / "test-plan.md"
+    workspace_plan.write_text("# Plan\n", encoding="utf-8")
+
+    workspace_context = adversarial_review.build_adversarial_review_context(
+        str(workspace_plan),
+        root=None,
+    )
+
+    # Each plan location gets its own adversarial subdirectory
+    expected_workspace_base = workspace_plans / "adversarial" / "test-plan" / context.terminal_id
+    assert workspace_context.base_dir == expected_workspace_base
+    # Different base_dir from user home plan (multi-location isolation)
+    assert workspace_context.base_dir != context.base_dir
