@@ -1,0 +1,15 @@
+{
+  "artifact_paths": {
+    "coverage_gate": "P:\\packages\\.claude-marketplace\\plugins\\cc-skills-sdlc\\skills\\go\\test_coverage_gate\\state\\coverage-gate-test-001.json"
+  },
+  "coverage": {
+    "actual": 100.0,
+    "mode": "absolute",
+    "reason": "Overall coverage: 100.0% (threshold: 80.0%) - Failed modules: test_module_high (41.7% < 80.0%)",
+    "threshold": 80.0
+  },
+  "generated_at": "2026-06-21T20:00:55Z",
+  "pr_ready": false,
+  "run_id": "test-001",
+  "status": "fail"
+}

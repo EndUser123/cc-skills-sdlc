@@ -1,0 +1,22 @@
+{
+  "failed_modules": [
+    "test_module_high (25.0% < 40.0%)"
+  ],
+  "generated_at": "2026-06-22T02:40:07Z",
+  "mode": "absolute",
+  "modules": [
+    {
+      "name": "test_module_high",
+      "num_covered": 24,
+      "num_missing": 0,
+      "num_statements": 24,
+      "pct_covered": 25.0
+    }
+  ],
+  "overall_pct": 100.0,
+  "reason": "Overall coverage: 100.0% (threshold: 40.0%) - Failed modules: test_module_high (25.0% < 40.0%)",
+  "run_id": "concurrent-002",
+  "schema_version": "go.coverage-gate.v1",
+  "status": "fail",
+  "threshold": 40.0
+}

@@ -1,0 +1,15 @@
+{
+  "artifact_paths": {
+    "coverage_gate": "P:\\packages\\.claude-marketplace\\plugins\\cc-skills-sdlc\\skills\\go\\test_concurrency\\state1\\coverage-gate-concurrent-001.json"
+  },
+  "coverage": {
+    "actual": 100.0,
+    "mode": "absolute",
+    "reason": "Overall coverage: 100.0% (threshold: 40.0%) - Failed modules: test_module_high (25.0% < 40.0%)",
+    "threshold": 40.0
+  },
+  "generated_at": "2026-06-22T02:40:07Z",
+  "pr_ready": false,
+  "run_id": "concurrent-001",
+  "status": "fail"
+}

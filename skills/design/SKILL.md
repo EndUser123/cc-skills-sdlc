@@ -11,6 +11,8 @@ workflow_steps:
     description: "MANDATORY evidence check via verify_claims.py"
   - id: template-routing
     description: "Load and execute template from ./resources/{template}.md"
+  - id: self-critique
+    description: "MANDATORY: Perform critical review of own proposal before emitting. List named failure modes, risks, and falsification conditions."
   - id: contract-closure
     description: "For contract-sensitive work, emit a Contract Authority Packet using resources/contract-authority-packet.md"
   - id: critic-review

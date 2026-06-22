@@ -229,7 +229,7 @@ def main() -> int:
         "--threshold",
         type=float,
         default=None,
-        help=f"Coverage threshold percentage (default: {DEFAULT_THRESHOLD}%, env: GO_COVERAGE_THRESHOLD)",
+        help=f"Coverage threshold percentage (default: {DEFAULT_THRESHOLD}, env: GO_COVERAGE_THRESHOLD)",
     )
     parser.add_argument(
         "--mode",
@@ -260,7 +260,7 @@ def main() -> int:
 
 # Get configuration from env or args
     threshold = (
-        float(os.getenv("GO_COVERAGE_THRESHOLD", args.threshold))
+        float(os.getenv("GO_COVERAGE_THRESHOLD", DEFAULT_THRESHOLD))
         if args.threshold is None
         else args.threshold
     )
