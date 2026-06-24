@@ -739,10 +739,30 @@ def _strip_negative_declaration_sections(plan: str) -> str:
         "state_model_contracts",
         "contract_authority_reference",
         "contract_boundary_matrix",
+        "implementation_changes",
     ]:
         section_text = extract_section_content(plan, section_name)
         if section_text and _has_negative_declaration(section_text):
             searchable = searchable.replace(section_text.lower(), " ")
+
+    # Unconditionally strip sections that describe verification procedures,
+    # not stateful implementation details.
+    for section_name in ["test_matrix", "requirements_trace_matrix"]:
+        section_text = extract_section_content(plan, section_name)
+        if not section_text:
+            # Fallback: search for raw header if not in SECTION_ALIASES
+            # Handles sections like "Requirements Trace Matrix" that aren't aliased
+            header_patterns = {
+                "test_matrix": r"^## Test Matrix\n.*?(?=\n#{1,6}\s|\Z)",
+                "requirements_trace_matrix": r"^## Requirements Trace Matrix\n.*?(?=\n#{1,6}\s|\Z)",
+            }
+            if section_name in header_patterns:
+                match = re.search(header_patterns[section_name], plan, re.DOTALL | re.MULTILINE | re.IGNORECASE)
+                if match:
+                    section_text = match.group(0)
+        if section_text:
+            searchable = searchable.replace(section_text.lower(), " ")
+
     return searchable
 
 
