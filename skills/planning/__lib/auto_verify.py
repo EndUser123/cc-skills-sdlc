@@ -99,6 +99,7 @@ SECTION_ALIASES = {
         "Tasks",
     ],
     "test_matrix": ["Test Matrix", "Test Coverage", "Test Discovery", "Tests", "Testing"],
+    "requirements_trace_matrix": ["Requirements Trace Matrix", "Requirements Matrix", "Requirements Trace", "Trace Matrix"],
     "assumptions": [
         "Assumptions/Defaults",
         "Assumptions and Defaults",
@@ -734,7 +735,18 @@ def _has_negative_declaration(section_text: str) -> bool:
 
 
 def _strip_negative_declaration_sections(plan: str) -> str:
+    """Strip sections that contain negative stateful declarations.
+
+    These sections describe what the plan does NOT need (e.g., "not stateful",
+    "no persistence"). If such declarations are present, the entire section
+    can be safely ignored because it describes what is NOT being implemented.
+
+    Also unconditionally strips test sections (test_matrix, requirements_trace_matrix)
+    which contain test instructions (e.g., "Manual multi-terminal test") that
+    may match stateful keywords but are not stateful by definition.
+    """
     searchable = plan.lower()
+
     for section_name in [
         "state_model_contracts",
         "contract_authority_reference",
@@ -745,21 +757,9 @@ def _strip_negative_declaration_sections(plan: str) -> str:
         if section_text and _has_negative_declaration(section_text):
             searchable = searchable.replace(section_text.lower(), " ")
 
-    # Unconditionally strip sections that describe verification procedures,
-    # not stateful implementation details.
+    # Unconditionally strip test sections (verification procedures, not implementation)
     for section_name in ["test_matrix", "requirements_trace_matrix"]:
         section_text = extract_section_content(plan, section_name)
-        if not section_text:
-            # Fallback: search for raw header if not in SECTION_ALIASES
-            # Handles sections like "Requirements Trace Matrix" that aren't aliased
-            header_patterns = {
-                "test_matrix": r"^## Test Matrix\n.*?(?=\n#{1,6}\s|\Z)",
-                "requirements_trace_matrix": r"^## Requirements Trace Matrix\n.*?(?=\n#{1,6}\s|\Z)",
-            }
-            if section_name in header_patterns:
-                match = re.search(header_patterns[section_name], plan, re.DOTALL | re.MULTILINE | re.IGNORECASE)
-                if match:
-                    section_text = match.group(0)
         if section_text:
             searchable = searchable.replace(section_text.lower(), " ")
 
