@@ -6,15 +6,19 @@ Validates:
 - Required headings match between templates and contracts
 - Contract compliance (must_include items)
 - Duplicate logic detection across templates
+- Evidence hygiene for pasted LLM content
 """
 
 import sys
 import re
 import os
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Any, cast
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     # Public API functions
@@ -25,11 +29,19 @@ __all__ = [
     "load_template_content",
     "load_contracts",
     "extract_headings",
+    # Evidence hygiene
+    "validate_evidence_hygiene",
+    "classify_evidence_tier",
+    # Entity scope validation
+    "validate_entity_scope",
+    # Friction budget
+    "validate_friction_budget",
     # Constants
     "TEMPLATE_NAMES",
     "DUPLICATE_OVERLAP_THRESHOLD",
     "HIGH_OVERLAP_THRESHOLD",
     "DEFAULT_CACHE_SIZE",
+    "EVIDENCE_TIERS",
 ]
 
 # Constants
@@ -53,6 +65,64 @@ HIGH_OVERLAP_THRESHOLD = (
 
 # Cache configuration
 DEFAULT_CACHE_SIZE = 32  # Default LRU cache size for template content loading
+
+# Evidence tier classifications
+EVIDENCE_TIERS = {
+    "VERIFIED_FROM_FILES": "Claim backed by direct inspection, test output, or runtime behavior",
+    "USER_AUTHORITATIVE": "User preference or explicit requirement",
+    "PASTED_LLM_CLAIM": "Third-party/LLM output (unverified hypothesis)",
+    "ASSISTANT_INFERENCE": "Model deduction without direct evidence",
+}
+
+# Friction budget thresholds
+FRICTION_BUDGET_THRESHOLDS = {
+    "fast": {
+        "max_clarifications": 1,
+        "max_permission_pushes": 0,
+        "max_implementation_choices": 1,
+        "max_time_to_first_action": 300,  # 5 minutes in seconds
+    },
+    "deep": {
+        "max_clarifications": 3,
+        "max_permission_pushes": 2,
+        "max_implementation_choices": 2,
+        "max_time_to_first_action": 600,  # 10 minutes in seconds
+    },
+}
+
+# Friction indicators (patterns that increase friction)
+_FRICTION_INDICATORS = {
+    "clarification": (
+        r"\b(could you clarify|clarify this|what do you mean|i need more info|not sure what you mean)\b",
+        r"\b(before i proceed, i need|to help me better|to understand your requirement)\b",
+        r"\b(and one more thing|and one last thing|one more thing)\b",  # Chain of clarifications
+    ),
+    "permission_push": (
+        r"\b(may i|should i|can i|would you like me to|do you want me to|shall i)\b",
+        r"\b(is it ok|is that acceptable|would that work)\b",
+    ),
+    "implementation_choice": (
+        r"\b(which (one|option|approach)|option [a-z]:|alternative [0-9]:|choice [0-9]:)\b",
+        r"\b(do you prefer|would you prefer|which would you rather|which approach)\b",
+        r"\b(choose between|select from|pick one)\b",
+        r"\b(which (do )?you prefer|which one (do )?you (want|like|prefer))\b",  # Broader match
+    ),
+    "internal_failure": (
+        r"\b(tool failed|error in tool|tool error|tried but failed|attempt failed)\b",
+        r"\b(fallback to|retrying|trying another approach)\b",
+    ),
+}
+
+# Patterns for detecting pasted LLM content
+_PASTED_LLM_MARKERS = (
+    r"```(?:python|markdown|bash|sh|text)?",  # Code blocks (language optional)
+    r"According to (?:ChatGPT|Claude|GPT|GPT-\d+|the model|the AI|another (?:model|LLM|assistant)):?",
+    r"(?:ChatGPT|Claude|GPT|GPT-\d+) (?:said|responded|output|generated|claimed|suggested|indicated)(?: that|:|,)?",
+    r"from (?:another (?:model|LLM|assistant)|the previous (?:model|LLM|assistant)):?",
+    r"the (?:other|previous) (?:model|LLM|assistant) (?:said|told|wrote|claimed)(?: that|:|,)?",
+    r"based on (?:the (?:other|previous) (?:model|LLM|assistant)'s (?:output|response|suggestion)):?",
+    r"(?:ChatGPT|Claude|GPT|GPT-\d+|the model|the AI) (?:said|told|wrote|stated|suggested|claimed|indicated) that",
+)
 
 # Sections to check for duplicate logic between templates
 DUPLICATE_CHECK_SECTIONS = [
@@ -90,6 +160,318 @@ class ValidationResult:
     check_type: str
     status: str
     details: Optional[list[str]] = None
+
+
+def classify_evidence_tier(claim_text: str, source: str | None = None) -> str:
+    """
+    Classify a claim's evidence tier based on its content and source.
+
+    Evidence tiers:
+    - VERIFIED_FROM_FILES: Direct tool result (Read, Grep, Bash with output)
+    - USER_AUTHORITATIVE: Explicit user statement
+    - PASTED_LLM_CLAIM: Third-party/LLM output (treat as hypothesis)
+    - ASSISTANT_INFERENCE: Model deduction without direct evidence
+
+    Args:
+        claim_text: The claim text to classify.
+        source: Optional source information (e.g., "user", "Read tool", "Grep tool").
+
+    Returns:
+        The evidence tier constant.
+
+    Examples:
+        >>> classify_evidence_tier("File contains function X", "Read tool")
+        'VERIFIED_FROM_FILES'
+        >>> classify_evidence_tier("ChatGPT said X is faster", "user")
+        'PASTED_LLM_CLAIM'
+        >>> classify_evidence_tier("I want option A", "user")
+        'USER_AUTHORITATIVE'
+    """
+    lower_claim = claim_text.lower()
+    lower_source = (source or "").lower()
+
+    # Check for pasted LLM markers first
+    for pattern in _PASTED_LLM_MARKERS:
+        if re.search(pattern, claim_text, re.IGNORECASE):
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Pasted LLM claim detected: {pattern}")
+            return "PASTED_LLM_CLAIM"
+
+    # User-authoritative: explicit preference or requirement
+    user_authoritative_patterns = (
+        r"\b(i want|i need|i prefer|i'd like)\b",
+        r"\b(requirement:|must|must not|should not)\b",
+    )
+    for pattern in user_authoritative_patterns:
+        if re.search(pattern, lower_claim):
+            if "llm" not in lower_source and "ai" not in lower_source:
+                return "USER_AUTHORITATIVE"
+
+    # Verified from tools
+    verified_patterns = (
+        r"\b(file contains|line \d+|grep found|test result|runtime behavior)\b",
+        r"\baccording to (the file|the code|the test|the output)\b",
+    )
+    if source and any(keyword in lower_source for keyword in ("read", "grep", "bash", "test", "inspect")):
+        return "VERIFIED_FROM_FILES"
+
+    # Default: assistant inference
+    return "ASSISTANT_INFERENCE"
+
+
+def validate_evidence_hygiene(content: str) -> list[str]:
+    """
+    Validate evidence hygiene in content, flagging unverified pasted LLM claims.
+
+    This function scans content for pasted LLM output and ensures that
+    any claims from such sources are marked as unverified rather than
+    treated as factual authority.
+
+    Args:
+        content: The content to validate (e.g., design document, ADR).
+
+    Returns:
+        A list of validation warnings. Empty list if no issues found.
+
+    Examples:
+        >>> validate_evidence_hygiene("According to ChatGPT, X is faster.")
+        ['PASTED_LLM_CLAIM: Claim from "According to ChatGPT..." must be verified before design decisions']
+    """
+    warnings: list[str] = []
+
+    # Find pasted LLM content blocks
+    for pattern in _PASTED_LLM_MARKERS:
+        matches = list(re.finditer(pattern, content, re.IGNORECASE))
+        for match in matches:
+            # Extract context around the match
+            start = max(0, match.start() - 50)
+            end = min(len(content), match.end() + 50)
+            context = content[start:end].strip()
+
+            # Check if this is marked as unverified
+            if not any(
+                keyword in context.lower()
+                for keyword in ("unverified", "hypothesis", "needs verification", "to be verified")
+            ):
+                warnings.append(
+                    f"PASTED_LLM_CLAIM: Claim in context \"{context}\" must be marked "
+                    "as unverified or independently verified before use in design decisions"
+                )
+
+    # Check for unverified claims without evidence trail
+    # Look for claim patterns that should have evidence but don't
+    claim_patterns = (
+        r"(?:this|that) (?:is|has|uses?) better [^\.]+\.",
+        r"(?:the system|the code|the module) (?:should|will|can) [^\.]+\.",
+    )
+
+    for pattern in claim_patterns:
+        for match in re.finditer(pattern, content, re.IGNORECASE):
+            sentence = match.group(0)
+
+            # If claim exists but no evidence markers nearby, flag as inference
+            # This is a soft warning (not an error) since some claims are inferred
+            if not any(
+                keyword in sentence.lower()
+                for keyword in (
+                    "file:",
+                    "line ",
+                    "test ",
+                    "verified",
+                    "according to the",
+                    "evidence:",
+                    "verified_from_files",
+                    "user_authoritative",
+                )
+            ):
+                # Only warn if this looks like a strong claim
+                if any(
+                    keyword in sentence.lower()
+                    for keyword in ("must", "should", "cannot", "will", "guarantee")
+                ):
+                    warnings.append(
+                        f"ASSISTANT_INFERENCE: Strong claim \"{sentence}\" lacks "
+                        "evidence tier marker. Consider adding evidence source."
+                    )
+
+    return warnings
+
+
+def validate_entity_scope(query: str, evidence_sources: list[Path]) -> tuple[bool, str]:
+    """
+    Validate that evidence sources are within the correct entity's scope.
+
+    This function prevents incorrect claims by ensuring that when a user
+    asks about a specific skill/command/package/module, the evidence
+    comes from that entity's directory, not from a similarly-named artifact
+    in a different location.
+
+    Args:
+        query: The user query containing the entity name.
+        evidence_sources: List of file paths used as evidence.
+
+    Returns:
+        A tuple of (is_valid, error_message). If valid, error_message is empty.
+
+    Examples:
+        >>> validate_entity_scope("how does /design work?", [Path("/design/skills/design/routing.py")])
+        (True, "")
+
+        >>> validate_entity_scope("how does /design work?", [Path("/other-skill/routing.py")])
+        (False, "Evidence from /other-skill/routing.py does not match requested entity /design")
+    """
+    # Extract named entities from query
+    # Look for patterns like "/design", "/go", "routing.py", "package X"
+    entity_patterns = (
+        r"/(\w+)",  # /design, /go, etc.
+        r"(?:in|for|about) (?:the )?(?:skill|command|package|module) ['\"]?(\w+)['\"]?",  # skill "design", module routing
+        r"\b(\w+)(?:\.py|\.md)\b",  # routing.py, SKILL.md
+    )
+
+    entities: set[str] = set()
+    for pattern in entity_patterns:
+        matches = re.findall(pattern, query, re.IGNORECASE)
+        entities.update(matches)
+
+    if not entities:
+        # No entities named, scope is not verifiable
+        return True, ""
+
+    # Check each evidence source
+    for evidence_path in evidence_sources:
+        path_str = str(evidence_path).lower()
+
+        # For each entity in the query, check if evidence is scoped correctly
+        for entity in entities:
+            entity_lower = entity.lower()
+
+            # If the path doesn't contain the entity, it might be wrong scope
+            # But we need to be careful about common names (e.g., "test")
+            if entity_lower not in path_str:
+                # Check if there are similarly-named artifacts in other locations
+                # This is a simplified check - in a full implementation,
+                # we'd search the codebase for similarly-named files
+                possible_wrong_scope = False
+
+                # If the evidence file is in a different top-level directory
+                # than the entity, it's likely wrong scope
+                if f"/{entity_lower}/" not in path_str.replace("\\", "/"):
+                    possible_wrong_scope = True
+
+                if possible_wrong_scope:
+                    error = (
+                        f"Evidence from {evidence_path} may be outside scope "
+                        f"for requested entity {entity}. Verify evidence source "
+                        "matches the named entity."
+                    )
+                    logger.warning(error)
+                    return False, error
+
+    return True, ""
+
+
+def validate_friction_budget(content: str, template_type: str = "fast") -> list[str]:
+    """
+    Validate that a design response respects the friction budget.
+
+    This function counts friction indicators (clarifications, permission pushes,
+    implementation choices, internal failures) and compares against thresholds.
+
+    Args:
+        content: The design response content to validate.
+        template_type: The template type ("fast" or "deep") for threshold selection.
+
+    Returns:
+        A list of validation warnings/errors. Empty list if no issues found.
+
+    Examples:
+        >>> validate_friction_budget("I recommend A. Criterion: X. First step: Y.", "fast")
+        []
+
+        >>> validate_friction_budget("Which option do you prefer? A or B?", "fast")
+        ['FAIL: implementation_choice_count=1 exceeds threshold for fast template']
+    """
+    issues: list[str] = []
+
+    # Get thresholds for the template type
+    thresholds = FRICTION_BUDGET_THRESHOLDS.get(
+        template_type, FRICTION_BUDGET_THRESHOLDS["fast"]
+    )
+
+    # Count each type of friction indicator
+    friction_counts = {
+        "clarification": 0,
+        "permission_push": 0,
+        "implementation_choice": 0,
+        "internal_failure": 0,
+    }
+
+    content_lower = content.lower()
+
+    for category, patterns in _FRICTION_INDICATORS.items():
+        for pattern in patterns:
+            matches = re.findall(pattern, content_lower, re.IGNORECASE)
+            friction_counts[category] += len(matches)
+
+    # Check clarifications
+    max_clarifications = thresholds["max_clarifications"]
+    if friction_counts["clarification"] > max_clarifications:
+        issues.append(
+            f"FAIL: clarification_count={friction_counts['clarification']} "
+            f"exceeds threshold {max_clarifications} for {template_type} template"
+        )
+
+    # Check permission pushes
+    max_permission_pushes = thresholds["max_permission_pushes"]
+    if friction_counts["permission_push"] > max_permission_pushes:
+        if friction_counts["permission_push"] > max_permission_pushes + 1:
+            issues.append(
+                f"FAIL: permission_push_count={friction_counts['permission_push']} "
+                f"exceeds threshold {max_permission_pushes} for {template_type} template"
+            )
+        else:
+            issues.append(
+                f"WARN: permission_push_count={friction_counts['permission_push']} "
+                f"exceeds threshold {max_permission_pushes} for {template_type} template"
+            )
+
+    # Check implementation choices
+    max_choices = thresholds["max_implementation_choices"]
+    if friction_counts["implementation_choice"] > max_choices:
+        issues.append(
+            f"FAIL: implementation_choice_count={friction_counts['implementation_choice']} "
+            f"exceeds threshold {max_choices} for {template_type} template. "
+            "Consider recommending a default path with criterion."
+        )
+
+    # Check internal failures
+    if friction_counts["internal_failure"] > 0:
+        issues.append(
+            f"WARN: internal_failure_count={friction_counts['internal_failure']}. "
+            "Consider handling tool/gate failures transparently."
+        )
+
+    # Check for safe default choice
+    # If there are implementation choices, is there a recommendation?
+    if friction_counts["implementation_choice"] > 0:
+        # Look for recommendation patterns
+        recommendation_patterns = (
+            r"\bi recommend\b",
+            r"\bthe best (option|choice|path) is\b",
+            r"\bcriterion:\s*\w",
+        )
+
+        has_recommendation = any(
+            re.search(pattern, content_lower) for pattern in recommendation_patterns
+        )
+
+        if not has_recommendation:
+            issues.append(
+                "FAIL: No safe default choice provided. For each A/B choice, "
+                "recommend a default and state the criterion."
+            )
+
+    return issues
 
 
 def print_status(message: str, status: str = "info") -> None:

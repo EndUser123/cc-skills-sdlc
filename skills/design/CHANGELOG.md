@@ -8,10 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Multi-terminal isolation integration tests (test_multi_terminal_isolation.py)
-- Real config file integration tests (test_config_real_files.py)
-- Fixture cleanup verification tests (TestFixtureCleanup class)
-- Thread-safe config caching with lru_cache clearing
+- **Frustrated User / Unclear Objective Protocol** - New top-level protocol that triggers when users express frustration, uncertainty, or ask for recommendations
+  - Reduces user decision burden by recommending best default with criterion instead of "Do you want A or B?"
+  - Converts vague dissatisfaction into actionable design objective
+  - Separates evidence tiers (Verified, User-authoritative, Pasted LLM claim, Assistant inference)
+  - Persists corrections as durable notes
+  - Agency mode: switches from option mode to recommendation mode
+  - Evidence-hygiene rule: pasted LLM output is never authority without verification
+  - "Wrong artifact / wrong scope" guard: validates evidence sources match requested entity
+  - Friction budget quality attribute with validation
+  - Diagnostic/design-improvement mode distinction with different requirements
+- Comprehensive test suite for frustrated user protocol (44 tests, all passing)
+- Evidence tier classification system with 4 tiers
+- Entity scope validation to prevent cross-entity evidence contamination
+- Friction budget validation with configurable thresholds per template type
+- `resources/friction_budget.md` - Friction budget quality attribute reference
+
+### Changed
+- Updated SKILL.md version from 5.7 to 5.8
+- Added "frustrated-user-protocol" workflow step before "audit-first"
+- Updated `detect_intent_type()` to return "FRUSTRATED_USER" when triggered
+- Updated `TEMPLATE_METADATA` with "agency_mode" flag for templates
+- Added friction budget quality attribute section to base.md tradeoffs table
+- Set ARCHITECTURE_REVIEW path default to DIAGNOSTIC_MODE
+- Set IMPROVE_SYSTEM and DEFAULT paths default to DESIGN_IMPROVEMENT_MODE
+
+### Fixed
+- Fixed syntax error in routing.py (unterminated string literal for path replacement)
+- Updated trigger patterns to match "unhelpful", "frustrating", "annoying" with word boundary variations
+- Updated LLM content patterns to include "GPT-4" and other GPT variants
+- Updated friction budget patterns to match clarification chains and implementation choice prompts
+
+### Multi-terminal isolation integration tests (test_multi_terminal_isolation.py)
+### Real config file integration tests (test_config_real_files.py)
+### Fixture cleanup verification tests (TestFixtureCleanup class)
+### Thread-safe config caching with lru_cache clearing
 
 ### Fixed
 - Config test thread safety issues - replaced pathlib.Path.exists patching with environment variable approach

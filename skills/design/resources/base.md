@@ -17,6 +17,40 @@
 - **DEFAULT:** General architecture decision without improvement intent
 - **CKS.db:** Constitutional Knowledge System
 
+---
+
+## [Agency Mode] — Activated when Frustrated User Protocol triggers
+
+> **Check this section first:** Before proceeding to Stage 0, check if the Frustrated User Protocol is active.
+> The dispatcher will have set `_frustrated_user_active=True` when triggered.
+
+**You are in agency mode. The user is frustrated or uncertain.**
+
+**DO:**
+- Recommend the best default path with explicit criterion
+- State: "I recommend X because [criterion]"
+- Prefer useful action over perfect diagnosis
+- Ask questions ONLY when the answer materially changes implementation
+
+**DO NOT:**
+- Ask "Do you want A or B?" for implementation choices
+- Make the user choose between technical options
+- Push decisions back when user asks for the "happy path"
+
+**Evidence tiers:** Use inline labels when useful:
+- `[VERIFIED]` — from Read/Grep/Bash output
+- `[PASTED_LLM]` — from another AI (hypothesis, not authority)
+- `[USER]` — user's explicit preference
+
+**Output for skill improvement requests (when asked):**
+1. What is going wrong
+2. Best happy path
+3. Skill changes
+4. First patch to make
+5. What this prevents next time
+
+---
+
 ## Execution Instructions (Base)
 
 **Do not:** Restate these instructions, summarize, or paraphrase.
@@ -309,6 +343,115 @@ Skip ONLY if: query is purely about user's internal system AND CKS has sufficien
 
 ---
 
+## Stage 0.4: Determine Response Mode (SHARED)
+
+**Before proceeding to option generation or decision paths, determine the response mode.**
+
+### Decision Tree
+
+```
+Is this a diagnostic/RCA request?
+├─ Keywords: why failing, root cause, adversarial review, diagnose, investigate,
+│             what's wrong, debug, failure analysis, post-mortem
+├─ Intent: Understand a failure, identify root cause, verify correctness
+└─ If YES → DIAGNOSTIC_MODE
+
+Otherwise, is this a design-improvement/execution request?
+├─ Keywords: improve, fix, implement, add, optimize, refactor, harden
+│           (without explicit RCA keywords)
+├─ Intent: Make a change, improve workflow, fix broken behavior
+└─ If YES → DESIGN_IMPROVEMENT_MODE
+
+Otherwise → DEFAULT mode (per query type)
+```
+
+### Mode Requirements
+
+#### DIAGNOSTIC_MODE
+
+**Use for:** Root cause analysis, failure investigation, adversarial review, correctness verification.
+
+**Required structure:**
+- Competing hypotheses (at least 2-3 distinct explanations)
+- Falsification tests for each hypothesis
+- Baseline comparison (what "working" looks like)
+- Evidence trail for each claim
+
+**Output format:**
+```
+## Diagnostic Analysis: [Problem]
+
+### Hypotheses
+
+| ID | Hypothesis | Falsification Test | Status |
+|----|-----------|-------------------|--------|
+| H1 | [explanation] | [test that would prove this false] | [untested/falsified/confirmed] |
+| H2 | [explanation] | [test that would prove this false] | [untested/falsified/confirmed] |
+
+### Baseline Comparison
+[What behavior exists when the system is working correctly]
+
+### Evidence Trail
+[Cite files, logs, tests for each finding]
+
+### Conclusion
+[Which hypothesis survived, with probability estimate]
+```
+
+#### DESIGN_IMPROVEMENT_MODE
+
+**Use for:** Practical improvements, workflow fixes, implementation tasks.
+
+**Required structure (minimum):**
+- Recommended path
+- Why this path (criterion)
+- Risk
+- Mitigation
+- First reversible step
+
+**Do NOT require:**
+- Competing hypotheses (unless genuinely uncertain)
+- Falsification tests (unless dealing with failure mode)
+- Baseline comparison (unless comparing before/after)
+
+**Output format:**
+```
+## Recommended Path: [Action]
+
+**Criterion:** [why this path is the best choice]
+
+**Risk:** [what could go wrong]
+
+**Mitigation:** [how to handle the risk]
+
+**First reversible step:**
+1. [Concrete action with file path and code/pseudocode]
+2. [How to verify the step worked]
+3. [How to undo if needed]
+```
+
+### Mode Flags
+
+Add mode flag to output headers to indicate which mode was used:
+
+| Mode | Use For |
+|------|---------|
+| `[DIAGNOSTIC MODE]` | RCA, adversarial review, failure investigation |
+| `[DESIGN-IMPROVEMENT MODE]` | Practical fixes, improvements, implementation |
+
+### Mode Selection Examples
+
+| Query | Mode | Reason |
+|-------|------|--------|
+| "Why is authentication failing?" | DIAGNOSTIC | RCA keywords present |
+| "Review this ADR for contradictions" | DIAGNOSTIC | Adversarial review request |
+| "Improve this workflow" | DESIGN_IMPROVEMENT | Practical improvement |
+| "Fix the hook registration bug" | DESIGN_IMPROVEMENT | Implementation task |
+| "Implement a new feature" | DESIGN_IMPROVEMENT | New functionality |
+| "Design a new component" | DEFAULT | Greenfield design (use existing path) |
+
+---
+
 ## Stage 0.8: Verbalized Sampling Option Generation (SHARED)
 
 **For DEFAULT path: Generate diverse architecture options using Verbalized Sampling pattern.**
@@ -379,6 +522,8 @@ This stage feeds into the DEFAULT decision path. The VS-generated options become
 ## ARCHITECTURE_REVIEW Path (SHARED)
 
 **Purpose**: Evaluate proposed architecture/design WITHOUT recommending alternatives or suggesting implementation first.
+
+**Default mode:** DIAGNOSTIC_MODE (adversarial review, gap analysis, risk assessment)
 
 ### Scope Constraints
 
@@ -473,6 +618,8 @@ This stage feeds into the DEFAULT decision path. The VS-generated options become
 ---
 
 ## IMPROVE_SYSTEM Path (SHARED)
+
+**Default mode:** DESIGN_IMPROVEMENT_MODE (practical changes, reversible steps)
 
 ### Your Definition of "Improve" Is Authoritative
 
@@ -649,6 +796,8 @@ Suggested next steps:
 
 **IMPORTANT: ADR format is the DEFAULT output.**
 
+**Default mode:** Use DESIGN_IMPROVEMENT_MODE unless RCA keywords present (see Stage 0.4).
+
 **CHECK FOR VERBOSE FLAG FIRST:**
 
 **IF user query contains `--verbose` or `-v` flag:**
@@ -700,6 +849,30 @@ Your job: Answer "What's smallest change that solves this?"
 | Quality | Improved | Degraded |
 |---------|----------|----------|
 | [ISO 25010 quality] | [Benefit] | [Cost] |
+
+### Friction Budget Quality Attribute
+
+**Minimize cognitive load on the user:**
+
+| Metric | Target (fast) | Target (deep) |
+|--------|--------------|--------------|
+| Clarification count | ≤ 1 | ≤ 3 |
+| Permission push count | 0 (routine tasks) | ≤ 2 |
+| Implementation choice burden | ≤ 1 | ≤ 2 |
+| Internal failures exposed | 0 | 0 |
+| Time to first action | < 5 min | < 10 min |
+| Safe default available | Yes | Yes |
+
+**Fail if:**
+- Clarification count exceeds threshold without justification
+- No safe default for non-preference choices
+- Time to first action exceeds threshold
+
+**Warn if:**
+- Permission push count exceeds threshold for routine tasks
+- Internal tool failures exposed to user
+
+See `resources/friction_budget.md` for full guidance.
 
 ### Multi-Terminal Safety
 - [Safe / Single-terminal only / Needs investigation]

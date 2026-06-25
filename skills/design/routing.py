@@ -28,6 +28,12 @@ __all__ = [
     "detect_domain_keywords",
     "detect_complexity",
     "detect_intent_type",
+    # Frustrated User Protocol
+    "detect_frustrated_user_trigger",
+    "should_use_recommendation_mode",
+    "set_frustrated_user_active",
+    "get_frustrated_user_active",
+    "clear_frustrated_user_state",
     # Verification domain detection
     "detect_verification_domain",
     "verification_requirements",
@@ -325,16 +331,17 @@ VALID_TEMPLATES: set[str] = {
 }
 
 TEMPLATE_METADATA = {
-    "fast": {"complexity": "LOW", "domain": "Generic", "output_size": "~5 KB"},
-    "deep": {"complexity": "HIGH", "domain": "Generic", "output_size": "~15-30 KB"},
-    "cli": {"complexity": "Any", "domain": "CLI/POSIX", "output_size": "~8 KB"},
-    "python": {"complexity": "Any", "domain": "Python 3.12+", "output_size": "~10 KB"},
+    "fast": {"complexity": "LOW", "domain": "Generic", "output_size": "~5 KB", "agency_mode": False},
+    "deep": {"complexity": "HIGH", "domain": "Generic", "output_size": "~15-30 KB", "agency_mode": False},
+    "cli": {"complexity": "Any", "domain": "CLI/POSIX", "output_size": "~8 KB", "agency_mode": False},
+    "python": {"complexity": "Any", "domain": "Python 3.12+", "output_size": "~10 KB", "agency_mode": False},
     "data-pipeline": {
         "complexity": "Any",
         "domain": "Data Systems",
         "output_size": "~12 KB",
+        "agency_mode": False,
     },
-    "precedent": {"complexity": "Any", "domain": "ADR", "output_size": "~20 KB"},
+    "precedent": {"complexity": "Any", "domain": "ADR", "output_size": "~20 KB", "agency_mode": False},
 }
 
 # Domain priority order (higher priority = checked first)
@@ -400,6 +407,141 @@ class SubjectInferenceContext(TypedDict):
     last_contract: str | None
     recent_paths: list[str]
     hint_text: str  # Formatted text for LLM prompt injection
+
+
+# =============================================================================
+# Frustrated User Protocol
+# =============================================================================
+
+# Patterns that trigger the Frustrated User / Unclear Objective Protocol
+# These indicate the user is frustrated, uncertain, or asking for recommendations
+_FRUSTRATED_USER_PATTERNS: tuple[str, ...] = (
+    # Frustration keywords (broader pattern with word boundary variations)
+    r"\b(frustrat|annoy|circular|unhelp|tired of)\w*\b",
+    # Self-deprecation
+    r"\bi'?m bad with words\b",
+    r"\bbad at (articulating|describing|explaining)\b",
+    # Uncertainty
+    r"\b(i don't know what i don't know|i don't know where to start|not sure where to begin)\b",
+    # Delegation / recommendation request
+    r"\b(what (do you think|is the best path|is the optimal happy path|should i do))\b",
+    r"\b(just tell me|stop asking me to choose|don't make me choose)\b",
+    # Reduce burden
+    r"\b(make (this|it) easier|simplify|less (decision|choice) burden)\b",
+    # Improvement request (broader patterns)
+    r"\bhow can we improve (this skill|this tool|this workflow|the (design|arch) skill)\b",
+    r"\bthis (skill|tool|workflow) is (frustrating|annoying|not working|broken)\b",
+    # Catch skill names in frustration context
+    r"\b(this|that) is (frustrating|annoying)\b",
+)
+
+
+@lru_cache(maxsize=256)
+def detect_frustrated_user_trigger(query: str) -> bool:
+    """
+    Detect whether the query should trigger the Frustrated User Protocol.
+
+    This function identifies when a user is frustrated, uncertain about
+    their objective, or explicitly asking for recommendations instead of
+    making implementation choices.
+
+    Given: query string
+    When: query contains frustrated user patterns
+    Then: return True if the Frustrated User Protocol should trigger
+
+    Examples:
+        >>> detect_frustrated_user_trigger("this is frustrating")
+        True
+        >>> detect_frustrated_user_trigger("i'm bad with words, what's the optimal happy path?")
+        True
+        >>> detect_frustrated_user_trigger("improve memory system")
+        False
+        >>> detect_frustrated_user_trigger("design a new API")
+        False
+    """
+    normalized = query.strip().lower()
+    for pattern in _FRUSTRATED_USER_PATTERNS:
+        if re.search(pattern, normalized, re.IGNORECASE):
+            logger.debug(f"Frustrated User Protocol triggered: {pattern}")
+            return True
+    return False
+
+
+@lru_cache(maxsize=256)
+def should_use_recommendation_mode(query: str) -> bool:
+    """
+    Detect whether to use recommendation mode instead of option mode.
+
+    Recommendation mode means recommending the best default path with
+    explicit criterion, instead of asking the user to choose between A/B.
+
+    Given: query string
+    When: query indicates preference delegation or frustration with choice burden
+    Then: return True if recommendation mode should be used
+
+    Examples:
+        >>> should_use_recommendation_mode("what's the optimal happy path?")
+        True
+        >>> should_use_recommendation_mode("i'm bad with words, just tell me what to do")
+        True
+        >>> should_use_recommendation_mode("should i use A or B?")
+        False  # Explicit choice request - let them choose
+    """
+    normalized = query.strip().lower()
+
+    # Agency mode triggers: user wants the assistant to recommend
+    agency_triggers = [
+        r"\b(i'?m bad with words|i don't know what i don't know)\b",
+        r"\b(what (is the optimal happy path|is the best path|do you think))\b",
+        r"\b(make (this|it) easier|simplify)\b",
+        r"\b(just tell me|stop asking me to choose)\b",
+    ]
+
+    for pattern in agency_triggers:
+        if re.search(pattern, normalized, re.IGNORECASE):
+            logger.debug(f"Recommendation mode triggered: {pattern}")
+            return True
+
+    return False
+
+
+# =============================================================================
+# Frustrated User Protocol - State Management
+# =============================================================================
+
+# Global state for protocol activation
+_frustrated_user_active: bool = False
+
+
+def set_frustrated_user_active(query: str) -> None:
+    """Set global state when Frustrated User Protocol is triggered.
+
+    This should be called by the skill dispatcher before template execution
+    to inform templates to switch to agency mode.
+
+    Args:
+        query: The user query to check for trigger patterns
+    """
+    global _frustrated_user_active
+    _frustrated_user_active = detect_frustrated_user_trigger(query)
+
+
+def get_frustrated_user_active() -> bool:
+    """Check if the Frustrated User Protocol is currently active.
+
+    Returns:
+        True if protocol is active, False otherwise
+    """
+    return _frustrated_user_active
+
+
+def clear_frustrated_user_state() -> None:
+    """Reset the frustrated user protocol state.
+
+    This should be called after each query to prevent state leakage.
+    """
+    global _frustrated_user_active
+    _frustrated_user_active = False
 
 
 # =============================================================================
@@ -521,10 +663,16 @@ def detect_intent_type(query: str) -> str:
     Detect intent type from query.
 
     Given: query string
-    When: query matches review keywords + architecture → ARCHITECTURE_REVIEW
+    When: query triggers Frustrated User Protocol → FRUSTRATED_USER
+         query matches review keywords + architecture → ARCHITECTURE_REVIEW
          query contains both improve and subsystem keywords → IMPROVE_SYSTEM
-    Then: return "ARCHITECTURE_REVIEW", "IMPROVE_SYSTEM", or "DEFAULT"
+    Then: return "FRUSTRATED_USER", "ARCHITECTURE_REVIEW", "IMPROVE_SYSTEM", or "DEFAULT"
     """
+    # Priority 1: Frustrated User Protocol (check first)
+    if detect_frustrated_user_trigger(query):
+        logger.debug("Intent type detected: FRUSTRATED_USER")
+        return "FRUSTRATED_USER"
+
     query_lower = query.lower()
 
     # ARCHITECTURE_REVIEW: explicit review/audit/assess of architecture
@@ -695,7 +843,7 @@ def retrieve_context_hint(limit: int = 5) -> SubjectInferenceContext:
                         path = args.get("file_path") or args.get("path") or args.get("target_path")
                         if path and isinstance(path, str):
                             # Clean up path (strip project root if present)
-                            clean_path = path.replace("P:\\\\\\", "").replace("P:\\\\\\\", "")
+                            clean_path = path.replace("P:\\\\", "").replace("P:\\", "")
                             if clean_path not in found_paths:
                                 found_paths.append(clean_path)
 
