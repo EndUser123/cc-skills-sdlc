@@ -1,0 +1,20 @@
+{
+  "failed_modules": [],
+  "generated_at": "2026-06-22T13:53:49Z",
+  "mode": "absolute",
+  "modules": [
+    {
+      "name": "test_module_high",
+      "num_covered": 24,
+      "num_missing": 0,
+      "num_statements": 24,
+      "pct_covered": 25.0
+    }
+  ],
+  "overall_pct": 100.0,
+  "reason": "Overall coverage: 100.0% (threshold: 20.0%)",
+  "run_id": "e2e-test-002",
+  "schema_version": "go.coverage-gate.v1",
+  "status": "pass",
+  "threshold": 20.0
+}

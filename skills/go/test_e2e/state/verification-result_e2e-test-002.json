@@ -1,0 +1,15 @@
+{
+  "artifact_paths": {
+    "coverage_gate": "P:\\packages\\.claude-marketplace\\plugins\\cc-skills-sdlc\\skills\\go\\test_e2e\\state\\coverage-gate-e2e-test-002.json"
+  },
+  "coverage": {
+    "actual": 100.0,
+    "mode": "absolute",
+    "reason": "Overall coverage: 100.0% (threshold: 20.0%)",
+    "threshold": 20.0
+  },
+  "generated_at": "2026-06-22T13:53:49Z",
+  "pr_ready": true,
+  "run_id": "e2e-test-002",
+  "status": "pass"
+}

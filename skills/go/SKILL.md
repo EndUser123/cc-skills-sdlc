@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.0.0
+version: 2.0.1
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -9,6 +9,19 @@ dispatch_modes:
   - pi
   - claude
   - local
+allowed_first_tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - Write
+  - Edit
+  - MultiEdit
+  - Skill
+  - AskUserQuestion
+  - TodoWrite
+required_first_command_patterns: []
+workflow_steps: []
 hooks:
   Stop:
     - matcher: .*

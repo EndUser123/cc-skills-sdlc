@@ -1,0 +1,11 @@
+{
+  "task": {
+    "id": "test-e2e",
+    "prompt": "Verify orchestrator runs gates in correct order",
+    "description": "End-to-end test of gate sequencing"
+  },
+  "verification_commands": [
+    "python -c 'print(\"verification step 1\")'",
+    "python -c 'print(\"verification step 2\")'"
+  ]
+}
