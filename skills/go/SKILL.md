@@ -111,6 +111,7 @@ When dispatch is `pi`, the classifier output is resolved through `scripts/adapte
 - `<promise>BLOCKED</promise>` — task cannot proceed or max attempts reached
 - `<promise>MORE_TASKS_IN_PLAN</promise>` — current task done, more remain
 - `<promise>ALL_TASKS_COMPLETE</promise>` — no eligible tasks remain
+- `<promise>PAUSED_FOR_APPROVAL</promise>` — run paused at a plan-declared gate: the only remaining tasks are `requires_approval: true` and not yet `approved`. Resume by flipping a gated task's `status` to `approved` and re-running `/go`.
 
 ---
 
@@ -121,7 +122,7 @@ export TERMINAL_ID="${TERMINAL_ID:-$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[
 export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 export GO_DISPATCH="${GO_DISPATCH:-pi}"
-export GO_STATE_DIR="$(pwd)/.claude/.artifacts/${TERMINAL_ID}/go"
+export GO_STATE_DIR="${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts/${TERMINAL_ID}/go"
 export GO_DEFAULT_VERIFICATION_COMMANDS="${GO_DEFAULT_VERIFICATION_COMMANDS:-python -m pytest -q}"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
 export GO_PROMPT="${GO_PROMPT:-}"
@@ -265,6 +266,12 @@ If no transcript path is found or the transcript cannot be read, fall back to `H
 
 ## STEP 1: Task Acquisition
 
+**From plan (GO_PLAN_FILE) — queue-pointer rule:** Before synthesizing, read the plan's
+frontmatter. If it declares `go_tasks_file`, treat that path as `GO_TASKS_FILE` and acquire
+from the **queue** (below) — this is what enables run-to-completion across all plan tasks
+with plan-declared pause gates. Only fall back to single-task synthesis (next paragraph) when
+no `go_tasks_file` is declared. This makes `/go <plan-path>` run the whole plan to completion.
+
 **From intent (GO_PROMPT / HANDOFF_TRANSCRIPT / GO_PLAN_FILE):** Parse intent and synthesize a task contract. Write `active-task_{RUN_ID}.json`.
 Prompt-synthesized tasks use `GO_DEFAULT_VERIFICATION_COMMANDS` split on `;` for verification. Set `GO_REQUIRE_EXPLICIT_VERIFICATION=1` to block prompt tasks unless that env var is explicitly set.
 
@@ -273,6 +280,17 @@ Prompt-synthesized tasks use `GO_DEFAULT_VERIFICATION_COMMANDS` split on `;` for
 ```bash
 python ".claude/skills/go/scripts/select-task.py"
 STATUS=$?
+# Plan-declared gate: only gated (requires_approval, not yet approved) tasks remain.
+if [ -f "$GO_STATE_DIR/.paused_$RUN_ID" ]; then
+  cat "$GO_STATE_DIR/.paused_$RUN_ID"
+  echo "<promise>PAUSED_FOR_APPROVAL</promise>"
+  exit 0
+fi
+# exit 2 with no pause flag = queue genuinely empty → plan complete.
+if [ "$STATUS" -eq 2 ]; then
+  echo "<promise>ALL_TASKS_COMPLETE</promise>"
+  exit 0
+fi
 [ "$STATUS" -ne 0 ] && exit 1
 touch "$GO_STATE_DIR/.task-selected_$RUN_ID"
 ```
@@ -443,11 +461,22 @@ echo "<promise>PR_READY</promise>"
 
 ## STEP 8: Loop Check
 
-Check if more eligible tasks remain.
+Check if more eligible tasks remain, then **continue automatically**. `/go` runs the
+plan to completion: it stops ONLY on `PAUSED_FOR_APPROVAL` (a plan-declared gate),
+`BLOCKED`, `MAX_ATTEMPTS`, or `ALL_TASKS_COMPLETE`. **Never stop mid-plan to ask
+"should I continue?"** — that decision belongs to the plan's `requires_approval`
+markers, not a mid-run judgment. This is the run-to-completion rule.
 
 ```bash
-python ".claude/skills/go/scripts/loop-check.py"
+LOOP_TOKEN="$(python ".claude/skills/go/scripts/loop-check.py")"
+echo "$LOOP_TOKEN"
 ```
+
+- **`MORE_TASKS_IN_PLAN`** → loop back to **STEP 1** (Task Acquisition) in the same
+  worktree. Do **not** re-run STEP 0 — the worktree persists across every task in the
+  run. `select-task.py` emits `PAUSED_FOR_APPROVAL` on its own if the next task is
+  `requires_approval: true` and not yet `approved`; you do not need to pre-check.
+- **`ALL_TASKS_COMPLETE`** → the run is complete. Stop.
 
 ---
 
@@ -460,6 +489,7 @@ python ".claude/skills/go/scripts/loop-check.py"
 - Ignoring HIGH/CRITICAL simplify findings
 - Auto-pushing or creating remote PRs
 - Modifying `forbidden_files` listed in task contract
+- **Stopping mid-plan to ask whether to continue** — the run stops ONLY on `PAUSED_FOR_APPROVAL` (a `requires_approval` gate), `BLOCKED`, `MAX_ATTEMPTS`, or `ALL_TASKS_COMPLETE`. A `MORE_TASKS_IN_PLAN` result at STEP 8 means loop back to STEP 1, not pause for direction.
 
 ## Evidence-First Principles
 

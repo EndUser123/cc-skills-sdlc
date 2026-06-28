@@ -19,6 +19,18 @@ def _priority_value(task):
     return 999
 
 
+def _is_approval_gated(task):
+    """A task that needs explicit director approval before /go will auto-select it.
+
+    Reuses the existing ``approved`` status as the approval signal: a gated task
+    (requires_approval: true) becomes selectable only once its status is flipped
+    to ``approved``. This is the plan-level pause marker — /go runs to completion
+    and pauses ONLY on these (plus BLOCKED / MAX_ATTEMPTS), never on an ad-hoc
+    "should I continue?" judgment.
+    """
+    return bool(task.get("requires_approval")) and task.get("status") != "approved"
+
+
 def _acquire_lock():
     try:
         return os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -54,7 +66,7 @@ try:
     candidates = [
         (index, task)
         for index, task in enumerate(tasks)
-        if task.get("status") in allowed
+        if task.get("status") in allowed and not _is_approval_gated(task)
     ]
     if candidates:
         selected_index, source_task = sorted(candidates, key=lambda item: (_priority_value(item[1]), item[0]))[0]
@@ -64,6 +76,41 @@ try:
         selected["selected_at"] = selected_at
 
     if not selected:
+        gated = [
+            {
+                "id": task.get("id"),
+                "title": task.get("title"),
+                "priority": task.get("priority", "P999"),
+                "reason": task.get("pause_reason", "requires director approval"),
+            }
+            for task in tasks
+            if _is_approval_gated(task)
+        ]
+        if gated:
+            paused_flag = state_dir / f".paused_{run_id}"
+            try:
+                paused_flag.write_text(
+                    json.dumps(
+                        {"run_id": run_id, "terminal_id": terminal_id, "gated": gated},
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            except OSError as exc:
+                print(f"ERROR: failed to write pause flag: {exc}", file=sys.stderr)
+                sys.exit(4)
+            print("<promise>PAUSED_FOR_APPROVAL</promise>")
+            print(
+                f"PAUSED: {len(gated)} task(s) await director approval before /go will select them:"
+            )
+            for g in gated:
+                print(f"  - {g['id']} ({g['priority']}): {g['title']} — {g['reason']}")
+            print(
+                'To resume: set each gated task\'s status to "approved" in the tasks file, '
+                "then re-run /go."
+            )
+            sys.exit(2)
         print("ERROR: no actionable task found", file=sys.stderr)
         sys.exit(2)
 

@@ -176,3 +176,106 @@ def test_select_task_rewritten_queue_matches_schema(tmp_path):
     schema = json.loads((PACKAGE / "schemas" / "tasks-file.schema.json").read_text(encoding="utf-8"))
     payload = json.loads(tasks_file.read_text(encoding="utf-8"))
     jsonschema.Draft202012Validator(schema).validate(payload)
+
+
+def test_select_task_pauses_when_only_gated_tasks_remain(tmp_path):
+    """Run-to-completion pause marker: only requires_approval tasks left -> PAUSED_FOR_APPROVAL."""
+    tasks_file = tmp_path / "tasks.json"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    tasks_file.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "id": "GATED-1",
+                        "title": "needs director signoff",
+                        "status": "ready",
+                        "priority": "P1",
+                        "requires_approval": True,
+                        "pause_reason": "measurement needs director eyes",
+                    }
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_select(tasks_file, state_dir, "run-paused")
+
+    assert result.returncode == 2, result.stderr
+    assert "<promise>PAUSED_FOR_APPROVAL</promise>" in result.stdout
+    paused = json.loads((state_dir / ".paused_run-paused").read_text(encoding="utf-8"))
+    assert paused["gated"][0]["id"] == "GATED-1"
+    assert paused["gated"][0]["reason"] == "measurement needs director eyes"
+    # A pause must not mutate the queue or claim a task.
+    assert not (state_dir / "active-task_run-paused.json").exists()
+    assert json.loads(tasks_file.read_text(encoding="utf-8"))["tasks"][0]["status"] == "ready"
+
+
+def test_select_task_skips_gated_task_in_favor_of_ungated(tmp_path):
+    """A gated task must not preempt an ungated one, even at higher priority."""
+    tasks_file = tmp_path / "tasks.json"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    tasks_file.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "id": "GATED",
+                        "title": "gated higher priority",
+                        "status": "ready",
+                        "priority": "P1",
+                        "requires_approval": True,
+                    },
+                    {
+                        "id": "UNGATED",
+                        "title": "ungated lower priority",
+                        "status": "ready",
+                        "priority": "P2",
+                    },
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_select(tasks_file, state_dir, "run-skip")
+
+    assert result.returncode == 0, result.stderr
+    active = json.loads((state_dir / "active-task_run-skip.json").read_text(encoding="utf-8"))
+    assert active["task"]["id"] == "UNGATED"
+    assert not (state_dir / ".paused_run-skip").exists()
+
+
+def test_select_task_selects_gated_task_once_approved(tmp_path):
+    """Flipping a gated task's status to 'approved' makes it selectable."""
+    tasks_file = tmp_path / "tasks.json"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    tasks_file.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "id": "GATED",
+                        "title": "approved gate",
+                        "status": "approved",
+                        "priority": "P1",
+                        "requires_approval": True,
+                    }
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_select(tasks_file, state_dir, "run-approved")
+
+    assert result.returncode == 0, result.stderr
+    active = json.loads((state_dir / "active-task_run-approved.json").read_text(encoding="utf-8"))
+    assert active["task"]["id"] == "GATED"
