@@ -120,7 +120,6 @@ Score ≥ 4 → HOOKS recommended for reliability
 ```
 
 **Examples of skills that DON'T need hooks:**
-- `/standards` - Knowledge reference
 - `/explain` - Claude provides explanation
 - `/brainstorm` - Flexible exploration
 - `/summarize` - Single-step analysis

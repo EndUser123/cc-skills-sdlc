@@ -117,7 +117,7 @@ Score >= 4  -> HOOKS recommended for reliability
 ```
 
 **Needs hooks:** /tdd, /rca, /deploy, /v (multi-phase, state, enforcement)
-**No hooks needed:** /standards, /explain, /brainstorm, /summarize (knowledge, simple)
+**No hooks needed:** /explain, /brainstorm, /summarize (knowledge, simple)
 
 ---
 
