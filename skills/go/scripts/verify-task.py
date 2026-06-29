@@ -7,8 +7,15 @@ llm_behavior_contract format from the transcript analysis.
 """
 import json, os, subprocess, pathlib, datetime, sys
 
-state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
-run_id = os.environ["RUN_ID"]
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from run_context import resolve as _resolve_run_context  # noqa: E402
+
+_ctx = _resolve_run_context()
+state_dir = _ctx.state_dir
+run_id = _ctx.run_id
+if not _ctx.resolved:
+    # Fresh run: no crash; verify-task will report an empty task set upstream.
+    pass
 
 
 def _check_scope_drift(task: dict, state_dir: pathlib.Path, f) -> list[str]:

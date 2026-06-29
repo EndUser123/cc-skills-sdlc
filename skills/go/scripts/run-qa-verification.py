@@ -58,10 +58,14 @@ def resolve_skills_analysis_root() -> Path:
 
 SKILLS_ANALYSIS = resolve_skills_analysis_root()
 
-# State root for /go.
-GO_STATE_DIR = Path(os.environ.get("GO_STATE_DIR", Path.home() / ".claude" / ".artifacts" / "temp" / "go"))
-TERMINAL_ID = os.environ.get("TERMINAL_ID", "unknown")
-RUN_ID = os.environ.get("RUN_ID", os.environ.get("GO_RUN_ID", ""))
+# State root for /go — disk-authority via run_context.resolve() (go.resume.v1).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from run_context import resolve as _resolve_run_context  # type: ignore  # noqa: E402
+
+_qa_ctx = _resolve_run_context()
+GO_STATE_DIR = _qa_ctx.state_dir
+TERMINAL_ID = _qa_ctx.terminal_id or os.environ.get("TERMINAL_ID", "unknown")
+RUN_ID = _qa_ctx.run_id or os.environ.get("RUN_ID", os.environ.get("GO_RUN_ID", ""))
 SESSION_ID = os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
 
 # ─── Routing-aware skip ───────────────────────────────────────────────────────

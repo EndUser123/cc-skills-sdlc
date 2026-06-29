@@ -24,6 +24,9 @@ VALID_DISPATCHES = ("pi", "claude", "local")
 SKILL_DIR = Path(__file__).resolve().parents[1]
 PLUGIN_ROOT = SKILL_DIR.parent.parent
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
+
 
 @dataclass
 class TaskContract:
@@ -159,7 +162,7 @@ def phase_marker(state_dir: Path, phase: str, run_id: str) -> Path:
 
 
 def write_current_run(state_dir: Path, run_id: str, status: str, dispatch: str) -> None:
-    terminal_id = os.environ.get("CLAUDE_TERMINAL_ID") or os.environ.get("TERMINAL_ID", "default")
+    terminal_id = _canonical_terminal_id()
     payload = {
         "schema_version": "go.current-run.v1",
         "run_id": run_id,
@@ -220,7 +223,7 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
 
     plan_text = plan_path.read_text(encoding="utf-8")
     title = _heading_or_stem(plan_path, plan_text)
-    terminal_id = os.environ.get("TERMINAL_ID", "default")
+    terminal_id = _canonical_terminal_id()
     selected_at = now_utc_z()
     task_data: dict[str, Any] = {
         "run_id": run_id,
@@ -248,10 +251,17 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
 
 
 def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
-    terminal_id = os.environ.get("TERMINAL_ID", "default")
+    terminal_id = _canonical_terminal_id()
     os.environ["TERMINAL_ID"] = terminal_id
-    os.environ.setdefault("CLAUDE_TERMINAL_ID", terminal_id)
-    run_id = os.environ.get("RUN_ID") or os.environ.get("GO_RUN_ID") or str(uuid.uuid4())
+    os.environ["CLAUDE_TERMINAL_ID"] = terminal_id
+    # Recover run_id from disk before minting a fresh one (go.resume.v1 D3).
+    recovered = _resolve_run_context()
+    run_id = (
+        os.environ.get("RUN_ID")
+        or os.environ.get("GO_RUN_ID")
+        or (recovered.run_id if recovered.resolved else "")
+        or str(uuid.uuid4())
+    )
     os.environ["RUN_ID"] = run_id
     os.environ["GO_RUN_ID"] = run_id
     os.environ.setdefault("MAX_ATTEMPTS", "3")
@@ -278,7 +288,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             touch(state_dir / f".blocked_{run_id}")
             return None
         selected_at = now_utc_z()
-        terminal_id = os.environ.get("TERMINAL_ID", "default")
+        terminal_id = _canonical_terminal_id()
         task_data: dict[str, Any] = {
             "run_id": run_id,
             "terminal_id": terminal_id,

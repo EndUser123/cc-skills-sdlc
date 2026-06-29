@@ -2,9 +2,13 @@
 """Generate 7-pass review files at the appropriate depth."""
 import json, os, pathlib, subprocess, sys
 
-state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
-run_id = os.environ["RUN_ID"]
-terminal_id = os.environ.get("TERMINAL_ID", "unknown")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from run_context import resolve as _resolve_run_context  # noqa: E402
+
+_ctx = _resolve_run_context()
+state_dir = _ctx.state_dir
+run_id = _ctx.run_id
+terminal_id = _ctx.terminal_id or os.environ.get("TERMINAL_ID", "unknown")
 
 # Determine review depth from diff-summary
 depth = "full"

@@ -2,8 +2,12 @@
 """Generate local PR artifacts from verified gate evidence."""
 import json, os, pathlib, datetime, sys
 
-state_dir = pathlib.Path(os.environ["GO_STATE_DIR"])
-run_id = os.environ["RUN_ID"]
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from run_context import resolve as _resolve_run_context  # noqa: E402
+
+_ctx = _resolve_run_context()
+state_dir = _ctx.state_dir
+run_id = _ctx.run_id
 
 task_path = state_dir / f"active-task_{run_id}.json"
 task = json.loads(task_path.read_text(encoding="utf-8"))["task"]
