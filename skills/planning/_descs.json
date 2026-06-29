@@ -1,0 +1,1 @@
+{"d1": "The plan State model claims a finding is stale (downgrade to low severity, tag stale) when age_hours exceeds 24h."}
