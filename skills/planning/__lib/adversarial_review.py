@@ -91,6 +91,19 @@ def sanitize_plan_name(plan_path: str) -> str:
     return sanitized or "plan"
 
 
+def default_adversarial_root() -> Path:
+    """Resolve the default adversarial-artifacts root.
+
+    Override with the CLAUDE_ADVERSARIAL_ROOT env var; otherwise use the project
+    artifacts tree so scratch stays out of ~/.claude/plans/ and out of the repo
+    root. auto_verify.py searches this same root.
+    """
+    env_root = os.environ.get("CLAUDE_ADVERSARIAL_ROOT", "").strip()
+    if env_root:
+        return Path(env_root)
+    return Path("P:/.claude/.artifacts/adversarial")
+
+
 def build_adversarial_review_context(
     plan_path: str,
     *,
@@ -100,12 +113,11 @@ def build_adversarial_review_context(
     resolved_plan_path = str(Path(plan_path))
     resolved_terminal_id = terminal_id or detect_terminal_id()
     sanitized_plan_name = sanitize_plan_name(resolved_plan_path)
-    # Derive default root from plan's parent directory to align with auto_verify.py's
-    # search logic which checks plan.parent / "adversarial". This prevents path mismatches
-    # when plans exist in user home directories (C:/Users/brsth/.claude/plans/) rather
-    # than P:/.claude/plans/.
+    # Default to the project artifacts tree so adversarial scratch stays out of
+    # ~/.claude/plans/ and out of the repo root. Override via the `root` kwarg
+    # or the CLAUDE_ADVERSARIAL_ROOT env var.
     if root is None:
-        base_root = Path(resolved_plan_path).resolve().parent / "adversarial"
+        base_root = default_adversarial_root()
     else:
         base_root = Path(root)
     base_dir = base_root / sanitized_plan_name / resolved_terminal_id

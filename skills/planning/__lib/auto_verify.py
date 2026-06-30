@@ -3174,6 +3174,18 @@ def _candidate_review_summary_paths(plan_path: str) -> list[Path]:
             if nested_dir.exists():
                 candidates.extend(nested_dir.glob("**/*.review.summary.md"))
 
+    # Artifacts-tree layout: <artifacts_root>/<plan.stem>/<terminal_id>/**
+    # (default_adversarial_root is the source of truth; adversarial_review.py
+    # writes findings here, so verification must search it too.)
+    try:
+        from adversarial_review import default_adversarial_root
+
+        artifacts_plan_dir = default_adversarial_root() / plan.stem
+        if artifacts_plan_dir.exists():
+            candidates.extend(artifacts_plan_dir.glob("**/*.review.summary.md"))
+    except ImportError:
+        pass
+
     unique: list[Path] = []
     seen: set[str] = set()
     for candidate in candidates:
