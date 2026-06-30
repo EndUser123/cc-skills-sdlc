@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# NOTE: Adversarial root is now derived from plan path's parent directory
-# at runtime in build_adversarial_review_context(). This aligns with
-# auto_verify.py's search logic which checks plan.parent / "adversarial".
-# The previous hardcoded P: path caused path mismatches when plans
-# existed in user home directories (C:/Users/brsth/.claude/plans/) rather than P:/.
+# NOTE: Adversarial artifacts default to the project artifacts tree
+# (<root>/<plan>/<terminal_id>/), where <root> is CLAUDE_ADVERSARIAL_ROOT or
+# P:/.claude/.artifacts/adversarial. auto_verify.py searches this same root.
+# The previous plan-parent coupling was retired because it dropped scratch
+# into ~/.claude/plans/ when plans lived in the user home directory.
 REFERENCE_PROMPTS_PATH = Path(__file__).resolve().parents[1] / "references" / "adversarial-agent-prompts.md"
 AGENT_FINDINGS_FILENAMES = {
     "compliance": "compliance-findings.json",
