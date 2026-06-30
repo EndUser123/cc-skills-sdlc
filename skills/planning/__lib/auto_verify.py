@@ -268,7 +268,7 @@ EVIDENCE_FILE_PATTERNS = (
 )
 
 INLINE_FILE_LINE_RE = re.compile(
-    rf"(?P<path>(?<!\.)(?:[A-Za-z]:[\/])?[\w./\-_]+\.(?!['\"])(?:{'|'.join(EVIDENCE_FILE_PATTERNS)}))(?:(?:#L|:)(?P<start>\d+)(?:[-:](?P<end>\d+))?)?",
+    rf"(?P<path>(?<!\.)(?:[A-Za-z]:[\/])?[\w./\-_]+\.(?!['\"])(?:{'|'.join(EVIDENCE_FILE_PATTERNS)})(?![A-Za-z0-9]))(?:(?:#L|:)(?P<start>\d+)(?:[-:](?P<end>\d+))?)?",
     re.IGNORECASE,
 )
 EXPLICIT_FILE_LINE_RE = re.compile(
