@@ -391,7 +391,7 @@ print(json.dumps(context.as_dict(), indent=2))
 " '${PLAN_PATH}'
 ```
 
-**Note**: Adversarial root is derived from `plan_path.parent / "adversarial"` at runtime. This ensures plans in user home directories (`C:/Users/brsth/.claude/plans/`) and workspace plans (`P:/.claude/plans/`) each use their own adversarial subdirectory, aligning with `auto_verify.py`'s search logic.
+**Note**: Adversarial root defaults to the project artifacts tree (`P:/.claude/.artifacts/adversarial/<plan_name>/<terminal_id>/`), or the `CLAUDE_ADVERSARIAL_ROOT` env var if set. Findings stay out of `~/.claude/plans/` and out of the repo root. `auto_verify.py` searches this same tree, so verification and resume/retry continue to find the findings.
 
 **Dispatch contract**:
 - Step 4a must produce a concrete `findings_dir` and concrete `findings_paths[agent]` values

@@ -173,44 +173,41 @@ def test_validate_findings_file_rejects_stale_and_mismatched_payloads(
     assert stale["reason"] == "stale"
 
 
-def test_adversarial_root_derived_from_plan_path_when_root_not_provided(
+def test_adversarial_root_defaults_to_project_artifacts_tree(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When root=None, adversarial location is derived from plan path's parent directory.
-
-    This ensures plans in user home directories (C:/Users/brsth/.claude/plans/)
-    and workspace plans (P:/.claude/plans/) each get their own adversarial subdirectory,
-    aligning with auto_verify.py's search logic which checks plan.parent / "adversarial".
+    """When root=None, adversarial location is the project artifacts tree, NOT the
+    plan's parent directory. This keeps scratch out of ~/.claude/plans/ and out of
+    the repo root. auto_verify.py searches this same tree.
     """
-    # Simulate plan in user home directory
-    plans_dir = tmp_path / "plans"
-    plans_dir.mkdir(parents=True, exist_ok=True)
-    plan_file = plans_dir / "test-plan.md"
+    monkeypatch.setenv("CLAUDE_ADVERSARIAL_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_test")
+    plan_file = tmp_path / "test-plan.md"
     plan_file.write_text("# Plan\n", encoding="utf-8")
 
     context = adversarial_review.build_adversarial_review_context(
         str(plan_file),
-        root=None,  # No explicit root provided
-    )
-
-    # Adversarial dir should be plan.parent / "adversarial" / plan_name / terminal_id
-    expected_base = plans_dir / "adversarial" / "test-plan" / context.terminal_id
-    assert context.base_dir == expected_base
-    assert context.findings_paths["compliance"] == expected_base / "compliance-findings.json"
-
-    # Simulate workspace plan (different root, but same plan name)
-    workspace_plans = tmp_path / "workspace" / "plans"
-    workspace_plans.mkdir(parents=True, exist_ok=True)
-    workspace_plan = workspace_plans / "test-plan.md"
-    workspace_plan.write_text("# Plan\n", encoding="utf-8")
-
-    workspace_context = adversarial_review.build_adversarial_review_context(
-        str(workspace_plan),
         root=None,
     )
 
-    # Each plan location gets its own adversarial subdirectory
-    expected_workspace_base = workspace_plans / "adversarial" / "test-plan" / context.terminal_id
-    assert workspace_context.base_dir == expected_workspace_base
-    # Different base_dir from user home plan (multi-location isolation)
-    assert workspace_context.base_dir != context.base_dir
+    expected_base = tmp_path / "artifacts" / "test-plan" / "console_test"
+    assert context.base_dir == expected_base
+    assert context.findings_paths["compliance"] == expected_base / "compliance-findings.json"
+
+    # Critical: the base_dir must NOT be co-located with the plan (the retired behavior).
+    assert context.base_dir.parent.parent != plan_file.parent
+
+
+def test_adversarial_root_env_var_override_takes_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLAUDE_ADVERSARIAL_ROOT redirects all adversarial output."""
+    monkeypatch.setenv("CLAUDE_ADVERSARIAL_ROOT", "Z:/custom/adversarial")
+    assert adversarial_review.default_adversarial_root() == Path("Z:/custom/adversarial")
+
+
+def test_adversarial_root_falls_back_to_project_tree_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the env var, the default is the project artifacts tree on P:."""
+    monkeypatch.delenv("CLAUDE_ADVERSARIAL_ROOT", raising=False)
+    assert adversarial_review.default_adversarial_root() == Path("P:/.claude/.artifacts/adversarial")
