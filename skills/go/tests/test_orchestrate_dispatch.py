@@ -498,3 +498,131 @@ def test_local_dispatch_outputs_satisfy_stop_gate(monkeypatch, tmp_path):
 
     assert exit_code == 0
     assert message == ""
+
+
+# ---------------------------------------------------------------------------
+# --preflight-only: proposal-only mode (phase 1, reversible)
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_only_writes_proposal_and_marker(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--preflight-only", "--prompt", "fix the parser to handle None in foo.py"])
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-pf-ok")
+    monkeypatch.setenv("TERMINAL_ID", "tid-pf")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-pf")
+
+    summary = _ORCHESTRATE.orchestrate(args)
+
+    assert "preflight OK" in summary
+    proposal = json.loads((tmp_path / "task-proposal_run-pf-ok.json").read_text(encoding="utf-8"))
+    assert proposal["runid"] == "run-pf-ok"
+    # run_context.canonical_terminal_id_from_env() prefixes non-'console_' values,
+    # so the env-set plain id gets normalized to "console_tid-pf".
+    assert proposal["terminalid"] == "console_tid-pf"
+    assert proposal["source"] == "cli-preflight"
+    assert proposal["originalPrompt"] == "fix the parser to handle None in foo.py"
+    # rewrite strips the politeness prefix; originalPrompt keeps it for the audit trail.
+    assert "parser" in proposal["rewrittenGoal"]
+    assert proposal["suggestedDispatch"] in ("pi", "local", "claude")
+    assert isinstance(proposal["localEligible"], bool)
+    assert isinstance(proposal["requiresApproval"], bool)
+    assert isinstance(proposal["verificationSuggestions"], list)
+    assert (tmp_path / ".preflight-proposed_run-pf-ok").exists()
+    # main() honors the preflight exit-code carrier; success path stays 0.
+    assert _ORCHESTRATE._preflight_exit_code == 0
+
+
+def test_preflight_only_does_not_write_active_task_or_dispatch(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--preflight-only", "--prompt", "fix parser"])
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-pf-side")
+    monkeypatch.setenv("TERMINAL_ID", "tid-side")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-side")
+
+    # Fail loudly if any dispatch / common-tail path is touched.
+    def forbid(*_args, **_kwargs):
+        raise AssertionError("preflight-only must not call load_or_create_task / dispatch / common-tail")
+
+    monkeypatch.setattr(_ORCHESTRATE, "load_or_create_task", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "dispatch_local", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "dispatch_claude", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", forbid)
+
+    _ORCHESTRATE.orchestrate(args)
+
+    # active-task must NOT exist (the whole point of preflight).
+    assert not list(tmp_path.glob("active-task_*.json"))
+    # No dispatch / common-tail markers.
+    assert not (tmp_path / ".dispatched_run-pf-side").exists()
+    assert not (tmp_path / ".coded_run-pf-side").exists()
+    assert not (tmp_path / ".verified_run-pf-side").exists()
+    assert not (tmp_path / ".qa-passed_run-pf-side").exists()
+    # The proposal + phase marker ARE written (proves preflight ran).
+    assert (tmp_path / "task-proposal_run-pf-side.json").exists()
+    assert (tmp_path / ".preflight-proposed_run-pf-side").exists()
+
+
+def test_preflight_only_without_prompt_blocks_with_sentinel(monkeypatch, tmp_path):
+    args = _ORCHESTRATE.parse_args(["--preflight-only"])
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-pf-miss")
+    monkeypatch.setenv("TERMINAL_ID", "tid-miss")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-miss")
+
+    summary = _ORCHESTRATE.orchestrate(args)
+
+    assert "BLOCKED" in summary
+    assert "missing --prompt" in summary
+    blocked = json.loads((tmp_path / "blocked_preflight_run-pf-miss.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "missing_prompt"
+    assert (tmp_path / ".preflight-failed_run-pf-miss").exists()
+    # No proposal was written.
+    assert not (tmp_path / "task-proposal_run-pf-miss.json").exists()
+    # Exit-code carrier set to non-zero (so main() returns 2).
+    assert _ORCHESTRATE._preflight_exit_code == _ORCHESTRATE._PREFLIGHT_FAIL_RC == 2
+
+
+def test_preflight_only_is_terminal_and_run_scoped(monkeypatch, tmp_path):
+    """Two preflight invocations under different RUN_IDs write distinct artifacts."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("TERMINAL_ID", "tid-scope")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-scope")
+
+    for i, rid in enumerate(("run-A", "run-B")):
+        monkeypatch.setenv("RUN_ID", rid)
+        args = _ORCHESTRATE.parse_args(["--preflight-only", "--prompt", f"task {i}"])
+        _ORCHESTRATE.orchestrate(args)
+        assert (tmp_path / f"task-proposal_{rid}.json").exists()
+        assert (tmp_path / f".preflight-proposed_{rid}").exists()
+
+    # No cross-contamination: each proposal's runid matches its invocation.
+    a = json.loads((tmp_path / "task-proposal_run-A.json").read_text(encoding="utf-8"))
+    b = json.loads((tmp_path / "task-proposal_run-B.json").read_text(encoding="utf-8"))
+    assert a["runid"] == "run-A" and b["runid"] == "run-B"
+
+
+def test_non_preflight_prompt_path_unchanged(monkeypatch, tmp_path):
+    """Sanity: omitting --preflight-only still goes through the normal flow."""
+    args = _ORCHESTRATE.parse_args(["--dispatch", "local", "--prompt", "verify only"])
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-normal")
+
+    def fail_worktree(dispatch, state_dir, run_id):
+        raise AssertionError("local dispatch must not create a worktree")
+
+    tail_calls: list[str] = []
+
+    def fake_tail(worktree, state_dir, run_id):
+        tail_calls.append(run_id)
+        return True
+
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)
+    monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", fake_tail)
+
+    assert _ORCHESTRATE.orchestrate(args) == "<promise>PR_READY</promise>"
+    assert tail_calls == ["run-normal"]
+    # Preflight artifacts must NOT exist (normal path).
+    assert not (tmp_path / "task-proposal_run-normal.json").exists()
+    assert not (tmp_path / ".preflight-proposed_run-normal").exists()

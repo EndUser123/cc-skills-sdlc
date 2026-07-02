@@ -26,6 +26,7 @@ PLUGIN_ROOT = SKILL_DIR.parent.parent
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
+from preflight_propose import run_preflight as _run_preflight  # noqa: E402
 
 
 @dataclass
@@ -185,6 +186,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Worker dispatch mode. Precedence: CLI, GO_DISPATCH, pi.",
     )
     parser.add_argument("--prompt", help="Task description (overrides task queue)")
+    parser.add_argument(
+        "--preflight-only",
+        action="store_true",
+        help="Generate a proposal artifact only; do NOT dispatch, verify, or mutate active-task.",
+    )
     parser.add_argument("--plan", help="Path to plan.md")
     parser.add_argument("--tasks", help="Path to tasks.json")
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
@@ -641,6 +647,11 @@ def orchestrate(args: argparse.Namespace) -> str:
             return "<promise>PR_READY</promise>"
         return "<promise>BLOCKED</promise>"
 
+    # Preflight-only: generate a proposal artifact and exit BEFORE load_or_create_task
+    # so active-task-<runid>.json is never written. No dispatch / common-tail.
+    if getattr(args, "preflight_only", False):
+        return _orchestrate_preflight(args, state_dir, run_id)
+
     task = load_or_create_task(args, state_dir, run_id)
     if task is None:
         return finish("blocked")
@@ -675,10 +686,47 @@ def orchestrate(args: argparse.Namespace) -> str:
     return finish("pr_ready")
 
 
+_PREFLIGHT_FAIL_RC = 2
+# Module-level exit-code carrier, set by _orchestrate_preflight, read by main().
+# Kept separate from any function name to avoid the int-overwrites-function pitfall.
+_preflight_exit_code: int = 0
+
+
+def _orchestrate_preflight(args: argparse.Namespace, state_dir: Path, run_id: str) -> str:
+    """Generate proposal artifact only. Never dispatch / verify / write active-task.
+
+    Returns a one-line summary. If --preflight-only is used without --prompt,
+    writes a small blocked sentinel and sets the module-level exit code to 2.
+    """
+    global _preflight_exit_code
+    if not getattr(args, "prompt", None):
+        write_json(
+            state_dir / f"blocked_preflight_{run_id}.json",
+            {
+                "phase": "preflight",
+                "reason_code": "missing_prompt",
+                "message": "--preflight-only requires --prompt.",
+            },
+        )
+        touch(state_dir / f".preflight-failed_{run_id}")
+        write_current_run(state_dir, run_id, "preflight-failed", args.dispatch)
+        _preflight_exit_code = _PREFLIGHT_FAIL_RC
+        return f"preflight-only BLOCKED (run_id={run_id}): missing --prompt"
+    artifact = _run_preflight(args, state_dir, run_id, _canonical_terminal_id())
+    phase_marker(state_dir, "preflight-proposed", run_id)
+    write_current_run(state_dir, run_id, "preflight-proposed", args.dispatch)
+    _preflight_exit_code = 0
+    return f"preflight OK (run_id={run_id}): wrote {artifact.name}"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     token = orchestrate(args)
+    # Preflight returns a one-line summary string (not a promise token); print as-is.
     print(token)
+    # Honor preflight failure exit code; default 0 keeps the existing contract.
+    if getattr(args, "preflight_only", False):
+        return _preflight_exit_code
     return 0
 
 
