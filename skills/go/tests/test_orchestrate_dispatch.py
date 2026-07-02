@@ -85,9 +85,12 @@ def test_common_tail_records_skipped_simplify_before_review_and_qa(monkeypatch, 
     assert _ORCHESTRATE.run_common_tail(tmp_path, tmp_path, "run1") is True
     assert calls == [
         "verify-task.py",
+        "refactor-review.py",
+        "regression-runner.py",
         "review-passes.py",
         "run-qa-verification.py",
         "mutation-gate.py",
+        "coverage-gate.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
@@ -118,9 +121,12 @@ def test_common_tail_runs_configured_simplify_command(monkeypatch, tmp_path):
     assert commands == ["python simplify.py"]
     assert calls == [
         "verify-task.py",
+        "refactor-review.py",
+        "regression-runner.py",
         "review-passes.py",
         "run-qa-verification.py",
         "mutation-gate.py",
+        "coverage-gate.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
