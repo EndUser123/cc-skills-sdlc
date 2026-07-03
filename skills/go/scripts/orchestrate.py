@@ -61,6 +61,91 @@ class TaskContract:
         )
 
 
+
+
+def inject_route_decision(
+    state_dir: Path, run_id: str, dispatch: str,
+    pi_info: "PiModelInfo | None" = None,
+) -> None:
+    """Write routeDecision metadata into the active-task JSON.
+
+    Metadata-only -- does not change dispatch behavior or routing.
+    Records the correct abstraction: harness, model source, role separation
+    status, and rejected harnesses with reasons.
+    """
+    task_file = state_dir / f"active-task_{run_id}.json"
+    if not task_file.exists():
+        return
+    task_data = json.loads(task_file.read_text(encoding="utf-8"))
+    task = task_data.get("task", task_data)
+
+    # Determine model source
+    override = os.environ.get("GO_MODEL_OVERRIDE", "").strip()
+    local_llm = os.environ.get("GO_LOCAL_LLM", "").strip()
+    if override:
+        model_source = "GO_MODEL_OVERRIDE"
+    elif dispatch == "local" and local_llm:
+        model_source = "GO_LOCAL_LLM"
+    elif dispatch == "pi" and pi_info is not None:
+        model_source = "complexity-classifier"
+    else:
+        model_source = "unknown"
+
+    # Rejected harnesses with reasons
+    rejected: list[dict[str, str]] = []
+    for harness, reason in [
+        ("claude", "unsupported-stub: no non-interactive worker implementation"),
+        ("agy", "not-wired: agy is not integrated into /go dispatch"),
+    ]:
+        rejected.append({"harness": harness, "reason": reason})
+    if dispatch != "local":
+        if local_llm:
+            rejected.append({"harness": "local", "reason": "not-selected"})
+        else:
+            rejected.append({"harness": "local", "reason": "unavailable: GO_LOCAL_LLM not set"})
+    if dispatch != "pi":
+        rejected.append({"harness": "pi", "reason": "not-selected"})
+
+    pi_transcript_review = dispatch == "pi"
+
+    chosen_model: str | None = None
+    complexity_tier: str | None = None
+    if dispatch == "pi" and pi_info is not None:
+        chosen_model = pi_info.pi_model
+        complexity_tier = pi_info.tier
+    elif override:
+        chosen_model = override
+    elif dispatch == "local" and local_llm:
+        chosen_model = local_llm
+    else:
+        chosen_model = None
+
+    route: dict[str, object] = {
+        "roleSeparation": False,
+        "dispatchMode": "flat-single-harness",
+        "plannerHarness": None,
+        "plannerModelRoute": None,
+        "implementerHarness": dispatch,
+        "implementerModelRoute": chosen_model,
+        "verifierHarness": "builtin-scripts",
+        "verifierModelRoute": None,
+        "selfVerificationAllowed": False,
+        "piTranscriptReview": pi_transcript_review,
+        "singleDispatchHarness": dispatch,
+        "singleDispatchModel": chosen_model,
+        "chosenDispatch": dispatch,
+        "chosenModel": chosen_model,
+        "modelSource": model_source,
+        "complexityTier": complexity_tier,
+        "fallbackPolicyVisibleToGo": False,
+        "actualFallbackObserved": None,
+        "rejectedHarnesses": rejected,
+    }
+
+    task["routeDecision"] = route
+    write_json(task_file, task_data)
+
+
 @dataclass
 class PiModelInfo:
     """Resolved pi model from pi-model_*.json."""
@@ -942,6 +1027,7 @@ def orchestrate(args: argparse.Namespace) -> str:
         return finish("blocked")
 
     if args.dispatch == "local":
+        inject_route_decision(state_dir, run_id, "local")
         if not dispatch_local(state_dir, run_id):
             return finish("blocked")
         if not run_common_tail(Path.cwd(), state_dir, run_id):
@@ -949,6 +1035,7 @@ def orchestrate(args: argparse.Namespace) -> str:
         return finish("pr_ready")
 
     if args.dispatch == "claude":
+        inject_route_decision(state_dir, run_id, "claude")
         if not dispatch_claude(state_dir, run_id):
             return finish("blocked")
 
@@ -963,6 +1050,7 @@ def orchestrate(args: argparse.Namespace) -> str:
         return finish("blocked")
     if args.dispatch == "pi":
         pi_info = classify_and_resolve_pi(state_dir, run_id)
+        inject_route_decision(state_dir, run_id, "pi", pi_info)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
             return finish("blocked")
 
