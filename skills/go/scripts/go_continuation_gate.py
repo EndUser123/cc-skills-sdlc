@@ -137,8 +137,12 @@ def _load_active_task(state_dir: Path, run_id: str) -> dict | None:
 
 def _is_done(record: dict, state_dir: Path, run_id: str) -> bool:
     """True if the run is complete (.pr_ready or explicit task status)."""
-    # Completion marker on disk.
+    # Completion marker on disk. Check both underscore and hyphen conventions:
+    # - .pr_ready_{run_id} (underscore — used by orchestrate.py)
+    # - .pr-ready_{run_id} (hyphen — used by SKILL.md STEP 7)
     if list(state_dir.glob(f".pr_ready*{run_id}*")) or list(state_dir.glob(".pr_ready*")):
+        return True
+    if list(state_dir.glob(f".pr-ready*{run_id}*")) or list(state_dir.glob(".pr-ready*")):
         return True
     # Explicit status in the task record.
     task = record.get("task") or record
