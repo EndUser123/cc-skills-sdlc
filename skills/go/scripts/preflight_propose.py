@@ -142,7 +142,7 @@ _FAILURE_MODE_MATRIX: list[_FMMRow] = [
         ['Must show direct invocation stdout (not just return value)', 'Must show negative case ran without blocking'],
     ),
     (
-        ('/go change', 'orchestrator change', 'orchestrate.py', 'common_tail'),
+        ('/go change', 'go change', '/go', 'orchestrator change', 'orchestrate.py', 'common_tail', 'worker prompt', 'task_prompt'),
         ['Mutating active-task file during dry-run', 'Changing dispatch behavior without updating CLI smoke test', 'Breaking plan/planless branch split logic'],
         ['Read orchestrate.py CLI entry points before editing', 'Confirm which branch (prompt/plan/recon-bypass) is affected'],
         ['grep function call sites of any changed function', 'Read the test file for the affected code path'],
@@ -174,7 +174,7 @@ _FAILURE_MODE_MATRIX: list[_FMMRow] = [
         ['Must show grep of all import sites and confirm they are unaffected'],
     ),
     (
-        ('telemetry change', 'summarizer change', 'telemetry summarizer', 'log_event', 'log hook', 'agentic reliability'),
+        ('telemetry change', 'telemetry', 'summarizer change', 'telemetry summarizer', 'log_event', 'log hook', 'agentic reliability'),
         ['Adding side effects to a read-only path', 'Crashing on empty/malformed data', 'Mutating state that should be append-only'],
         ['Read telemetry pipeline before editing', 'Confirm change is in a read or write path'],
         ['Run with empty input and empty log files', 'Check log format unchanged (append-only invariant)'],
@@ -229,11 +229,18 @@ def failure_mode_guidance(prompt: str) -> dict[str, list[str]] | None:
         return None
     best_score = 0
     best_row = None
-    for row in _FAILURE_MODE_MATRIX:
+    # _HOOK_GATE_IDX is the index of the hook/gate row (broadest, most keywords).
+    # On tie, prefer the more-specific row (not hook/gate) to reduce false matches.
+    _HOOK_GATE_IDX = 0
+    for idx, row in enumerate(_FAILURE_MODE_MATRIX):
         hits = sum(1 for kw in row[0] if kw in p)
         if hits > best_score:
             best_score = hits
             best_row = row
+        elif hits == best_score and hits > 0 and best_row is not None:
+            # Tie: prefer the non-hook/gate row (more specific match)
+            if idx != _HOOK_GATE_IDX:
+                best_row = row
     if best_row is None or best_score == 0:
         return None
     # Very short prompts (<=3 words) with only 1 keyword: skip to avoid noise.
