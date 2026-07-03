@@ -355,6 +355,152 @@ def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
 
 
+# --- Parallel strategy detection ---
+
+_LANE_EVIDENCE_SCOUT: dict[str, object] = {
+    "name": "evidence-scout",
+    "mayMutate": False,
+    "purpose": "map current code paths, references, existing behavior",
+    "output": "evidence ledger",
+}
+
+_LANE_TEST_DESIGNER: dict[str, object] = {
+    "name": "test-designer",
+    "mayMutate": False,
+    "purpose": "propose regression, negative, and behavioral tests",
+    "output": "test plan",
+}
+
+_LANE_CRITIC: dict[str, object] = {
+    "name": "critic",
+    "mayMutate": False,
+    "purpose": "critique plan/diff/final report against original request and known failure modes",
+    "output": "review memo",
+}
+
+_LANE_ALTERNATIVE_DESIGNER: dict[str, object] = {
+    "name": "alternative-designer",
+    "mayMutate": False,
+    "purpose": "compare bridge patch vs refactor vs larger architecture change",
+    "output": "options memo",
+}
+
+_PARALLEL_KEYWORDS: dict[str, list[str]] = {
+    "hook": ["evidence-scout", "test-designer", "critic"],
+    "gate": ["evidence-scout", "test-designer", "critic"],
+    "stop": ["evidence-scout", "test-designer", "critic"],
+    "orchestrat": ["evidence-scout", "test-designer", "critic"],
+    "rout": ["evidence-scout", "test-designer", "critic", "alternative-designer"],
+    "refactor": ["evidence-scout", "test-designer", "critic", "alternative-designer"],
+    "multi-phase": ["evidence-scout", "test-designer", "critic"],
+    "audit": ["evidence-scout", "test-designer", "critic"],
+    "review": ["evidence-scout", "test-designer", "critic"],
+    "quarantine": ["evidence-scout", "test-designer", "critic"],
+    "classif": ["evidence-scout", "test-designer", "critic"],
+    "rca": ["evidence-scout", "test-designer", "critic"],
+    "diagnos": ["evidence-scout", "test-designer", "critic"],
+    "design": ["evidence-scout", "test-designer", "critic", "alternative-designer"],
+    "architect": ["evidence-scout", "test-designer", "critic", "alternative-designer"],
+}
+
+_MUTATION_KEYWORDS = {"quarantine", "move", "delete", "git mv", "git rm", "cleanup"}
+_TRIVIAL_KEYWORDS = {"typo", "rename variable", "fix whitespace", "update comment", "say hi"}
+
+_LANE_MAP = {
+    "evidence-scout": _LANE_EVIDENCE_SCOUT,
+    "test-designer": _LANE_TEST_DESIGNER,
+    "critic": _LANE_CRITIC,
+    "alternative-designer": _LANE_ALTERNATIVE_DESIGNER,
+}
+
+
+def parallel_strategy_for_task(prompt: str) -> dict[str, object]:
+    """Determine parallel-agent strategy for a task.
+
+    Returns a dict with keys:
+      recommended, reason, mode, lanes, mutationPolicy,
+      spawnByDefault, overheadRisk
+    """
+    p = " ".join(prompt.split()).strip().lower()
+    if not p:
+        return {
+            "recommended": False,
+            "reason": "empty prompt",
+            "mode": "none-trivial",
+            "lanes": [],
+            "mutationPolicy": "serialized",
+            "spawnByDefault": False,
+            "overheadRisk": "none",
+        }
+
+    for kw in _TRIVIAL_KEYWORDS:
+        if kw in p:
+            return {
+                "recommended": False,
+                "reason": f"trivial task (matched '{kw}')",
+                "mode": "none-trivial",
+                "lanes": [],
+                "mutationPolicy": "serialized",
+                "spawnByDefault": False,
+                "overheadRisk": "none",
+            }
+
+    is_mutation = any(kw in p for kw in _MUTATION_KEYWORDS)
+    has_design_ambiguity = any(kw in p for kw in ("refactor", "design", "architect", "rout"))
+
+    matched_lanes: set[str] = set()
+    for kw, lanes in _PARALLEL_KEYWORDS.items():
+        if kw in p:
+            matched_lanes.update(lanes)
+
+    if not matched_lanes:
+        return {
+            "recommended": False,
+            "reason": "no parallel-benefit task type detected",
+            "mode": "none-trivial",
+            "lanes": [],
+            "mutationPolicy": "serialized",
+            "spawnByDefault": False,
+            "overheadRisk": "none",
+        }
+
+    if "alternative-designer" in matched_lanes and not has_design_ambiguity:
+        matched_lanes.discard("alternative-designer")
+
+    lanes = [_LANE_MAP[name] for name in sorted(matched_lanes) if name in _LANE_MAP]
+
+    if is_mutation:
+        mode = "analysis-parallel-mutation-serialized"
+        mutation_policy = "parent-only unless isolated worktree or patch bundle"
+    else:
+        mode = "analysis-parallel-mutation-serialized"
+        mutation_policy = "serialized"
+
+    lane_count = len(lanes)
+    if lane_count >= 4:
+        overhead = "medium"
+    elif lane_count >= 3:
+        overhead = "low-medium"
+    else:
+        overhead = "low"
+
+    reason_parts = []
+    for kw in _PARALLEL_KEYWORDS:
+        if kw in p:
+            reason_parts.append(kw)
+    reason = f"nontrivial task (matched: {', '.join(sorted(reason_parts))})"
+
+    return {
+        "recommended": True,
+        "reason": reason,
+        "mode": mode,
+        "lanes": lanes,
+        "mutationPolicy": mutation_policy,
+        "spawnByDefault": True,
+        "overheadRisk": overhead,
+    }
+
+
 # --- Mutation plan detection (explicit keyword scan) ---
 
 _MUTATION_PLAN_KEYWORDS = {
