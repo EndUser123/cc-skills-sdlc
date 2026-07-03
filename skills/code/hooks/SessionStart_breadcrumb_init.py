@@ -50,7 +50,7 @@ def main():
         initialize_breadcrumb_trail("code")
 
         # Allow session to continue
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         sys.exit(0)
 
     except Exception as e:

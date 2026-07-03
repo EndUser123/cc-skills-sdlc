@@ -49,24 +49,24 @@ def main() -> None:
 
     # If no stdin or not JSON, allow — this isn't a design session
     if not raw:
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         return
     try:
         json.loads(raw)
     except (json.JSONDecodeError, ValueError):
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         return
 
     state_file = _state_file()
 
     if not state_file.exists():
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         return
 
     try:
         state = json.loads(state_file.read_text())
     except (json.JSONDecodeError, OSError):
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         return
 
     if state.get("verified") is True:
@@ -75,7 +75,7 @@ def main() -> None:
             state_file.unlink()
         except OSError:
             pass
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
         return
 
     print(json.dumps({
