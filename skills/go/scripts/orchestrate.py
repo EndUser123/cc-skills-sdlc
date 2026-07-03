@@ -494,6 +494,11 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                 _vp = _policy_key(_rewritten)
                 if _vp is not None:
                     task_data["task"]["verificationPolicy"] = _vp
+                _fmm = getattr(_preflight, "failure_mode_guidance", None)
+                if _fmm:
+                    _fmm_result = _fmm(args.prompt)
+                    if _fmm_result:
+                        task_data["task"]["failureModeGuidance"] = _fmm_result
         except Exception:
             # Verification plan is advisory; never block dispatch on import/parse failure.
             pass
@@ -590,6 +595,30 @@ def task_prompt(task_file: Path) -> str:
             'Do not claim "verified," "tests pass," "fixed," or "works" '
             "without command evidence."
         )
+    # Phase 6: Failure Mode Matrix guidance — proactive failure anticipation.
+    fmm = inner.get("failureModeGuidance")
+    if fmm:
+        parts.append("")
+        parts.append("---")
+        parts.append("Common failure modes for this task type:")
+        for fm in fmm.get("failure_modes", []):
+            parts.append(f"  - {fm}")
+        if fmm.get("required_recon"):
+            parts.append("Required recon before editing:")
+            for item in fmm["required_recon"]:
+                parts.append(f"  - {item}")
+        if fmm.get("search_evidence"):
+            parts.append("Search/read evidence required:")
+            for item in fmm["search_evidence"]:
+                parts.append(f"  - {item}")
+        if fmm.get("negative_tests"):
+            parts.append("Negative tests / behavior tests:")
+            for item in fmm["negative_tests"]:
+                parts.append(f"  - {item}")
+        if fmm.get("claim_requirements"):
+            parts.append("Completion claim requirements:")
+            for item in fmm["claim_requirements"]:
+                parts.append(f"  - {item}")
     return "\n".join(parts)
 
 

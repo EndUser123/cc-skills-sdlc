@@ -127,6 +127,126 @@ _VERIFICATION_POLICY_MATRIX: list[tuple[tuple[str, ...], list[str], str]] = [
 ]
 
 
+# ---
+# Failure Mode Matrix -- proactive failure anticipation
+# ---
+_FMMRow = tuple[tuple[str, ...], list[str], list[str], list[str], list[str], list[str]]
+
+_FAILURE_MODE_MATRIX: list[_FMMRow] = [
+    (
+        ('hook change', 'gate change', 'stop gate', 'pretooluse', 'posttooluse', 'pre tool use', 'post tool use', 'sessionstart', 'hook.py', 'hook gate', 'stop hook', 'stop.py', 'hook'),
+        ['Wrong hook file or wrong event type', 'Invalid JSON output shape (Zod validation failure)', 'Overblocking on valid input', 'No fail-open path on exception'],
+        ['Read hook dispatcher (router.py or hooks.json) before editing', 'Read the hook file to confirm event routing'],
+        ['grep hook name in settings.json + all plugin hooks.json', 'Run direct invocation to capture real stdout'],
+        ['Direct invocation invalid input must exit cleanly (fail-open)', 'Direct invocation valid input must emit schema-valid JSON', 'Negative test: gate condition that should NOT fire'],
+        ['Must show direct invocation stdout (not just return value)', 'Must show negative case ran without blocking'],
+    ),
+    (
+        ('/go change', 'orchestrator change', 'orchestrate.py', 'common_tail'),
+        ['Mutating active-task file during dry-run', 'Changing dispatch behavior without updating CLI smoke test', 'Breaking plan/planless branch split logic'],
+        ['Read orchestrate.py CLI entry points before editing', 'Confirm which branch (prompt/plan/recon-bypass) is affected'],
+        ['grep function call sites of any changed function', 'Read the test file for the affected code path'],
+        ['Active-task JSON must NOT be mutated by --recon-bypass or --preflight-only', 'orchestrate.py --help must exit 0 after change'],
+        ['Must show active-task diff (or no-diff assertion) between pre/post dry-run'],
+    ),
+    (
+        ('classifier change', 'heuristic change', 'classify_dispatch', 'rewrite_goal', 'verification_suggestion', 'prompt classification', 'preflight propose', 'failure_mode'),
+        ['Overmatching -- new rule matches unintended prompts', 'Undermatching -- new rule misses intended prompts', 'No adversarial/mutation test to prove detection is real'],
+        ['Read full classify_dispatch function before editing', 'Read existing keyword lists for potential overlap'],
+        ['Run classify_dispatch on 3+ prompts: one match, two no-match', 'Check keywords for collision with existing rules'],
+        ['Table-driven tests: each rule >=1 positive + >=1 negative case', 'Mutation test: invert branch, confirm tests FAIL', 'Sentinel test: must-NOT-match prompt produces default'],
+        ['Must show table-driven test results (positive + negative)', 'Must show mutation test confirmed detection is real'],
+    ),
+    (
+        ('new helper', 'new hook', 'new skill', 'new script', 'add function', 'create module', 'helper function'),
+        ['Duplicating existing functionality (search before creating)', 'Missing error handling or edge cases', 'No direct invocation test proving entry point works'],
+        ['Search codebase for existing implementations of same function', 'Read the entry point that will call this helper'],
+        ['grep similar function/module names before creating', 'Read calling module to understand expected interface'],
+        ['Direct invocation test from CLI (not just import)', 'Negative test: invalid input, confirm clean error'],
+        ['Must show grep results proving no duplicate (or justify new)', 'Must show direct invocation output'],
+    ),
+    (
+        ('high risk', 'critical file', 'do not modify', 'forbidden file', 'protected file', 'security hook', 'permission'),
+        ['Editing a file outside the intended scope', 'Changing behavior other systems depend on', 'Missing a dependency chain break'],
+        ['Read the full file before editing', 'Identify all callers/consumers of the changed code'],
+        ['grep imports/usages of the changed function/class', 'Read any file that imports the changed module'],
+        ['Confirm all existing tests still pass after change', 'Verify no new warnings or behavior change in dependent code'],
+        ['Must show grep of all import sites and confirm they are unaffected'],
+    ),
+    (
+        ('telemetry change', 'summarizer change', 'telemetry summarizer', 'log_event', 'log hook', 'agentic reliability'),
+        ['Adding side effects to a read-only path', 'Crashing on empty/malformed data', 'Mutating state that should be append-only'],
+        ['Read telemetry pipeline before editing', 'Confirm change is in a read or write path'],
+        ['Run with empty input and empty log files', 'Check log format unchanged (append-only invariant)'],
+        ['Run with empty data: must not crash', 'Run twice: must be idempotent', 'Verify no mutation of source data files'],
+        ['Must show idempotence test result', 'Must show no side effects on source data'],
+    ),
+    (
+        ('claim change', 'validation change', 'claim-honesty', 'evidence hook', 'claim gap', 'unverified claim', 'honesty gate'),
+        ['Gate fires on hedged/not-run claims (false positive)', 'Gate misses bare unverified claims (false negative)', 'Gate blocks when it should only warn (wrong severity)'],
+        ['Read the gate pattern list before editing', 'Read the gate decision path (block vs warn vs allow)'],
+        ['Run with 3 cases: bare claim, hedged claim, evidence-backed claim', 'Check if gate is in ADVISORY or BLOCK mode'],
+        ['Hedged claim must NOT trigger blocking action', 'Bare claim must trigger the gate action', 'Evidence-backed claim must pass cleanly'],
+        ['Must show all three cases ran with expected outcomes'],
+    ),
+    (
+        ('test drift', 'test/source', 'stale test', 'expectation mismatch', 'test failure', 'failing test', 'broken test'),
+        ['Blindly editing the test to match a broken source', 'Blindly editing the source to match a broken test', 'Not classifying: source bug vs stale test vs missing coverage'],
+        ['Record source-vs-test triage: what does source do, what does test expect', 'Determine which is authoritative and why'],
+        ['Read the test file and the source file it tests', 'Check git blame/log for recent changes to either file'],
+        ['Classify the failure before fixing: source bug, stale test, or missing coverage', 'Fix the authoritative side; update the other to match'],
+        ['Must state triage classification before editing', 'Must show fix changed authoritative side (not just test)'],
+    ),
+    (
+        ('generated', 'cache change', 'canonical source', 'auto-generated', 'bidir sync', 'cache rebuild', 'plugin cache'),
+        ['Patching generated/cached artifact instead of canonical source', 'Forgetting to rebuild cache after source change', 'Source and cache diverge silently'],
+        ['Identify canonical source file and its generation path', 'Read the generation/cache-build command'],
+        ['grep generation command or bidir_sync config', 'Check if file is in source or cache (git status + path)'],
+        ['Regenerate artifact from source and confirm match', 'If direct edit intentional, document why source path is bypassed'],
+        ['Must state canonical source location before editing', 'Must run regeneration or explain bypass'],
+    ),
+    (
+        ('review', 'audit', 'diagnosis', 'rca', 'root cause', 'investigate', 'check status', 'assess', 'inspect'),
+        ['Reviewing prompt text only without reading actual source files', 'Making claims without citing file:line evidence', 'Missing actual failing path (only testing synthetic inputs)'],
+        ['Read the actual files referenced in the review, not just summaries', 'Build an evidence ledger: each claim needs a file:line source'],
+        ['For each claim, verify with grep/read on the real file', 'Distinguish observed (you ran it) vs inferred (you guessed)'],
+        ['Each factual claim must cite a specific file:line or tool output', 'Claims marked as verified must have a discriminating test result', 'Uncertainty must be explicit'],
+        ['Must show evidence ledger with file:line for each key claim', 'Must not use pytest as sole verification for non-test reviews'],
+    ),
+]
+
+
+def failure_mode_guidance(prompt: str) -> dict[str, list[str]] | None:
+    """Match a prompt against the Failure Mode Matrix and return guidance.
+
+    Returns a dict with keys:
+      failure_modes, required_recon, search_evidence,
+      negative_tests, claim_requirements
+    or None if no task-type match (trivial/ambiguous prompts get nothing).
+    """
+    p = " ".join(prompt.split()).strip().lower()
+    if not p:
+        return None
+    best_score = 0
+    best_row = None
+    for row in _FAILURE_MODE_MATRIX:
+        hits = sum(1 for kw in row[0] if kw in p)
+        if hits > best_score:
+            best_score = hits
+            best_row = row
+    if best_row is None or best_score == 0:
+        return None
+    # Very short prompts (<=3 words) with only 1 keyword: skip to avoid noise.
+    if best_score < 2 and len(p.split()) <= 3:
+        return None
+    return {
+        "failure_modes": best_row[1],
+        "required_recon": best_row[2],
+        "search_evidence": best_row[3],
+        "negative_tests": best_row[4],
+        "claim_requirements": best_row[5],
+    }
+
 
 def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()

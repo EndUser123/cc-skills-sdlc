@@ -1168,3 +1168,129 @@ def test_task_prompt_advisory_text_included(monkeypatch, tmp_path):
     assert "advisory" in prompt.lower()
     assert "not run" in prompt
     assert "command evidence" in prompt
+
+
+# ---- Phase 6: Failure Mode Matrix rendering in task_prompt ----
+
+def test_task_prompt_includes_failure_modes_for_hook_gate(monkeypatch, tmp_path):
+    """Hook/gate task gets failure mode guidance in the prompt."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "fix hook gate",
+            "objective": "fix json validation",
+            "failureModeGuidance": {
+                "failure_modes": ["Invalid JSON output shape", "Overblocking"],
+                "required_recon": ["Read hook dispatcher"],
+                "search_evidence": ["grep hook in settings.json"],
+                "negative_tests": ["Direct invocation invalid input"],
+                "claim_requirements": ["Must show direct invocation stdout"],
+            },
+        }
+    }
+    p = tmp_path / "active-task_fmm.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Common failure modes" in prompt
+    assert "Invalid JSON output shape" in prompt
+    assert "Read hook dispatcher" in prompt
+    assert "grep hook" in prompt
+    assert "Direct invocation" in prompt
+    assert "Must show direct invocation stdout" in prompt
+
+
+def test_task_prompt_includes_failure_modes_for_classifier(monkeypatch, tmp_path):
+    """Classifier task gets overmatching/undermatching failure modes."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "update classifier",
+            "objective": "fix overmatching",
+            "failureModeGuidance": {
+                "failure_modes": [
+                    "Overmatching -- matches unintended prompts",
+                    "Undermatching -- misses intended prompts",
+                ],
+                "required_recon": ["Read classify_dispatch"],
+                "search_evidence": ["Run classify_dispatch on 3+ prompts"],
+                "negative_tests": [
+                    "Table-driven tests: >=1 positive + >=1 negative",
+                    "Mutation test: invert branch, confirm FAIL",
+                ],
+                "claim_requirements": ["Must show table-driven results"],
+            },
+        }
+    }
+    p = tmp_path / "active-task_fmm.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Overmatching" in prompt
+    assert "Mutation test" in prompt
+    assert "table-driven" in prompt.lower()
+
+
+def test_task_prompt_no_failure_modes_for_trivial_task(monkeypatch, tmp_path):
+    """Trivial task with no failureModeGuidance gets no FMM section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "say hi",
+            "objective": "greet",
+        }
+    }
+    p = tmp_path / "active-task_fmm.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "failure mode" not in prompt.lower()
+    assert "Common failure" not in prompt
+
+
+def test_task_prompt_fmm_preserves_existing_sections(monkeypatch, tmp_path):
+    """FMM section appears after verification section, both present."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "fix hook gate",
+            "objective": "fix json",
+            "verificationPolicy": "hook_gate",
+            "verificationSuggestions": ["python hook.py < sample.json"],
+            "failureModeGuidance": {
+                "failure_modes": ["Invalid JSON output"],
+                "required_recon": ["Read dispatcher"],
+                "search_evidence": ["grep settings.json"],
+                "negative_tests": ["Direct invocation"],
+                "claim_requirements": ["Show stdout"],
+            },
+        }
+    }
+    p = tmp_path / "active-task_fmm.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    # Both sections present
+    assert "Verification expectations:" in prompt
+    assert "Common failure modes" in prompt
+    # Verification comes before failure modes
+    v_idx = prompt.index("Verification expectations:")
+    f_idx = prompt.index("Common failure modes")
+    assert v_idx < f_idx
+
+
+def test_task_prompt_fmm_partial_fields_handled(monkeypatch, tmp_path):
+    """FMM with only some fields still renders without error."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "minimal fmm",
+            "objective": "test",
+            "failureModeGuidance": {
+                "failure_modes": ["Only failure mode"],
+            },
+        }
+    }
+    p = tmp_path / "active-task_fmm.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Only failure mode" in prompt
+    # Missing sections should not appear
+    assert "Required recon" not in prompt
+    assert "Search/read evidence" not in prompt
