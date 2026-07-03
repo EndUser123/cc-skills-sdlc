@@ -246,3 +246,59 @@ class TestFailureModeGuidanceAll:
         assert r1 is not None and r2 is not None
         assert r1["failure_modes"] == r2["failure_modes"]
         assert r1["required_recon"] == r2["required_recon"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 6.7: Execution-control safeguard tests
+# ---------------------------------------------------------------------------
+
+class TestExecutionControlSafeguards:
+    """Verify the 5 execution-control safeguards are present in FMM data."""
+
+    def test_hook_gate_has_stop_json_claim(self):
+        """Task 5: live Stop JSON validation failure prevents DONE."""
+        r = failure_mode_guidance("fix the hook gate json validation")
+        assert r is not None
+        assert any("Stop JSON validation failure" in c for c in r["claim_requirements"])
+
+    def test_orchestrator_has_delegation_failure_mode(self):
+        """Task 1: delegated agents writing partial work."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("delegated agent" in f.lower() for f in r["failure_modes"])
+
+    def test_orchestrator_has_authoritative_run_failure_mode(self):
+        """Task 3: reclassifying from truncated output."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("reclassif" in f.lower() for f in r["failure_modes"])
+
+    def test_orchestrator_has_delegation_recon(self):
+        """Task 1: delegation requires isolation/patch/disjoint plan."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("isolation" in rec.lower() or "disjoint" in rec.lower() for rec in r["required_recon"])
+
+    def test_orchestrator_has_mutation_preconditions(self):
+        """Task 2: phase mutation needs permitted-files + verification + rollback."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("permitted" in rec.lower() for rec in r["required_recon"])
+
+    def test_orchestrator_has_authoritative_run_negative(self):
+        """Task 3: truncated output prevents silent reclassification."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("truncat" in t.lower() for t in r["negative_tests"])
+
+    def test_orchestrator_has_report_contract_claim(self):
+        """Task 4: strict report format must be matched."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("strict format" in c.lower() or "report format" in c.lower() for c in r["claim_requirements"])
+
+    def test_orchestrator_has_stop_hook_claim(self):
+        """Task 5: Stop JSON validation failure prevents DONE."""
+        r = failure_mode_guidance("orchestrate.py change common_tail dispatch")
+        assert r is not None
+        assert any("Stop JSON validation" in c for c in r["claim_requirements"])

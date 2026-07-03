@@ -633,6 +633,24 @@ def task_prompt(task_file: Path) -> str:
                 parts.append("  Claim requirements:")
                 for item in sec["claim_requirements"]:
                     parts.append(f"    - {item}")
+    # Phase 6.7: Execution-control safeguards for multi-phase/multi-task prompts.
+    _title_obj = f"{inner.get('title', '')} {inner.get('objective', '')}".lower()
+    _has_phase_pattern = any(kw in _title_obj for kw in (
+        "phase", "multi-phase", "multi-task", "stages", "steps",
+        "quarantine", "migration", "delegat",
+    ))
+    if _has_phase_pattern:
+        parts.append("")
+        parts.append("---")
+        parts.append("Execution-control safeguards (multi-phase task):")
+        parts.append("  Delegation: executors may not write to shared tree unless")
+        parts.append("    isolated worktree, patch bundle, or disjoint-file lock plan exists.")
+        parts.append("  Mutation preconditions: before any file change, produce:")
+        parts.append("    permitted files, proposed changes, verification contract, rollback command.")
+        parts.append("  Authoritative run: if run-once-defines-result, save full output to file.")
+        parts.append("    If truncated/missing, mark phase FAILED or restart once. Do not reclassify.")
+        parts.append("  Report contract: if user requested strict format, final output must match.")
+        parts.append("  Live hook path: Stop hook JSON validation failure = task not complete.")
     return "\n".join(parts)
 
 

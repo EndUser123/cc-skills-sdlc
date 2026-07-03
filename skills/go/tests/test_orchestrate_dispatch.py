@@ -1356,3 +1356,76 @@ def test_task_prompt_no_secondary_when_empty(monkeypatch, tmp_path):
     prompt = _ORCHESTRATE.task_prompt(p)
     assert "Common failure modes" in prompt
     assert "Additional safeguards" not in prompt
+
+
+def test_task_prompt_execution_control_for_multi_phase(monkeypatch, tmp_path):
+    """Multi-phase prompt triggers execution-control safeguards section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "Phase 2: quarantine sweep, Phase 3: dispatch manifest",
+            "objective": "run multiple phases",
+            "failureModeGuidance": {
+                "failure_modes": ["partial writes"],
+                "required_recon": [],
+                "search_evidence": [],
+                "negative_tests": [],
+                "claim_requirements": [],
+            },
+        }
+    }
+    p = tmp_path / "active-task_exec.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Execution-control safeguards" in prompt
+    assert "isolated worktree" in prompt
+    assert "permitted files" in prompt
+    assert "save full output" in prompt
+    assert "strict format" in prompt
+    assert "Stop hook JSON validation" in prompt
+
+
+def test_task_prompt_no_execution_control_for_simple_task(monkeypatch, tmp_path):
+    """Simple hook fix prompt does NOT get execution-control section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "fix hook gate",
+            "objective": "fix json",
+            "failureModeGuidance": {
+                "failure_modes": ["Invalid JSON"],
+                "required_recon": ["Read dispatcher"],
+                "search_evidence": ["grep"],
+                "negative_tests": ["Direct invocation"],
+                "claim_requirements": ["Show stdout"],
+            },
+        }
+    }
+    p = tmp_path / "active-task_simple.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Execution-control safeguards" not in prompt
+    assert "Common failure modes" in prompt
+
+
+def test_task_prompt_execution_control_for_quarantine(monkeypatch, tmp_path):
+    """Quarantine prompt triggers execution-control safeguards."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "quarantine failing tests before editing",
+            "objective": "move files",
+            "failureModeGuidance": {
+                "failure_modes": ["moving files prematurely"],
+                "required_recon": [],
+                "search_evidence": [],
+                "negative_tests": [],
+                "claim_requirements": [],
+            },
+        }
+    }
+    p = tmp_path / "active-task_q.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Execution-control safeguards" in prompt
+    assert "Mutation preconditions" in prompt
