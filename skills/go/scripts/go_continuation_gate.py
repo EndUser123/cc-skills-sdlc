@@ -49,6 +49,9 @@ import sys
 import time
 from pathlib import Path
 
+# telemetry is optional (fail-open); imported lazily in _emit.
+_emit = None  # deferred import of emit_gate_telemetry
+
 ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
 SESSIONS_DIR_NAME = "go-sessions"
 STALE_TTL_SECONDS = 6 * 3600  # 6h — see module docstring justification.
@@ -161,6 +164,28 @@ def _block_reason(record: dict, state_dir: Path, run_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Telemetry (fail-open)
+# ---------------------------------------------------------------------------
+
+def _telemetry(event: str, session_id: str = "", decision: str = "silent",
+               reason: str = "") -> None:
+    """Emit continuation_gate telemetry. Fail-open; never blocks the gate."""
+    global _emit
+    if _emit is None:
+        try:
+            import importlib
+            _mod = importlib.import_module("orchestrate")
+            _emit = getattr(_mod, "emit_gate_telemetry", None)
+        except Exception:
+            _emit = False  # sentinel: import failed, don't retry
+    if _emit and _emit is not False:
+        try:
+            _emit(event=event, session_id=session_id, decision=decision, reason=reason)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Decision
 # ---------------------------------------------------------------------------
 
@@ -179,29 +204,37 @@ def check_go_completion(payload: dict | None = None) -> dict | None:
 
     session_id = _payload_session_id(payload)
     if not session_id:
+        _telemetry("no_session_id", "", "silent")
         return None  # absent/malformed identity -> silent
 
     pointer = _read_pointer(session_id)
     if pointer is None:
+        _telemetry("no_pointer", session_id, "silent")
         return None  # no pointer / stale pointer -> silent
 
     state_dir = _resolve_state_dir(pointer)
     if state_dir is None:
+        _telemetry("missing_state_dir", session_id, "silent")
         return None  # pointer points to missing state dir -> silent
 
     run_id = pointer.get("run_id") or ""
     if not run_id:
+        _telemetry("malformed_pointer", session_id, "silent")
         return None  # malformed pointer -> silent
 
     record = _load_active_task(state_dir, run_id)
     if record is None:
+        _telemetry("no_active_task", session_id, "silent")
         return None  # no active task -> silent (done or never started)
 
     if _is_done(record, state_dir, run_id):
+        _telemetry("done", session_id, "silent")
         return None  # completed -> silent
 
     # Active, not done -> work remaining -> BLOCK.
-    return {"decision": "block", "reason": _block_reason(record, state_dir, run_id)}
+    reason = _block_reason(record, state_dir, run_id)
+    _telemetry("block", session_id, "block", reason)
+    return {"decision": "block", "reason": reason}
 
 
 def main() -> None:

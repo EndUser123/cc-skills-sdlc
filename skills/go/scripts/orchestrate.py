@@ -494,6 +494,22 @@ def _emit_recon_telemetry(
     except Exception:
         pass
 
+def emit_gate_telemetry(event: str, session_id: str = "", decision: str = "silent",
+                        reason: str = "", extra: dict | None = None) -> None:
+    """Emit a continuation gate telemetry event. Fail-open (importable by the gate)."""
+    try:
+        from __lib.agentic_reliability_telemetry import log_event
+        log_event(
+            category="continuation_gate",
+            event=event,
+            gate="continuation_gate",
+            session_id=session_id,
+            decision=decision,
+            extra={**(extra or {}), "reason": reason} if reason else (extra or {}),
+        )
+    except Exception:
+        pass
+
 
 def require_recon(
     args: argparse.Namespace, state_dir: Path, run_id: str, prompt: str
