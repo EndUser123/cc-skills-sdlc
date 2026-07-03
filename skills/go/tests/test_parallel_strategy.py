@@ -13,10 +13,6 @@ from preflight_propose import parallel_strategy_for_task
 from orchestrate import task_prompt
 
 
-# ---------------------------------------------------------------------------
-# Strategy detection tests
-# ---------------------------------------------------------------------------
-
 class TestParallelStrategyDetection:
 
     def test_hook_task_recommends_evidence_test_critic(self):
@@ -59,7 +55,6 @@ class TestParallelStrategyDetection:
         assert s["recommended"] is True
 
     def test_all_lanes_may_not_mutate(self):
-        """No lane has mayMutate=True in default mode."""
         for prompt in [
             "fix the Stop hook JSON validation failure",
             "Phase 2: quarantine failing tests",
@@ -83,18 +78,12 @@ class TestParallelStrategyDetection:
         assert s["recommended"] is False
 
 
-# ---------------------------------------------------------------------------
-# Active-task JSON wiring
-# ---------------------------------------------------------------------------
-
 class TestParallelStrategyInActiveTask:
 
     def test_recommended_writes_to_task(self, monkeypatch, tmp_path):
-        """parallelStrategy appears in task dict when recommended."""
         monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
         ps = parallel_strategy_for_task("fix the Stop hook JSON validation failure")
         assert ps["recommended"] is True
-        # Simulate what load_or_create_task does
         task = {"task": {"title": "fix hook", "objective": "fix"}}
         if ps.get("recommended"):
             task["task"]["parallelStrategy"] = ps
@@ -105,16 +94,11 @@ class TestParallelStrategyInActiveTask:
         monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
         ps = parallel_strategy_for_task("say hi")
         assert ps["recommended"] is False
-        # Should NOT be written to task
         task = {"task": {"title": "hi", "objective": "hi"}}
         if ps.get("recommended"):
             task["task"]["parallelStrategy"] = ps
         assert "parallelStrategy" not in task["task"]
 
-
-# ---------------------------------------------------------------------------
-# Worker prompt rendering
-# ---------------------------------------------------------------------------
 
 class TestParallelStrategyPromptRendering:
 
@@ -149,12 +133,7 @@ class TestParallelStrategyPromptRendering:
 
     def test_no_render_when_not_recommended(self, monkeypatch, tmp_path):
         monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
-        task = {
-            "task": {
-                "title": "fix typo",
-                "objective": "fix",
-            }
-        }
+        task = {"task": {"title": "fix typo", "objective": "fix"}}
         p = tmp_path / "active-task_ps.json"
         json.dump(task, p.open("w"))
         prompt = task_prompt(p)
@@ -162,12 +141,7 @@ class TestParallelStrategyPromptRendering:
 
     def test_no_render_when_absent(self, monkeypatch, tmp_path):
         monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
-        task = {
-            "task": {
-                "title": "simple task",
-                "objective": "do thing",
-            }
-        }
+        task = {"task": {"title": "simple task", "objective": "do thing"}}
         p = tmp_path / "active-task_ps.json"
         json.dump(task, p.open("w"))
         prompt = task_prompt(p)
