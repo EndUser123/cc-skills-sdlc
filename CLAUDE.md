@@ -78,3 +78,39 @@ Plugins live directly in `P:/packages/.claude-marketplace/plugins/<name>/`.
 
 
 Command frontends live in .
+
+## Hook-Work Contract
+
+Binding for any task that touches hook wiring (Stop/PreToolUse/PostToolUse,
+settings.json, hooks.json, dispatch routers). Injected into `/go` worker
+prompts for hook tasks; applies to direct edits too.
+
+1. **Discover the dispatch surface BEFORE wiring.** Read `settings.json`,
+   `settings.local.json`, plugin `hooks/hooks.json`, and `__lib/router.py`.
+   State which surface is live. Do not create a third dispatch pattern unless
+   documented as a temporary exception.
+2. **Stop output contract (strict).** Block → print
+   `{"decision":"block","reason":"continue: ..."}` and exit 0. Allow / done /
+   fail-open / not-my-session → print **nothing** and exit 0. Never print `{}`,
+   `{"decision":"approve"}`, `{"continue":true}`, or any other allow payload —
+   those surface as "Stop hook error: JSON validation failed". stderr is
+   diagnostics-only.
+3. **Never claim "registered" / "live" / "verified" without evidence.** Cite
+   the registration file:line and show real-command smoke output for each
+   branch (block, done, no-state). Tests-passing is not liveness — a gate can
+   be green in unit tests yet emit the wrong shape on the real dispatch path.
+4. **Tests must cover three layers:** unit logic, direct invocation, and real
+   registered-dispatch-path smoke. A mocked implementation cannot fake success
+   at the dispatch boundary.
+5. **Plugin file changes trigger the mutation checklist where applicable:**
+   version bump + cache rebuild + scope check before declaring "done".
+
+### Direct-entry exception: `go_continuation_gate.py`
+
+This gate is wired as a **direct project-settings entry**
+(`P:/.claude/settings.json` `hooks.Stop[3]`), NOT through this plugin's
+`hooks/hooks.json` (which is kept at `{"hooks": {}}` — dormant). It is
+self-scoping: `_find_state_dir()` returns `None` and the gate prints nothing
+when no `console_go_*/go` state tree exists, so it is inert in every non-`/go`
+session. It is **additive** to the native goal-loop evaluator — it does not
+replace it.
