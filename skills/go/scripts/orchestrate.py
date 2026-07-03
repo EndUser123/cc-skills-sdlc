@@ -499,6 +499,13 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                     _fmm_result = _fmm(args.prompt)
                     if _fmm_result:
                         task_data["task"]["failureModeGuidance"] = _fmm_result
+                _mp = getattr(_preflight, "requires_mutation_plan", None)
+                if _mp:
+                    _mp_result = _mp(args.prompt)
+                    if _mp_result:
+                        task_data["task"]["requiresMutationPlan"] = True
+                        task_data["task"]["mutationPlanReason"] = _mp_result["reason"]
+                        task_data["task"]["mutationPlanKinds"] = _mp_result["kinds"]
         except Exception:
             # Verification plan is advisory; never block dispatch on import/parse failure.
             pass
@@ -651,6 +658,23 @@ def task_prompt(task_file: Path) -> str:
         parts.append("    If truncated/missing, mark phase FAILED or restart once. Do not reclassify.")
         parts.append("  Report contract: if user requested strict format, final output must match.")
         parts.append("  Live hook path: Stop hook JSON validation failure = task not complete.")
+    # Phase 6.8: Mutation-plan requirement (explicit field, not inferred).
+    if inner.get("requiresMutationPlan"):
+        parts.append("")
+        parts.append("---")
+        parts.append("MUTATION PLAN REQUIRED:")
+        parts.append(f"  Reason: {inner.get('mutationPlanReason', 'quarantine/move/delete task')}")
+        parts.append(f"  Kinds: {', '.join(inner.get('mutationPlanKinds', []))}")
+        parts.append("  BEFORE any file move/delete/quarantine operation, create")
+        parts.append("    mutation-plan_{phase_id}.json in the state directory with:")
+        parts.append("      phase_id, operation_type, authoritative_source_output,")
+        parts.append("      exempt_filter_result, proposed_move_list (or proposed_delete_list),")
+        parts.append("      permitted_fence, rollback_command, verification_commands.")
+        parts.append("  Use ONLY the authoritative source output for classification.")
+        parts.append("  Do NOT classify from truncated output.")
+        parts.append("  Do NOT mutate files outside the permitted fence.")
+        parts.append("  Rollback if verification or fence checks fail.")
+        parts.append("  If DONE is claimed but no valid mutation-plan exists, the phase is NOT complete.")
     return "\n".join(parts)
 
 

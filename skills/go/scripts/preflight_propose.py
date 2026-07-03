@@ -307,6 +307,51 @@ def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
 
 
+# --- Mutation plan detection (explicit keyword scan) ---
+
+_MUTATION_PLAN_KEYWORDS = {
+    "quarantine": "quarantine",
+    "move file": "move",
+    "move test": "move",
+    "git mv": "move",
+    "delete file": "delete",
+    "remove file": "delete",
+    "git rm": "delete",
+    "cleanup": "delete",
+    "purge": "delete",
+    "mass cleanup": "delete",
+}
+
+
+def requires_mutation_plan(prompt: str) -> dict[str, str] | None:
+    """Detect whether a prompt requires a mutation plan (quarantine/move/delete).
+
+    Returns a dict with keys 'reason' and 'kinds' if mutation plan is required,
+    or None if the prompt is not a mutation-heavy task.
+
+    This is explicit keyword detection -- NOT inferred from rendered prompt text.
+    """
+    p = " ".join(prompt.split()).strip().lower()
+    if not p:
+        return None
+
+    matched_kinds: list[str] = []
+    matched_reasons: list[str] = []
+    for kw, kind in _MUTATION_PLAN_KEYWORDS.items():
+        if kw in p:
+            matched_kinds.append(kind)
+            matched_reasons.append(kw)
+
+    if not matched_kinds:
+        return None
+
+    unique_kinds = list(dict.fromkeys(matched_kinds))  # dedupe, preserve order
+    return {
+        "reason": f"Prompt contains mutation keywords: {chr(44).join(matched_reasons)}",
+        "kinds": unique_kinds,
+    }
+
+
 def rewrite_goal(prompt: str) -> str:
     """Light cleanup that strips common request politeness prefixes only.
 
