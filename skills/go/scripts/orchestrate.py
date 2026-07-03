@@ -477,6 +477,26 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                 "task_type": "implementation",
             },
         }
+        # Phase 5: include the verification plan from the matrix so the
+        # worker sees task-specific verification expectations before
+        # implementation. The plan is informational/advisory only —
+        # it does not block dispatch.
+        try:
+            _preflight = importlib.import_module("preflight_propose")
+            _classify = getattr(_preflight, "classify_dispatch", None)
+            _suggest = getattr(_preflight, "verification_suggestions", None)
+            _policy_key = getattr(_preflight, "_verification_policy_key", None)
+            _rewrite = getattr(_preflight, "rewrite_goal", None)
+            if _classify and _suggest and _policy_key and _rewrite:
+                _rewritten = _rewrite(args.prompt)
+                _classify(_rewritten)
+                task_data["task"]["verificationSuggestions"] = _suggest(_rewritten)
+                _vp = _policy_key(_rewritten)
+                if _vp is not None:
+                    task_data["task"]["verificationPolicy"] = _vp
+        except Exception:
+            # Verification plan is advisory; never block dispatch on import/parse failure.
+            pass
         write_json(state_dir / f"active-task_{run_id}.json", task_data)
         phase_marker(state_dir, "task-selected", run_id)
     elif args.plan:

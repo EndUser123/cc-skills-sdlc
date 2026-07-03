@@ -939,3 +939,87 @@ def test_load_or_create_task_dispatches_with_recon(monkeypatch, tmp_path):
     result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-load-ok")
     assert result is not None
     assert (tmp_path / "active-task_run-load-ok.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: verification policy injected into active-task
+# ---------------------------------------------------------------------------
+
+
+def test_active_task_includes_verification_policy_for_high_risk_prompt(monkeypatch, tmp_path):
+    """High-risk prompt (hook/gate) gets verificationPolicy + suggestions in active-task."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-vp-1")
+    monkeypatch.setenv("TERMINAL_ID", "tid-vp1")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-vp1")
+
+    args = _ORCHESTRATE.parse_args(["--prompt", "fix the new hook gate change", "--recon-bypass"])
+    result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-vp-1")
+
+    assert result is not None
+    active = json.loads((tmp_path / "active-task_run-vp-1.json").read_text(encoding="utf-8"))
+    task = active.get("task", {})
+    assert "verificationPolicy" in task, f"verificationPolicy missing: {active}"
+    assert "verificationSuggestions" in task
+    assert isinstance(task["verificationSuggestions"], list)
+    assert len(task["verificationSuggestions"]) > 0
+    # Should contain matrix-derived suggestions
+    joined = "\n".join(task["verificationSuggestions"]).lower()
+    assert "hook" in joined, f"hook/gate should mention hook: {task['verificationSuggestions']}"
+
+
+def test_active_task_skips_verification_policy_for_trivial_prompt(monkeypatch, tmp_path):
+    """Trivial prompt (typo, rename) does NOT get verificationPolicy in active-task."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-vp-trivial")
+    monkeypatch.setenv("TERMINAL_ID", "tid-vp-triv")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-vp-triv")
+
+    args = _ORCHESTRATE.parse_args(["--prompt", "fix a typo in README.md"])
+    result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-vp-trivial")
+
+    assert result is not None
+    active = json.loads((tmp_path / "active-task_run-vp-trivial.json").read_text(encoding="utf-8"))
+    task = active.get("task", {})
+
+    # Trivial prompt should not have verificationPolicy injected
+    assert "verificationPolicy" not in task, f"trivial should not have verificationPolicy: {task}"
+    assert "verificationSuggestions" in task, f"trivial should still get default suggestions: {task}"
+
+
+def test_active_task_includes_verification_suggestions_for_telemetry_prompt(monkeypatch, tmp_path):
+    """Prompt matching the telemetry/summarizer matrix entry gets verificationPolicy."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-vp-tel")
+    monkeypatch.setenv("TERMINAL_ID", "tid-vp-tel")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-vp-tel")
+
+    args = _ORCHESTRATE.parse_args(["--prompt", "add a new agentic_reliability_telemetry log_event category --recon-bypass"])
+    result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-vp-tel")
+
+    assert result is not None
+    active = json.loads((tmp_path / "active-task_run-vp-tel.json").read_text(encoding="utf-8"))
+    task = active.get("task", {})
+    assert "verificationPolicy" in task
+    assert "verificationSuggestions" in task
+    joined = "\n".join(task["verificationSuggestions"]).lower()
+    assert "read-only" in joined or "idempotence" in joined, f"telemetry should suggest read-only: {task['verificationSuggestions']}"
+
+
+def test_preflight_only_still_works_after_phase5(monkeypatch, tmp_path):
+    """--preflight-only still produces a proposal artifact without writing active-task."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-p5-pf")
+    monkeypatch.setenv("TERMINAL_ID", "tid-p5-pf")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-p5-pf")
+
+    args = _ORCHESTRATE.parse_args(["--preflight-only", "--prompt", "fix the parser bug"])
+    summary = _ORCHESTRATE.orchestrate(args)
+
+    assert "preflight OK" in summary
+    assert (tmp_path / "task-proposal_run-p5-pf.json").exists()
+    assert not (tmp_path / "active-task_run-p5-pf.json").exists()
+    proposal = json.loads((tmp_path / "task-proposal_run-p5-pf.json").read_text(encoding="utf-8"))
+    # Phase 4 artifacts: verificationPolicy + verificationSuggestions must be present
+    assert "verificationPolicy" in proposal
+    assert "verificationSuggestions" in proposal
