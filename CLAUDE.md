@@ -124,11 +124,16 @@ This gate is wired as a **direct project-settings entry**
   it to cache state where stale cache silently overrides source fixes. Direct
   entry is a single, consistent pattern; the plugin dispatcher stays dormant.
   Full rationale + gate inventory: `skills/go/HOOK_GATE_INVENTORY.md`.
-- **Dormant surfaces NOT to revive:** (a) `skills/go/hooks/Stop_enforce_gate.py`
-  — declared in `skills/go/SKILL.md` frontmatter `hooks.Stop` but not registered
-  in settings.json or plugin hooks.json (live-status unverified); (b)
-  `cc-skills-sdlc/hooks/Stop.py` — exists but plugin dispatcher is dormant,
-  referenced only by `enforce/tests/test_enforce.py`. Both are classified in
+- **Dormant surfaces NOT to revive:** `cc-skills-sdlc/hooks/Stop.py`
+  — exists but plugin dispatcher is dormant, referenced only by
+  `enforce/tests/test_enforce.py`. Classified in
+  `HOOK_GATE_INVENTORY.md` as G6 (dormant-intentional).
+- **G5 (Stop_enforce_gate.py) is LIVE:** Confirmed 2026-07-04 — CC's skill
+  loader honors SKILL.md frontmatter `hooks.Stop` for the active skill.
+  G5 fires on every Stop event during a `/go` session and enforces SDLC hard
+  gates via `enforce/stop_gate.py`. It is complementary to G4 (continuation
+  gate): G5 enforces completeness; G4 handles task-completion semantics.
+  Full classification in `HOOK_GATE_INVENTORY.md`.
   `HOOK_GATE_INVENTORY.md` (G5, G6). Do not wire either as a side effect of
   gate work — their retirement/wiring is a separate isolated decision.
 
