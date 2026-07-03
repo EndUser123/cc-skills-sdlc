@@ -358,6 +358,71 @@ class TestHookWorkContractRendering:
 
 
 # ---------------------------------------------------------------------------
+# Continuation policy + native /goal warning + cache-drift + direct-entry docs
+# ---------------------------------------------------------------------------
+
+class TestContinuationPolicyRendering:
+
+    def test_warning_renders_for_state_expressible_goal(self, monkeypatch, tmp_path):
+        """State-expressible completion goal -> native /goal warning renders."""
+        monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+        task = {"task": {"title": "run to completion", "objective": "finish"}}
+        p = tmp_path / "active-task_cp.json"
+        json.dump(task, p.open("w"))
+        prompt = task_prompt(p)
+        assert "Continuation policy" in prompt
+        assert "Do NOT pair native /goal" in prompt or "Do not pair native /goal" in prompt
+        assert "deterministic gate" in prompt
+
+    def test_no_warning_for_non_completion_task(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+        task = {"task": {"title": "rename a variable", "objective": "rename"}}
+        p = tmp_path / "active-task_nc.json"
+        json.dump(task, p.open("w"))
+        prompt = task_prompt(p)
+        assert "Continuation policy" not in prompt
+
+    def test_policy_documented_in_skill_md(self):
+        skill = Path(__file__).resolve().parent.parent / "SKILL.md"
+        text = skill.read_text(encoding="utf-8")
+        assert "Continuation Policy" in text
+        assert "tier-2 review/critic" in text
+        assert "Do not pair native" in text or "Do NOT pair native" in text
+
+
+class TestCacheDriftAndDirectEntry:
+
+    def test_cache_drift_zero(self):
+        """Source plugin.json version must equal the installed cache version."""
+        plugin_json = Path(
+            "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc/.claude-plugin/plugin.json"
+        )
+        src_version = json.loads(plugin_json.read_text(encoding="utf-8"))["version"]
+        cache_root = Path("C:/Users/brsth/.claude/plugins/cache/local/cc-skills-sdlc")
+        if cache_root.exists():
+            cache_versions = [p.name for p in cache_root.iterdir() if p.is_dir()]
+            assert src_version in cache_versions, (
+                f"cache drift: source={src_version}, cache has {cache_versions}"
+            )
+            # No stale versions beside the current one.
+            assert cache_versions == [src_version], (
+                f"stale cache dirs remain: {cache_versions}"
+            )
+
+    def test_direct_entry_exception_documented(self):
+        """CLAUDE.md documents the direct-entry exception + dormant gate warning."""
+        claude_md = Path(
+            "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc/CLAUDE.md"
+        )
+        text = claude_md.read_text(encoding="utf-8")
+        assert "Direct-entry exception" in text
+        assert "Stop[3]" in text
+        assert "temporary" in text or "pending dispatch reconciliation" in text
+        assert "Stop_enforce_gate" in text  # dormant gate not to revive
+        assert "task #1053" in text or "#1053" in text
+
+
+# ---------------------------------------------------------------------------
 # Continuation gate: registration check
 # ---------------------------------------------------------------------------
 

@@ -115,6 +115,40 @@ When dispatch is `pi`, the classifier output is resolved through `scripts/adapte
 
 ---
 
+## Continuation Policy: Deterministic Gate vs Native `/goal`
+
+`/go` task-completion is decided by the **deterministic continuation gate**
+(`scripts/go_continuation_gate.py`), registered as a direct project-settings
+Stop hook (`P:/.claude/settings.json` `hooks.Stop[3]`). It reads
+machine-readable `/go` state — not an LLM transcript judgment — so it does not
+inherit the native goal-loop evaluator's intermittent "JSON validation failed"
+failures.
+
+**Policy:**
+
+- **Do not pair native `/goal` with state-expressible `/go` task-completion
+  work.** If the success condition is expressible in `/go` state (phase
+  markers, `.pr_ready`, `.blocked`), let the deterministic gate drive
+  continuation. Setting `/goal` on top re-enables the brittle native evaluator
+  for no benefit.
+- **Use deterministic `/go` state continuation for task-completion goals.**
+- **Use tier-2 review/critic (e.g. `/av`, `/pre-mortem`, pi/GLM reviewers) for
+  fuzzy quality goals** the gate cannot express (subjective correctness,
+  design quality). Those are not state-expressible and legitimately belong to
+  an LLM evaluator — but prefer a dedicated reviewer subagent over the raw
+  native goal loop.
+- **Warn when a setup appears to rely on native `/goal` unnecessarily.** If a
+  `/go` run is active and a state-expressible completion condition is also
+  set as a `/goal`, surface the redundancy: the deterministic gate already
+  covers it.
+
+The gate is **additive** — it does not disable the native evaluator (no plugin
+API exists for that). It coexists as Stop[3] and is self-scoping: when no
+`console_go_*/go` state tree exists, `_find_state_dir()` returns `None` and the
+gate prints nothing, so it is inert in every non-`/go` session.
+
+---
+
 ## Required Environment
 
 ```bash

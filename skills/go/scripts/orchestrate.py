@@ -786,6 +786,24 @@ def task_prompt(task_file: Path) -> str:
         parts.append("     and real registered-dispatch-path smoke.")
         parts.append("  5. Plugin file changes trigger the mutation checklist where applicable:")
         parts.append("     version bump + cache rebuild + scope check before 'done'.")
+    # Phase 6.10: Continuation policy — warn against pairing native /goal with
+    # state-expressible /go task-completion work.
+    _has_completion_pattern = any(kw in _title_obj for kw in (
+        "completion", "task-completion", "run to completion", "until done",
+        "block stopping", "goal loop", "continuation", "pr_ready", "all tasks complete",
+    ))
+    if _has_completion_pattern:
+        parts.append("")
+        parts.append("---")
+        parts.append("Continuation policy (state-expressible /go goal):")
+        parts.append("  This goal is state-expressible. The deterministic /go continuation")
+        parts.append("  gate (scripts/go_continuation_gate.py, Stop[3]) decides completion from")
+        parts.append("  /go state (phase markers, .pr_ready, .blocked) — not an LLM judgment.")
+        parts.append("  Do NOT pair native /goal with this work: it re-enables the brittle")
+        parts.append("  native goal-loop evaluator for no benefit.")
+        parts.append("  Use the deterministic gate for task-completion goals.")
+        parts.append("  Reserve tier-2 review/critic subagents for FUZZY quality goals")
+        parts.append("  the gate cannot express (subjective correctness, design quality).")
     # Phase 6.8: Mutation-plan requirement (explicit field, not inferred).
     if inner.get("requiresMutationPlan"):
         parts.append("")
