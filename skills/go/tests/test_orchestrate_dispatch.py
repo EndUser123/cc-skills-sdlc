@@ -1023,3 +1023,148 @@ def test_preflight_only_still_works_after_phase5(monkeypatch, tmp_path):
     # Phase 4 artifacts: verificationPolicy + verificationSuggestions must be present
     assert "verificationPolicy" in proposal
     assert "verificationSuggestions" in proposal
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.5: worker sees verification policy in prompt
+# ---------------------------------------------------------------------------
+
+
+def test_task_prompt_includes_verification_policy_for_hook_gate(monkeypatch, tmp_path):
+    """Hook/gate task prompt includes direct invocation + negative test expectation."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-vp-55-1")
+    monkeypatch.setenv("TERMINAL_ID", "tid-vp55-1")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-vp55-1")
+
+    active = {
+        "task": {
+            "title": "fix hook gate",
+            "objective": "fix the hook gate change for validation",
+            "verificationPolicy": "hook_gate",
+            "verificationSuggestions": [
+                "python .claude/hooks/<hook>.py < sample.json  # direct hook invocation",
+                "python -m pytest <test_file>.py -q  # targeted negative test",
+                "Verify fail-open/fail-closed: trigger the gate with valid/invalid input",
+            ],
+        }
+    }
+    active_path = tmp_path / "active-task_run-vp-55-1.json"
+    json.dump(active, active_path.open("w"))
+
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "Verification expectations" in prompt
+    assert "Policy: hook_gate" in prompt
+    assert "direct hook invocation" in prompt
+    assert "negative test" in prompt
+    assert "fail-open/fail-closed" in prompt
+
+
+def test_task_prompt_includes_orchestrator_verification(monkeypatch, tmp_path):
+    """/go orchestrator prompt includes CLI smoke + artifact contract expectation."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+
+    active = {
+        "task": {
+            "title": "update orchestrator",
+            "objective": "update the /go common_tail orchestrator",
+            "verificationPolicy": "orchestrator",
+            "verificationSuggestions": [
+                "python skills/go/scripts/orchestrate.py --help  # CLI smoke",
+                "python -m pytest tests/test_orchestrate_dispatch.py -q  # artifact contract test",
+            ],
+        }
+    }
+    active_path = tmp_path / "active-task_orch.json"
+    json.dump(active, active_path.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "Verification expectations" in prompt
+    assert "Policy: orchestrator" in prompt
+    assert "CLI smoke" in prompt
+    assert "artifact contract" in prompt
+
+
+def test_task_prompt_includes_telemetry_verification(monkeypatch, tmp_path):
+    """Telemetry/summarizer prompt includes read-only/idempotence expectation."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+
+    active = {
+        "task": {
+            "title": "add log event",
+            "objective": "add a new telemetry log_event category",
+            "verificationPolicy": "telemetry",
+            "verificationSuggestions": [
+                "python -m pytest <test_file>.py -q  # read-only/idempotence test",
+                "Verify: no mutation, no side effects, no crash on empty data",
+            ],
+        }
+    }
+    active_path = tmp_path / "active-task_tel.json"
+    json.dump(active, active_path.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "Verification expectations" in prompt
+    assert "Policy: telemetry" in prompt
+    assert "read-only/idempotence" in prompt
+
+
+def test_task_prompt_no_verification_section_for_trivial_task(monkeypatch, tmp_path):
+    """Trivial task without verificationPolicy does not add a noisy section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+
+    active = {
+        "task": {
+            "title": "fix typo",
+            "objective": "fix a typo in README.md",
+        }
+    }
+    active_path = tmp_path / "active-task_trivial.json"
+    json.dump(active, active_path.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "Verification expectations" not in prompt
+    assert "Task: fix typo" in prompt
+
+
+def test_task_prompt_existing_content_present_with_verification_section(monkeypatch, tmp_path):
+    """Existing content (title, objective, scope) remains with the verification section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+
+    active = {
+        "task": {
+            "title": "update hook gate",
+            "objective": "fix the hook gate change",
+            "scope_in": [".claude/hooks/Stop_claim_gap_telemetry_probe.py"],
+            "forbidden_files": ["settings.json"],
+            "verificationPolicy": "hook_gate",
+            "verificationSuggestions": [
+                "python .claude/hooks/<hook>.py < sample.json  # direct hook invocation",
+            ],
+        }
+    }
+    active_path = tmp_path / "active-task_existing.json"
+    json.dump(active, active_path.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "Task: update hook gate" in prompt
+    assert "Scope: .claude/hooks/Stop_claim_gap_telemetry_probe.py" in prompt
+    assert "DO NOT modify: settings.json" in prompt
+    assert prompt.find("Task: update hook gate") < prompt.find("Verification expectations")
+    assert "direct hook invocation" in prompt
+
+
+def test_task_prompt_advisory_text_included(monkeypatch, tmp_path):
+    """The advisory note 'treat these as advisory' is included."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+
+    active = {
+        "task": {
+            "title": "update hook",
+            "objective": "fix the hook gate",
+            "verificationPolicy": "hook_gate",
+            "verificationSuggestions": ["python .claude/hooks/<hook>.py < sample.json"],
+        }
+    }
+    active_path = tmp_path / "active-task_adv.json"
+    json.dump(active, active_path.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(active_path)
+    assert "advisory" in prompt.lower()
+    assert "not run" in prompt
+    assert "command evidence" in prompt

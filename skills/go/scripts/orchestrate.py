@@ -572,6 +572,24 @@ def task_prompt(task_file: Path) -> str:
         parts.append(f"- Scope: {item}")
     for item in inner.get("forbidden_files", []):
         parts.append(f"- DO NOT modify: {item}")
+    # Phase 5.5: include the matrix-derived verification expectations so the worker
+    # sees them before implementation. Advisory only — never blocks dispatch.
+    vp = inner.get("verificationPolicy")
+    vs = inner.get("verificationSuggestions")
+    if vs:
+        parts.append("")
+        parts.append("---")
+        parts.append("Verification expectations:")
+        if vp:
+            parts.append(f"  Policy: {vp}")
+        for suggestion in vs:
+            parts.append(f"  - {suggestion}")
+        parts.append(
+            "  Treat these as advisory. Prefer targeted tests over generic pytest. "
+            "If not run, explicitly say not run. "
+            'Do not claim "verified," "tests pass," "fixed," or "works" '
+            "without command evidence."
+        )
     return "\n".join(parts)
 
 
