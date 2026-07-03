@@ -108,9 +108,25 @@ prompts for hook tasks; applies to direct edits too.
 ### Direct-entry exception: `go_continuation_gate.py`
 
 This gate is wired as a **direct project-settings entry**
-(`P:/.claude/settings.json` `hooks.Stop[3]`), NOT through this plugin's
-`hooks/hooks.json` (which is kept at `{"hooks": {}}` — dormant). It is
-self-scoping: `_find_state_dir()` returns `None` and the gate prints nothing
-when no `console_go_*/go` state tree exists, so it is inert in every non-`/go`
-session. It is **additive** to the native goal-loop evaluator — it does not
-replace it.
+(`P:/.claude/settings.json` `hooks.Stop[3]` → source path
+`skills/go/scripts/go_continuation_gate.py`), NOT through this plugin's
+`hooks/hooks.json` (kept at `{"hooks": {}}` — dormant).
+
+- **Why direct-entry:** the gate must run from source so edits take effect
+  without a cache rebuild, and `settings.json` invokes the source path
+  directly (not the version-keyed cache copy).
+- **Self-scoping & fail-silent:** `_find_state_dir()` returns `None` and the
+  gate prints nothing when no `console_go_*/go` state tree exists, so it is
+  inert in every non-`/go` session.
+- **Status: temporary, pending dispatch reconciliation (task #1053).** The
+  chosen end state is either (a) keep this direct entry permanently and
+  document it, or (b) migrate into `hooks/hooks.json` + versioned cache for
+  convention consistency. Not decided here — reviving the plugin dispatcher
+  is a separate, deliberate decision.
+- **Dormant surface NOT to revive:** `skills/go/hooks/Stop_enforce_gate.py`
+  exists and is declared in `skills/go/SKILL.md` frontmatter (`hooks.Stop`),
+  but is **not registered in any live dispatch surface**. It is a separate,
+  unrelated dormant gate. Do not wire it as a side effect of gate work.
+
+The gate is **additive** to the native goal-loop evaluator — it does not
+replace it (no plugin API exists to disable the native evaluator).
