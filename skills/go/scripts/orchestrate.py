@@ -191,6 +191,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Generate a proposal artifact only; do NOT dispatch, verify, or mutate active-task.",
     )
+    parser.add_argument(
+        "--recon-only",
+        action="store_true",
+        help="Force worker to produce a recon/flow artifact and stop. Used to bootstrap the recon-before-dispatch requirement.",
+    )
+    parser.add_argument(
+        "--recon-bypass",
+        action="store_true",
+        help="Skip the recon-before-dispatch requirement. Audit-logged.",
+    )
     parser.add_argument("--plan", help="Path to plan.md")
     parser.add_argument("--tasks", help="Path to tasks.json")
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
@@ -278,8 +288,160 @@ def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
     return state_dir, run_id
 
 
+# NOTE: Not using any existing require_recon() because no equivalent exists in
+# this repo. Searched via `grep -rn "require_recon" P:/packages/.claude-marketplace/plugins/cc-skills-sdlc/skills/go/`
+# on 2026-07-02 — no matches. The CLI flags `--recon-only` and `--recon-bypass`
+# were added in the same patch, so this is a fresh sub-system.
+
+# Fields required in a recon/flow artifact for non-trivial /go tasks. Promoted
+# from the agentic-reliability ladder to prevent "jump straight to coding" on
+# broad, architectural, hook/plugin/router/orchestrator prompts.
+_RECON_REQUIRED_FIELDS: tuple[str, ...] = (
+    "objective",
+    "task_classification",
+    "entrypoint",
+    "call_path",
+    "files_read",
+    "likely_edited_files",
+    "existing_pattern_found",
+    "ownership_layer",
+    "source_vs_test_triage",
+    "risk",
+    "patch_budget",
+    "verification_plan",
+    "skip_reason",
+)
+
+
+class ReconMissingError(Exception):
+    """Raised by require_recon when the required recon artifact is missing/incomplete."""
+
+
+def _classify_prompt_for_recon(prompt: str) -> dict[str, Any]:
+    """Classify whether a --prompt is high-risk (requires recon) or low-risk (skips)."""
+    low = prompt.lower()
+    high_risk_keywords = (
+        "hook", "plugin", "router", "dispatcher", "orchestrator",
+        "/go", "preflight", "stop gate", "pretooluse", "posttooluse",
+        "sessionstart", "userpromptsubmit", "subagentstop",
+        "architecture", "architectural", "broad", "system",
+        "investigate", "audit", "design ", "review ", "diagnos",
+        "refactor", "redesign", "migrat",
+    )
+    low_risk_keywords = (
+        "typo", "rename ", "bump ", "wip", "whitespace",
+        "add a test for", "add a comment",
+    )
+    is_low = any(k in low for k in low_risk_keywords)
+    is_high = any(k in low for k in high_risk_keywords)
+    is_long = len(prompt) >= 240
+    if is_low and not (is_high or is_long):
+        return {"requires_recon": False, "risk_class": "trivial"}
+    if is_high or is_long:
+        return {"requires_recon": True, "risk_class": "high"}
+    return {"requires_recon": False, "risk_class": "moderate"}
+
+
+def _emit_recon_telemetry(
+    event: str, state_dir: Path, run_id: str, extra: dict[str, Any]
+) -> None:
+    """Emit a recon telemetry event to the existing sink. Fail-open."""
+    try:
+        from __lib.agentic_reliability_telemetry import log_event
+        log_event(
+            category="recon_before_dispatch",
+            event=event,
+            gate="recon_before_dispatch",
+            session_id=run_id,
+            terminal_id=_canonical_terminal_id(),
+            decision="telemetry",
+            extra=extra,
+        )
+    except Exception:
+        pass
+
+
+def require_recon(
+    args: argparse.Namespace, state_dir: Path, run_id: str, prompt: str
+) -> None:
+    """For high-risk --prompt tasks, require a recon/flow artifact before
+    load_or_create_task writes the active-task file. Raises ReconMissingError
+    (caller must treat as a block) when the artifact is missing or incomplete.
+    Audit-logs every event to the existing agentic_reliability_telemetry sink.
+    """
+    if getattr(args, "recon_bypass", False):
+        _emit_recon_telemetry(
+            "recon_bypass", state_dir, run_id,
+            {"reason": "explicit_bypass", "prompt_len": len(prompt)},
+        )
+        return
+    classification = _classify_prompt_for_recon(prompt)
+    if not classification["requires_recon"]:
+        return
+    recon_path = state_dir / f"recon_{run_id}.json"
+    if not recon_path.exists():
+        blocked = {
+            "phase": "recon",
+            "reason_code": "missing_recon_artifact",
+            "risk_class": classification["risk_class"],
+            "required_artifact": str(recon_path),
+            "required_fields": list(_RECON_REQUIRED_FIELDS),
+            "message": (
+                "High-risk prompt requires a recon/flow artifact before dispatch. "
+                f"Write {recon_path} with the 13 required fields, "
+                "or pass --recon-bypass to override (audit-logged), "
+                "or pass --recon-only to have the worker produce the artifact."
+            ),
+        }
+        write_json(state_dir / f"blocked_recon_{run_id}.json", blocked)
+        touch(state_dir / f".blocked-recon_{run_id}")
+        _emit_recon_telemetry("recon_missing", state_dir, run_id, blocked)
+        raise ReconMissingError(blocked)
+    try:
+        with open(recon_path, encoding="utf-8") as fh:
+            recon = json.loads(fh.read())
+    except (OSError, json.JSONDecodeError) as exc:
+        blocked = {
+            "phase": "recon",
+            "reason_code": "recon_parse_error",
+            "error": str(exc),
+            "required_artifact": str(recon_path),
+        }
+        write_json(state_dir / f"blocked_recon_{run_id}.json", blocked)
+        touch(state_dir / f".blocked-recon_{run_id}")
+        _emit_recon_telemetry("recon_parse_error", state_dir, run_id, blocked)
+        raise ReconMissingError(blocked)
+    missing = [f for f in _RECON_REQUIRED_FIELDS if f not in recon]
+    if missing:
+        blocked = {
+            "phase": "recon",
+            "reason_code": "recon_incomplete",
+            "missing_fields": missing,
+            "required_artifact": str(recon_path),
+        }
+        write_json(state_dir / f"blocked_recon_{run_id}.json", blocked)
+        touch(state_dir / f".blocked-recon_{run_id}")
+        _emit_recon_telemetry("recon_incomplete", state_dir, run_id, blocked)
+        raise ReconMissingError(blocked)
+    write_json(
+        state_dir / f"recon-validated_{run_id}.json",
+        {"recon_artifact": str(recon_path), "validated_at": now_utc_z()},
+    )
+    _emit_recon_telemetry(
+        "recon_validated", state_dir, run_id,
+        {"artifact": str(recon_path), "risk_class": classification["risk_class"]},
+    )
+
+
 def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     if args.prompt:
+        # Recon-before-dispatch gate (Phase 1 of agentic-reliability ladder).
+        # Blocks dispatch for high-risk prompts until a recon artifact exists.
+        if not getattr(args, "preflight_only", False) and not getattr(args, "recon_only", False):
+            try:
+                require_recon(args, state_dir, run_id, args.prompt)
+            except ReconMissingError:
+                return None
         explicit_verification = os.environ.get("GO_DEFAULT_VERIFICATION_COMMANDS", "").strip()
         verification_commands = default_verification_commands()
         if os.environ.get("GO_REQUIRE_EXPLICIT_VERIFICATION") == "1" and not explicit_verification:

@@ -755,3 +755,122 @@ def test_diagnose_prompts_get_evidence_ledger_suggestion():
         assert "evidence ledger" in joined, (
             f"diagnose prompt should mention evidence ledger: {prompt!r} → {d['verify']!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Recon-before-dispatch (Phase 1 of /go reliability ladder)
+# ---------------------------------------------------------------------------
+
+def _recon_full(run_id: str) -> dict:
+    """Build a fully-populated recon artifact for tests."""
+    base = {f: f"value-{f}" for f in _ORCHESTRATE._RECON_REQUIRED_FIELDS}
+    base["_meta"] = {"run_id": run_id}
+    return base
+
+
+def test_recon_required_fields_constant_completeness():
+    """The 13 recon fields the directive specified are all present and non-empty."""
+    expected_fields = (
+        "objective", "task_classification", "entrypoint", "call_path",
+        "files_read", "likely_edited_files", "existing_pattern_found",
+        "ownership_layer", "source_vs_test_triage", "risk", "patch_budget",
+        "verification_plan", "skip_reason",
+    )
+    assert _ORCHESTRATE._RECON_REQUIRED_FIELDS == expected_fields
+    assert len(_ORCHESTRATE._RECON_REQUIRED_FIELDS) == 13
+    for f in _ORCHESTRATE._RECON_REQUIRED_FIELDS:
+        assert isinstance(f, str) and f.strip(), f"field {f!r} is empty/whitespace"
+
+
+def test_recon_trivial_prompt_skips_recon(monkeypatch, tmp_path):
+    """Trivial bounded prompts (typo, rename, bump) do not require recon."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-trivial")
+    args = _ORCHESTRATE.parse_args(["--prompt", "fix a typo in README"])
+    # Should NOT raise; recon is not required for trivial.
+    _ORCHESTRATE.require_recon(args, tmp_path, "run-trivial", "fix a typo in README")
+    assert not (tmp_path / "blocked_recon_run-trivial.json").exists()
+
+
+def test_recon_high_risk_prompt_blocks_without_artifact(monkeypatch, tmp_path):
+    """High-risk prompt without a recon file → returns None + writes blocked sentinel."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-hr")
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router for the /go orchestrator"])
+    # Capture the exception to verify the block path
+    try:
+        _ORCHESTRATE.require_recon(args, tmp_path, "run-hr", "design a new plugin router for the /go orchestrator")
+        raise AssertionError("require_recon should have raised ReconMissingError")
+    except _ORCHESTRATE.ReconMissingError as exc:
+        assert "missing_recon_artifact" in str(exc) or "missing_recon_artifact" in str(exc.args[0])
+    blocked = json.loads((tmp_path / "blocked_recon_run-hr.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "missing_recon_artifact"
+    assert "objective" in blocked["required_fields"]
+    assert (tmp_path / ".blocked-recon_run-hr").exists()
+
+
+def test_recon_high_risk_prompt_passes_with_full_artifact(monkeypatch, tmp_path):
+    """A high-risk prompt WITH a complete recon artifact passes the gate."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-ok")
+    (tmp_path / "recon_run-ok.json").write_text(
+        json.dumps(_recon_full("run-ok")), encoding="utf-8"
+    )
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router for the /go orchestrator"])
+    _ORCHESTRATE.require_recon(args, tmp_path, "run-ok", "design a new plugin router for the /go orchestrator")
+    assert not (tmp_path / "blocked_recon_run-ok.json").exists()
+    assert (tmp_path / "recon-validated_run-ok.json").exists()
+
+
+def test_recon_incomplete_artifact_blocks(monkeypatch, tmp_path):
+    """Recon file missing required fields → blocks with reason_code recon_incomplete."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-incomplete")
+    partial = _recon_full("run-incomplete")
+    del partial["verification_plan"]  # missing field
+    (tmp_path / "recon_run-incomplete.json").write_text(
+        json.dumps(partial), encoding="utf-8"
+    )
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router for the /go orchestrator"])
+    try:
+        _ORCHESTRATE.require_recon(args, tmp_path, "run-incomplete", "design a new plugin router for the /go orchestrator")
+        raise AssertionError("require_recon should have raised")
+    except _ORCHESTRATE.ReconMissingError as exc:
+        blocked = exc.args[0]
+    assert blocked["reason_code"] == "recon_incomplete"
+    assert "verification_plan" in blocked["missing_fields"]
+
+
+def test_recon_bypass_skips_requirement(monkeypatch, tmp_path):
+    """--recon-bypass flag skips the requirement regardless of risk class."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-bypass")
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router", "--recon-bypass"])
+    _ORCHESTRATE.require_recon(args, tmp_path, "run-bypass", "design a new plugin router")
+    # No block file, no missing-recon exception.
+    assert not (tmp_path / "blocked_recon_run-bypass.json").exists()
+
+
+def test_load_or_create_task_blocks_high_risk_without_recon(monkeypatch, tmp_path):
+    """load_or_create_task returns None for high-risk prompts without a recon file."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-load-block")
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router for the /go orchestrator"])
+    result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-load-block")
+    assert result is None
+    assert (tmp_path / "blocked_recon_run-load-block.json").exists()
+    # active-task must NOT exist (the whole point of the block).
+    assert not (tmp_path / "active-task_run-load-block.json").exists()
+
+
+def test_load_or_create_task_dispatches_with_recon(monkeypatch, tmp_path):
+    """load_or_create_task proceeds normally when recon is present for high-risk."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUN_ID", "run-load-ok")
+    (tmp_path / "recon_run-load-ok.json").write_text(
+        json.dumps(_recon_full("run-load-ok")), encoding="utf-8"
+    )
+    args = _ORCHESTRATE.parse_args(["--prompt", "design a new plugin router for the /go orchestrator"])
+    result = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-load-ok")
+    assert result is not None
+    assert (tmp_path / "active-task_run-load-ok.json").exists()
