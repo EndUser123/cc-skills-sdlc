@@ -137,128 +137,131 @@ class TestThoughtPartnerPromptRendering:
 # ---------------------------------------------------------------------------
 
 class TestContinuationGate:
-    """Session-bound, multi-terminal safe, stale-immune Stop contract."""
+    """Pointer-bound, session-id-only, stale-immune Stop contract."""
 
     @pytest.fixture
-    def go_env(self, tmp_path, monkeypatch):
-        """Point the gate at a temp artifacts root + set a terminal identity."""
+    def gate_env(self, tmp_path, monkeypatch):
+        """Set up pointer dir + state dir, patch ARTIFACTS_ROOT."""
         import go_continuation_gate as mod
         monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
-        tid = "console_test_tid"
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", tid)
-        state_dir = tmp_path / tid / "go"
+        sessions_dir = tmp_path / "go-sessions"
+        sessions_dir.mkdir(parents=True)
+        state_dir = tmp_path / "state" / "go"
         state_dir.mkdir(parents=True)
-        return mod, tid, state_dir
+        return mod, sessions_dir, state_dir
 
-    def _fresh_task(self, state_dir, run_id="run1", session_id="", title="t"):
+    def _write_pointer(self, sessions_dir, session_id, state_dir, run_id="run1"):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        (sessions_dir / f"{session_id}.json").write_text(json.dumps({
+            "go_state_dir": str(state_dir),
+            "run_id": run_id,
+            "updated_at": now,
+        }), encoding="utf-8")
+
+    def _write_task(self, state_dir, run_id="run1", title="t", status="selected"):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
         (state_dir / f"active-task_{run_id}.json").write_text(json.dumps({
-            "run_id": run_id,
-            "terminal_id": "console_test_tid",
-            "session_id": session_id,
+            "run_id": run_id, "session_id": "",
             "selected_at": now, "created_at": now, "updated_at": now, "state_version": 1,
-            "task": {"title": title, "status": "selected"},
+            "task": {"title": title, "status": status},
         }), encoding="utf-8")
 
-    def test_no_state_returns_none(self, go_env):
-        """No bound state dir / not a /go terminal -> None."""
-        mod, tid, _ = go_env
-        assert mod.check_go_completion({"session_id": "s1"}) is None
+    def test_no_session_id_silent(self, gate_env):
+        """No session_id in payload -> None (absent identity)."""
+        mod, _, _ = gate_env
+        assert mod.check_go_completion({}) is None
+        assert mod.check_go_completion({"session_id": ""}) is None
 
-    def test_matching_active_state_blocks(self, go_env):
-        """Fresh in-identity run with .blocked -> block dict."""
-        mod, tid, sd = go_env
-        self._fresh_task(sd, "run1", title="fix hook gate")
-        (sd / ".blocked_run1").touch()
-        (sd / "blocked_blocked_run1.json").write_text(
-            json.dumps({"reason_code": "dispatch_failed"}), encoding="utf-8")
-        r = mod.check_go_completion({"session_id": ""})
+    def test_no_pointer_silent(self, gate_env):
+        """session_id with no pointer file -> None."""
+        mod, _, _ = gate_env
+        assert mod.check_go_completion({"session_id": "no-such-id"}) is None
+
+    def test_matching_active_blocks(self, gate_env):
+        """Pointer -> state dir -> active task (not done) -> BLOCK."""
+        mod, sd, td = gate_env
+        self._write_pointer(sd, "sess-aaa", td, "run1")
+        self._write_task(td, "run1", title="fix hook gate")
+        r = mod.check_go_completion({"session_id": "sess-aaa"})
+        assert r is not None
         assert r["decision"] == "block"
         assert "continue:" in r["reason"]
-        assert "dispatch_failed" in r["reason"]
+        assert "fix hook gate" in r["reason"]
 
-    def test_matching_done_state_silent(self, go_env):
-        """Fresh in-identity run with .pr_ready -> None (NOT approve)."""
-        mod, tid, sd = go_env
-        self._fresh_task(sd, "run1")
-        (sd / ".pr_ready_run1").touch()
-        assert mod.check_go_completion({"session_id": ""}) is None
+    def test_matching_done_silent(self, gate_env):
+        """Pointer -> active task with .pr_ready -> None (done, silent)."""
+        mod, sd, td = gate_env
+        self._write_pointer(sd, "sess-aaa", td, "run1")
+        self._write_task(td, "run1")
+        (td / ".pr_ready_run1").touch()
+        assert mod.check_go_completion({"session_id": "sess-aaa"}) is None
 
-    def test_foreign_terminal_state_silent(self, tmp_path, monkeypatch):
-        """State under a DIFFERENT terminal dir is invisible to this gate."""
-        import go_continuation_gate as mod
-        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_THIS")
-        # State lives under a FOREIGN terminal.
-        foreign = tmp_path / "console_FOREIGN" / "go"
-        foreign.mkdir(parents=True)
-        self._fresh_task(foreign, "run1")
-        (foreign / ".blocked_run1").touch()
-        # This terminal has no state dir at all -> silent.
-        assert mod.check_go_completion({"session_id": ""}) is None
+    def test_matching_done_status_silent(self, gate_env):
+        """Pointer -> active task with status=completed -> None."""
+        mod, sd, td = gate_env
+        self._write_pointer(sd, "sess-aaa", td, "run1")
+        self._write_task(td, "run1", status="completed")
+        assert mod.check_go_completion({"session_id": "sess-aaa"}) is None
 
-    def test_foreign_session_state_silent(self, go_env):
-        """Same terminal, recorded session differs from payload -> foreign -> silent."""
-        mod, tid, sd = go_env
-        self._fresh_task(sd, "run1", session_id="RECORDED")
-        (sd / ".blocked_run1").touch()
-        # Payload carries a different session_id -> record excluded -> no candidates -> silent.
-        assert mod.check_go_completion({"session_id": "OTHER"}) is None
+    def test_foreign_session_silent(self, gate_env):
+        """Pointer for session X; payload carries session Y -> None."""
+        mod, sd, td = gate_env
+        self._write_pointer(sd, "sess-aaa", td, "run1")
+        self._write_task(td, "run1")
+        assert mod.check_go_completion({"session_id": "sess-bbb"}) is None
 
-    def test_stale_incomplete_state_silent(self, go_env):
-        """Incomplete state older than TTL -> silent (never block)."""
-        mod, tid, sd = go_env
+    def test_stale_pointer_silent(self, gate_env):
+        """Pointer updated >6h ago -> None (abandoned run)."""
+        mod, sd, td = gate_env
         from datetime import datetime, timezone, timedelta
         old = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
-        (sd / "active-task_run1.json").write_text(json.dumps({
-            "run_id": "run1", "session_id": "", "updated_at": old,
-            "task": {"title": "stale", "status": "selected"},
+        (sd / "sess-aaa.json").write_text(json.dumps({
+            "go_state_dir": str(td), "run_id": "run1", "updated_at": old,
         }), encoding="utf-8")
-        (sd / ".blocked_run1").touch()
-        assert mod.check_go_completion({"session_id": ""}) is None
+        self._write_task(td, "run1")
+        assert mod.check_go_completion({"session_id": "sess-aaa"}) is None
 
-    def test_two_terminals_do_not_cross_block(self, tmp_path, monkeypatch):
-        """Two concurrent /go states in separate terminals must not interfere."""
-        import go_continuation_gate as mod
-        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
-        # Terminal A: blocked run.
-        a = tmp_path / "console_A" / "go"; a.mkdir(parents=True)
-        self._fresh_task(a, "runA")
-        (a / ".blocked_runA").touch()
-        # Terminal B: clean (done).
-        b = tmp_path / "console_B" / "go"; b.mkdir(parents=True)
-        self._fresh_task(b, "runB")
-        (b / ".pr_ready_runB").touch()
-        # Gate running in terminal B must NOT see terminal A's block.
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_B")
-        assert mod.check_go_completion({"session_id": ""}) is None
-        # Gate running in terminal A MUST block.
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_A")
-        r = mod.check_go_completion({"session_id": ""})
-        assert r is not None and r["decision"] == "block"
+    def test_two_sessions_no_cross_block(self, gate_env):
+        """Two concurrent sessions with separate pointers -> no cross-block."""
+        mod, sd, td = gate_env
+        # Session A: active (should block).
+        td_a = td / "a"; td_a.mkdir()
+        self._write_pointer(sd, "sess-A", td_a, "runA")
+        self._write_task(td_a, "runA", title="session A work")
+        # Session B: done (should be silent).
+        td_b = td / "b"; td_b.mkdir()
+        self._write_pointer(sd, "sess-B", td_b, "runB")
+        self._write_task(td_b, "runB")
+        (td_b / ".pr_ready_runB").touch()
+        # Gate for session A blocks.
+        r_a = mod.check_go_completion({"session_id": "sess-A"})
+        assert r_a is not None and r_a["decision"] == "block"
+        # Gate for session B is silent.
+        assert mod.check_go_completion({"session_id": "sess-B"}) is None
 
-    def test_ambiguous_identity_silent(self, go_env):
-        """No session_id + multiple active-task files -> ambiguous -> silent."""
-        mod, tid, sd = go_env
-        self._fresh_task(sd, "run1")
-        self._fresh_task(sd, "run2")
-        (sd / ".blocked_run2").touch()
-        assert mod.check_go_completion({"session_id": ""}) is None
+    def test_blocked_refines_reason(self, gate_env):
+        """.blocked_* present refines the 'continue:' reason string."""
+        mod, sd, td = gate_env
+        self._write_pointer(sd, "sess-aaa", td, "run1")
+        self._write_task(td, "run1", title="deploy")
+        (td / ".blocked_run1").touch()
+        (td / "blocked_blocked_run1.json").write_text(
+            json.dumps({"reason_code": "dispatch_failed"}), encoding="utf-8")
+        r = mod.check_go_completion({"session_id": "sess-aaa"})
+        assert r is not None and "dispatch_failed" in r["reason"]
 
-    def test_no_machine_wide_mtime_selection(self, tmp_path, monkeypatch):
-        """A NEWER foreign-terminal run must never be selected by this gate."""
-        import go_continuation_gate as mod, os, time
-        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_THIS")
-        # This terminal: no state.
-        # Foreign terminal: a very-recent blocked run (newest mtime machine-wide).
-        foreign = tmp_path / "console_FOREIGN" / "go"; foreign.mkdir(parents=True)
-        self._fresh_task(foreign, "runF")
-        (foreign / ".blocked_runF").touch()
-        time.sleep(0.01)
-        os.utime(foreign / "active-task_runF.json", None)  # bump mtime to newest
-        assert mod.check_go_completion({"session_id": ""}) is None
+    def test_no_env_identity_or_mtime_binding(self):
+        """Grep gate source: no os.environ or mtime used for identity binding."""
+        gate_src = Path(__file__).resolve().parent.parent / "scripts" / "go_continuation_gate.py"
+        text = gate_src.read_text(encoding="utf-8")
+        # No _terminal_id, no WT_SESSION, no os.environ.get for identity.
+        assert "_terminal_id" not in text
+        assert "WT_SESSION" not in text
+        assert "os.environ.get" not in text
+        # No mtime-based selection.
+        assert "st_mtime" not in text
 
 
 class TestContinuationGateContract:
@@ -272,7 +275,6 @@ class TestContinuationGateContract:
             p = subprocess.run(
                 [sys.executable, str(gate)],
                 input=payload, capture_output=True, text=True,
-                env={**__import__("os").environ, "CLAUDE_TERMINAL_ID": "console_definitely_unused"},
             )
             return p.stdout, p.stderr, p.returncode
         return _run

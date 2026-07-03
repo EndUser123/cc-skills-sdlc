@@ -23,6 +23,31 @@ from typing import Any, Sequence
 VALID_DISPATCHES = ("pi", "claude", "local")
 SKILL_DIR = Path(__file__).resolve().parents[1]
 PLUGIN_ROOT = SKILL_DIR.parent.parent
+ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
+
+_TRANSCRIPT_PATH_FILE = Path.home() / "claude-log.transcript_path.txt"
+
+
+def resolve_session_id() -> str:
+    """Resolve the current Claude Code session ID from the transcript path.
+
+    The UserPromptSubmit log_hook writes ~/claude-log.transcript_path.txt
+    before any skill invocation. The filename is {session_uuid}.jsonl.
+    This is more reliable than CLAUDE_SESSION_ID env (empty in many
+    subprocess contexts). Falls back to env if the file is missing/empty.
+    """
+    # Primary: extract UUID from transcript filename.
+    try:
+        tp = _TRANSCRIPT_PATH_FILE.read_text(encoding="utf-8").strip()
+        if tp:
+            uuid = Path(tp).stem  # d6b4c348-2978-4347-8335-fefa15365fd8
+            if uuid and len(uuid) >= 36 and "-" in uuid:
+                return uuid
+    except (OSError, ValueError):
+        pass
+    # Fallback: env (often empty in subprocesses, but harmless to try).
+    return os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_AGENT_SESSION_ID") or ""
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
@@ -241,6 +266,25 @@ def run_script(
     return result.returncode
 
 
+
+def write_session_pointer(state_dir: Path, run_id: str, session_id: str) -> None:
+    """Write the session pointer that go_continuation_gate reads.
+
+    Pointer: {artifacts}/go-sessions/{session_id}.json -> {go_state_dir, run_id, updated_at}
+    Atomic write (tmp + replace). Overwritten on new run in the same session.
+    The gate resolves session_id -> pointer -> state dir ONLY (no env, no mtime).
+    """
+    if not session_id:
+        return  # cannot write a pointer without a session identity
+    ptr_path = ARTIFACTS_ROOT / 'go-sessions' / f'{session_id}.json'
+    write_json(ptr_path, {
+        'go_state_dir': str(state_dir.resolve()),
+        'run_id': run_id,
+        'updated_at': now_utc_z(),
+    })
+
+
+
 def phase_marker(state_dir: Path, phase: str, run_id: str) -> Path:
     p = state_dir / f".{phase}_{run_id}"
     touch(p)
@@ -329,7 +373,7 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
     task_data: dict[str, Any] = {
         "run_id": run_id,
         "terminal_id": terminal_id,
-        "session_id": os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_AGENT_SESSION_ID") or "",
+        "session_id": resolve_session_id(),
         "selected_at": selected_at,
         "created_at": selected_at,
         "updated_at": selected_at,
@@ -351,6 +395,7 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
         },
     }
     write_json(state_dir / f"active-task_{run_id}.json", task_data)
+    write_session_pointer(state_dir, run_id, task_data.get("session_id", ""))
     phase_marker(state_dir, "task-selected", run_id)
     return TaskContract.from_active_task(task_data)
 
@@ -549,7 +594,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
         task_data: dict[str, Any] = {
             "run_id": run_id,
             "terminal_id": terminal_id,
-            "session_id": os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_AGENT_SESSION_ID") or "",
+            "session_id": resolve_session_id(),
             "selected_at": selected_at,
             "created_at": selected_at,
             "updated_at": selected_at,
@@ -623,6 +668,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             # Verification plan is advisory; never block dispatch on import/parse failure.
             pass
         write_json(state_dir / f"active-task_{run_id}.json", task_data)
+        write_session_pointer(state_dir, run_id, task_data.get("session_id", ""))
         phase_marker(state_dir, "task-selected", run_id)
     elif args.plan:
         task = create_plan_task(args, state_dir, run_id)
