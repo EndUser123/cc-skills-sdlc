@@ -592,6 +592,11 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                         task_data["task"]["requiresMutationPlan"] = True
                         task_data["task"]["mutationPlanReason"] = _mp_result["reason"]
                         task_data["task"]["mutationPlanKinds"] = _mp_result["kinds"]
+                _ps = getattr(_preflight, "parallel_strategy_for_task", None)
+                if _ps:
+                    _ps_result = _ps(args.prompt)
+                    if _ps_result.get("recommended"):
+                        task_data["task"]["parallelStrategy"] = _ps_result
         except Exception:
             # Verification plan is advisory; never block dispatch on import/parse failure.
             pass
@@ -761,6 +766,23 @@ def task_prompt(task_file: Path) -> str:
         parts.append("  Do NOT mutate files outside the permitted fence.")
         parts.append("  Rollback if verification or fence checks fail.")
         parts.append("  If DONE is claimed but no valid mutation-plan exists, the phase is NOT complete.")
+    # Phase 7: Parallel strategy advisory.
+    ps = inner.get("parallelStrategy")
+    if ps and ps.get("recommended"):
+        parts.append("")
+        parts.append("---")
+        parts.append("Safe parallelism:")
+        parts.append("  Use non-mutating parallel agents by default for the lanes below if available.")
+        parts.append("  Do not let parallel agents mutate the shared tree.")
+        parts.append("  Parent owns final patch and verification.")
+        parts.append("")
+        parts.append(f"  Mode: {ps.get('mode', 'analysis-parallel-mutation-serialized')}")
+        parts.append(f"  Mutation policy: {ps.get('mutationPolicy', 'serialized')}")
+        parts.append(f"  Overhead risk: {ps.get('overheadRisk', 'low')}")
+        parts.append("")
+        parts.append("  Lanes:")
+        for lane in ps.get("lanes", []):
+            parts.append(f"    {lane['name']}: {lane['purpose']} -> {lane['output']}")
     return "\n".join(parts)
 
 
