@@ -1294,3 +1294,65 @@ def test_task_prompt_fmm_partial_fields_handled(monkeypatch, tmp_path):
     # Missing sections should not appear
     assert "Required recon" not in prompt
     assert "Search/read evidence" not in prompt
+
+
+def test_task_prompt_renders_secondary_safeguard_rows(monkeypatch, tmp_path):
+    """Secondary rows from failure_mode_guidance_all render as 'Additional safeguards'."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "review hook telemetry",
+            "objective": "review",
+            "failureModeGuidance": {
+                "failure_modes": ["Reviewing prompt text only"],
+                "required_recon": ["Read actual files"],
+                "search_evidence": ["grep claims"],
+                "negative_tests": ["Each claim cites file:line"],
+                "claim_requirements": ["Evidence ledger required"],
+                "secondary": [
+                    {
+                        "failure_modes": ["Invalid JSON output shape"],
+                        "required_recon": ["Read hook dispatcher"],
+                        "search_evidence": ["grep settings.json"],
+                        "negative_tests": ["Direct invocation test"],
+                        "claim_requirements": ["Show stdout"],
+                    }
+                ],
+            },
+        }
+    }
+    p = tmp_path / "active-task_sec.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Common failure modes" in prompt
+    assert "Additional safeguards" in prompt
+    assert "Invalid JSON output shape" in prompt
+    assert "Direct invocation test" in prompt
+    # Secondary comes after primary
+    primary_idx = prompt.index("Common failure modes")
+    sec_idx = prompt.index("Additional safeguards")
+    assert sec_idx > primary_idx
+
+
+def test_task_prompt_no_secondary_when_empty(monkeypatch, tmp_path):
+    """Empty secondary list does not produce 'Additional safeguards' section."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    active = {
+        "task": {
+            "title": "fix hook",
+            "objective": "fix",
+            "failureModeGuidance": {
+                "failure_modes": ["Invalid JSON"],
+                "required_recon": ["Read dispatcher"],
+                "search_evidence": ["grep"],
+                "negative_tests": ["Direct invocation"],
+                "claim_requirements": ["Show stdout"],
+                "secondary": [],
+            },
+        }
+    }
+    p = tmp_path / "active-task_sec.json"
+    json.dump(active, p.open("w"))
+    prompt = _ORCHESTRATE.task_prompt(p)
+    assert "Common failure modes" in prompt
+    assert "Additional safeguards" not in prompt

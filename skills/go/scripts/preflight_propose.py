@@ -255,6 +255,54 @@ def failure_mode_guidance(prompt: str) -> dict[str, list[str]] | None:
     }
 
 
+def failure_mode_guidance_all(prompt: str) -> dict[str, list[str]] | None:
+    """Like failure_mode_guidance() but includes up to 2 secondary rows.
+
+    Returns a dict with the same keys as failure_mode_guidance() for the
+    primary match, plus a "secondary" key containing a list of dicts with
+    the same shape for up to 2 additional matching rows.
+
+    Trivial/unmatched prompts return None (no noise).
+    Secondary rows are capped at 2 and ordered by keyword hit count
+    (most-relevant first).  The hook/gate row is excluded from secondaries
+    when it would be a secondary (it is the broadest and least useful as
+    additional context).
+    """
+    primary = failure_mode_guidance(prompt)
+    if primary is None:
+        return None
+
+    p = " ".join(prompt.split()).strip().lower()
+    _HOOK_GATE_IDX = 0
+
+    # Collect all rows with hits, excluding the one that won primary.
+    primary_fms = primary["failure_modes"]
+    candidates = []  # (score, idx, row)
+    for idx, row in enumerate(_FAILURE_MODE_MATRIX):
+        if row[1] == primary_fms:
+            continue
+        hits = sum(1 for kw in row[0] if kw in p)
+        if hits > 0:
+            candidates.append((hits, idx, row))
+
+    # Sort by score descending, then by specificity (prefer non-hook/gate)
+    candidates.sort(key=lambda t: (-t[0], 0 if t[1] != _HOOK_GATE_IDX else 1))
+
+    secondary = []
+    for _score, _idx, row in candidates[:2]:
+        secondary.append({
+            "failure_modes": row[1],
+            "required_recon": row[2],
+            "search_evidence": row[3],
+            "negative_tests": row[4],
+            "claim_requirements": row[5],
+        })
+
+    result = dict(primary)
+    result["secondary"] = secondary
+    return result
+
+
 def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
 

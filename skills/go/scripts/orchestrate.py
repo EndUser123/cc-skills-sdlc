@@ -494,7 +494,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                 _vp = _policy_key(_rewritten)
                 if _vp is not None:
                     task_data["task"]["verificationPolicy"] = _vp
-                _fmm = getattr(_preflight, "failure_mode_guidance", None)
+                _fmm = getattr(_preflight, "failure_mode_guidance_all", None)
                 if _fmm:
                     _fmm_result = _fmm(args.prompt)
                     if _fmm_result:
@@ -619,6 +619,20 @@ def task_prompt(task_file: Path) -> str:
             parts.append("Completion claim requirements:")
             for item in fmm["claim_requirements"]:
                 parts.append(f"  - {item}")
+        # Secondary safeguard rows (multi-type prompts).
+        for sec in fmm.get("secondary", []):
+            parts.append("")
+            parts.append("Additional safeguards (secondary task type):")
+            for fm in sec.get("failure_modes", []):
+                parts.append(f"  - {fm}")
+            if sec.get("negative_tests"):
+                parts.append("  Key tests:")
+                for item in sec["negative_tests"]:
+                    parts.append(f"    - {item}")
+            if sec.get("claim_requirements"):
+                parts.append("  Claim requirements:")
+                for item in sec["claim_requirements"]:
+                    parts.append(f"    - {item}")
     return "\n".join(parts)
 
 
