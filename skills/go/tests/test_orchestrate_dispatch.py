@@ -758,6 +758,71 @@ def test_diagnose_prompts_get_evidence_ledger_suggestion():
 
 
 # ---------------------------------------------------------------------------
+# Phase 4: Verification Policy Matrix behavior tests
+# ---------------------------------------------------------------------------
+
+def test_hook_gate_prompt_suggests_direct_invocation_and_negative_test():
+    """Hook/gate change → direct hook invocation + negative test."""
+    d = _classify("please create a new PreToolUse gate for checking session drift")
+    joined = "\n".join(d["verify"]).lower()
+    assert "direct hook invocation" in joined, f"hook/gate should suggest direct hook invocation: {d['verify']!r}"
+    assert "negative test" in joined, f"hook/gate should suggest negative test: {d['verify']!r}"
+
+
+def test_orchestrator_prompt_suggests_cli_smoke_and_artifact_contract():
+    """/go orchestrator change → CLI smoke + artifact contract test."""
+    d = _classify("update the /go run_common_tail to add a new verification step")
+    joined = "\n".join(d["verify"]).lower()
+    assert "cli smoke" in joined, f"orchestrator should suggest CLI smoke: {d['verify']!r}"
+    assert "artifact contract" in joined, f"orchestrator should suggest artifact contract: {d['verify']!r}"
+
+
+def test_classifier_prompt_suggests_table_driven_and_mutation():
+    """Classifier/heuristic change → table-driven tests + mutation/sentinel check."""
+    d = _classify("update the classify_dispatch heuristic to handle a new task family")
+    joined = "\n".join(d["verify"]).lower()
+    assert "table-driven behavior test" in joined, f"classifier should suggest table-driven tests: {d['verify']!r}"
+    assert "mutation/sentinel" in joined, f"classifier should suggest mutation/sentinel: {d['verify']!r}"
+
+
+def test_telemetry_prompt_suggests_read_only_idempotence():
+    """Telemetry/summarizer change → read-only/idempotence test."""
+    d = _classify("add a new agentic_reliability_telemetry log_event category")
+    joined = "\n".join(d["verify"]).lower()
+    assert "read-only/idempotence" in joined, f"telemetry should suggest read-only/idempotence: {d['verify']!r}"
+
+
+def test_review_audit_prompt_does_not_get_default_pytest():
+    """Review/audit prompts should NOT default to pytest (should get evidence-ledger)."""
+    d = _classify("critically review the findings on the hook change")
+    joined = "\n".join(d["verify"]).lower()
+    assert "pytest" not in joined, f"review prompt should NOT get pytest: {d['verify']!r}"
+    assert "evidence ledger" in joined, f"review prompt should get evidence ledger: {d['verify']!r}"
+
+
+def test_claim_validation_prompt_suggests_positive_negative_and_hedge():
+    """Claim/validation gate change → positive case + negative case + hedge suppression."""
+    d = _classify("update the claim-honesty validation hook to catch more patterns")
+    joined = "\n".join(d["verify"]).lower()
+    assert "positive case" in joined, f"claim/gate should suggest positive case: {d['verify']!r}"
+    assert "not run" in joined or "hedg" in joined, f"claim/gate should mention hedge/not-run: {d['verify']!r}"
+
+
+# Sentinel test: catching a classifier inversion
+# If classify_dispatch were inverted (broad→local), the table-driven test would
+# fail because a broad prompt would get local-eligible dispatch instead of pi.
+# This sentinel proves the table-driven behavior test catches inversions.
+def test_sentinel_classifier_inversion_caught_by_table_driven_tests():
+    """Sentinel: classifier inversion would be caught by existing table-driven tests."""
+    # The heuristic tuning tests already assert broad prompts → pi + reqAppr=true.
+    # If the classifier inverted (e.g. a code bug made "audit" return local),
+    # test_broad_executable_tasks_still_require_approval would fail.
+    d = _classify("audit the SessionStart hook drift")
+    assert d["dispatch"] == "pi", f"sentinel: audit prompt must be pi (not local): {d['dispatch']}"
+    assert d["reqAppr"] is True, f"sentinel: audit prompt must require approval"
+
+
+# ---------------------------------------------------------------------------
 # Recon-before-dispatch (Phase 1 of /go reliability ladder)
 # ---------------------------------------------------------------------------
 

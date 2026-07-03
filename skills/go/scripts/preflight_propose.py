@@ -64,6 +64,69 @@ _PATH_LIKE = re.compile(r"[\w./\\-]+\.(?:py|js|ts|md|json|toml|yaml|yml|sh)\b")
 _REVIEW_DECISION_MARKERS = ("review", "critique", "critically", "audit ", "evaluat", "optimal")
 _EVIDENCE_LEDGER_MARKERS = ("diagnos", "investigat", "root cause", "rca")
 
+# Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
+# verification modes that should be suggested. Each entry is (keyword, suggestions).
+# The suggestions override the generic keyword checks in verification_suggestions.
+# Only matched when the prompt contains the keyword; if none match, normal fallback.
+_VERIFICATION_POLICY_MATRIX: list[tuple[tuple[str, ...], list[str], str]] = [
+    # (keywords, suggestions, note_key)
+    (
+        ("hook change", "gate change", "stop gate", "pretooluse", "posttooluse",
+         "pre tool use", "post tool use", "sessionstart"),
+        [
+            "python .claude/hooks/<hook>.py < sample.json  # direct hook invocation",
+            "python -m pytest <test_file>.py -q  # targeted negative test",
+            "Verify fail-open/fail-closed: trigger the gate with valid/invalid input",
+        ],
+        "hook_gate",
+    ),
+    (
+        ("/go change", "orchestrator change", "orchestrate.py", "common_tail"),
+        [
+            "python skills/go/scripts/orchestrate.py --help  # CLI smoke",
+            "python -m pytest tests/test_orchestrate_dispatch.py -q  # artifact contract test",
+            "No-dispatch/no-mutation assertion: confirm active-task is NOT mutated by dry-run",
+        ],
+        "orchestrator",
+    ),
+    (
+        ("classifier change", "heuristic change", "classify_dispatch", "rewrite_goal",
+         "verification_suggestion", "prompt classification", "preflight propose"),
+        [
+            "python -m pytest <test_file>.py -q  # table-driven behavior tests",
+            "Add at least one mutation/sentinel: invert a classifier branch and confirm tests fail",
+        ],
+        "classifier",
+    ),
+    (
+        ("telemetry change", "summarizer change", "telemetry summarizer", "log_event"),
+        [
+            "python -m pytest <test_file>.py -q  # read-only/idempotence test",
+            "Verify: no mutation, no side effects, no crash on empty data",
+        ],
+        "telemetry",
+    ),
+    (
+        ("claim change", "validation change", "claim-honesty", "evidence hook",
+         "claim gap", "unverified claim"),
+        [
+            "python <hook>.py < sample.json  # positive case",
+            "Run with hedged/not-run input — must suppress the warning",
+            "Run with bare claim — must produce the warning (if promoted)",
+        ],
+        "claim_validation",
+    ),
+    (
+        ("test drift", "test/source", "stale test", "expectation mismatch"),
+        [
+            "Record source-vs-test triage: observed source, observed test, which is authoritative, why",
+            "Do not blindly change tests or source — classify as source bug, stale test, or missing coverage",
+        ],
+        "test_drift",
+    ),
+]
+
+
 
 def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
@@ -130,9 +193,26 @@ def classify_dispatch(rewritten: str) -> tuple[str, bool, bool]:
 
 
 def verification_suggestions(rewritten: str) -> list[str]:
-    """Heuristic verification strings. Not wired to task contract yet."""
+    """Heuristic verification strings. First checks the Verification Policy Matrix
+    (phase 4), then falls back to keyword-level heuristics if no matrix entry matches."""
     low = rewritten.lower()
     out: list[str] = []
+
+    # Review / critique / decision prompts must win over the policy matrix below,
+    # because "review the hook change" is fundamentally a review task, not a
+    # hook-creation task. Check this before the matrix.
+    if any(m in low for m in _REVIEW_DECISION_MARKERS):
+        out.append(
+            "No automated verification applicable; verify by evidence ledger and user decision."
+        )
+        return out
+
+    # Phase 4: check the Verification Policy Matrix next.
+    for keywords, suggestions, _note in _VERIFICATION_POLICY_MATRIX:
+        if any(k in low for k in keywords):
+            out.extend(suggestions)
+            return out
+
     # Review / critique / decision prompts — no automated verification.
     # pytest is the wrong default for "please critically review..." because
     # the work is judgment, not a unit-test change.
@@ -158,6 +238,15 @@ def verification_suggestions(rewritten: str) -> list[str]:
     return out
 
 
+def _verification_policy_key(rewritten: str) -> str | None:
+    """Return the Verification Policy Matrix key matching the prompt, or None."""
+    low = rewritten.lower()
+    for _keywords, _suggestions, note in _VERIFICATION_POLICY_MATRIX:
+        if any(k in low for k in _keywords if isinstance(k, str)):
+            return note
+    return None
+
+
 def generate_proposal(
     prompt: str,
     run_id: str,
@@ -176,6 +265,7 @@ def generate_proposal(
         "localEligible": local_eligible,
         "requiresApproval": requires_approval,
         "verificationSuggestions": verification_suggestions(rewritten),
+        "verificationPolicy": _verification_policy_key(rewritten),
         "notes": [
             "Deterministic heuristic (no LLM). dispatch="
             f"{dispatch} localEligible={local_eligible}",
