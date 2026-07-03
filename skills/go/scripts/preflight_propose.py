@@ -303,6 +303,54 @@ def failure_mode_guidance_all(prompt: str) -> dict[str, list[str]] | None:
     return result
 
 
+# --- FMM-derived verificationPolicy fallback ---
+
+# FMM row first-keyword to verification policy key.
+# Only used when _verification_policy_key() returns None (no direct match).
+_FMM_TO_POLICY: dict[str, str] = {
+    "hook change": "hook_gate",
+    "/go change": "orchestrator",
+    "go change": "orchestrator",
+    "classifier change": "classifier",
+    "telemetry change": "telemetry",
+    "claim change": "claim_validation",
+    "test drift": "test_drift",
+    "review": "claim_validation",
+}
+
+
+def verification_policy_from_fmm(prompt: str) -> tuple[str | None, str]:
+    """Derive verificationPolicy from FMM primary row when direct match fails.
+
+    Returns (policy_key, source) where source is one of:
+      "direct-policy-match" -- _verification_policy_key returned a result
+      "fmm-derived" -- fallback from FMM primary row mapping
+      "none" -- no policy found
+    """
+    rewritten = rewrite_goal(prompt)
+
+    # Step 1: try direct policy match (existing path)
+    direct = _verification_policy_key(rewritten)
+    if direct is not None:
+        return direct, "direct-policy-match"
+
+    # Step 2: FMM-derived fallback -- match prompt, map first keyword
+    fmm_result = failure_mode_guidance(rewritten)
+    if fmm_result is None:
+        return None, "none"
+
+    # Find which FMM row matched
+    for row in _FAILURE_MODE_MATRIX:
+        if row[1] == fmm_result["failure_modes"]:
+            first_kw = row[0][0]
+            fallback = _FMM_TO_POLICY.get(first_kw)
+            if fallback is not None:
+                return fallback, "fmm-derived"
+            break
+
+    return None, "none"
+
+
 def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
 

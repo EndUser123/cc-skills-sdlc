@@ -570,15 +570,16 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             _preflight = importlib.import_module("preflight_propose")
             _classify = getattr(_preflight, "classify_dispatch", None)
             _suggest = getattr(_preflight, "verification_suggestions", None)
-            _policy_key = getattr(_preflight, "_verification_policy_key", None)
+            _vp_fmm = getattr(_preflight, "verification_policy_from_fmm", None)
             _rewrite = getattr(_preflight, "rewrite_goal", None)
-            if _classify and _suggest and _policy_key and _rewrite:
+            if _classify and _suggest and _vp_fmm and _rewrite:
                 _rewritten = _rewrite(args.prompt)
                 _classify(_rewritten)
                 task_data["task"]["verificationSuggestions"] = _suggest(_rewritten)
-                _vp = _policy_key(_rewritten)
+                _vp, _vp_source = _vp_fmm(args.prompt)
                 if _vp is not None:
                     task_data["task"]["verificationPolicy"] = _vp
+                    task_data["task"]["verificationPolicySource"] = _vp_source
                 _fmm = getattr(_preflight, "failure_mode_guidance_all", None)
                 if _fmm:
                     _fmm_result = _fmm(args.prompt)
