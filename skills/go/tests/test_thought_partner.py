@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from preflight_propose import compress_goal, thought_partner_assessment, GOAL_MAX_CHARS
+from preflight_propose import compress_goal, thought_partner_assessment, plan_review, GOAL_MAX_CHARS
 from orchestrate import task_prompt
 
 
@@ -209,3 +209,121 @@ class TestContinuationGate:
             finally:
                 mod._find_state_dir = old_find
                 mod._find_active_task = old_task
+
+
+# ---------------------------------------------------------------------------
+# Goal compression: footer-included length
+# ---------------------------------------------------------------------------
+
+class TestGoalCompressionFooter:
+
+    def test_compressed_with_footer_fits_limit(self):
+        text = "Mission: fix everything\n" + "x" * 5000
+        result = compress_goal(text)
+        assert len(result) <= GOAL_MAX_CHARS
+        assert "Length:" in result
+
+    def test_compressed_preserves_constraints(self):
+        text = "Do not touch Stop.py\nConstraints: no hard blocking\n" + "y" * 5000
+        result = compress_goal(text)
+        assert "Do not" in result
+        assert "Constraints:" in result
+
+    def test_compressed_preserves_do_not_rules(self):
+        text = "Do not edit production files\nDo not break tests\n" + "z" * 5000
+        result = compress_goal(text)
+        assert "Do not" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan review
+# ---------------------------------------------------------------------------
+
+class TestPlanReview:
+
+    def test_multi_phase_plan_detected(self):
+        pr = plan_review(
+            "Phase 1: quarantine failing tests, Phase 2: create dispatch manifest, "
+            "Phase 3: run verification"
+        )
+        assert pr is not None
+        assert pr["planProvided"] is True
+        assert len(pr["planImprovements"]) > 0
+
+    def test_no_plan_returns_none(self):
+        pr = plan_review("fix the hook gate")
+        assert pr is None
+
+    def test_plan_with_shared_files(self):
+        pr = plan_review(
+            "Phase 1: update orchestrate.py, Phase 2: modify Stop.py, Phase 3: test"
+        )
+        assert pr is not None
+        assert len(pr["sharedFileConflicts"]) > 0
+
+    def test_plan_missing_rollback(self):
+        pr = plan_review(
+            "Phase 1: quarantine tests, Phase 2: create manifest, Phase 3: run verify"
+        )
+        assert pr is not None
+        assert len(pr["missingRollback"]) > 0
+
+    def test_plan_missing_tests(self):
+        pr = plan_review(
+            "Phase 1: move files, Phase 2: update config, Phase 3: clean up"
+        )
+        assert pr is not None
+        assert len(pr["missingTests"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# Plan review prompt rendering
+# ---------------------------------------------------------------------------
+
+class TestPlanReviewPromptRendering:
+
+    def test_renders_when_present(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+        task = {
+            "task": {
+                "title": "multi-phase task",
+                "objective": "execute plan",
+                "planReview": {
+                    "planProvided": True,
+                    "planImprovements": ["add verification step"],
+                    "sharedFileConflicts": [],
+                    "missingTests": ["add regression test"],
+                    "missingRollback": [],
+                },
+            }
+        }
+        p = tmp_path / "active-task_pr.json"
+        json.dump(task, p.open("w"))
+        prompt = task_prompt(p)
+        assert "Plan improvements:" in prompt
+        assert "add verification step" in prompt
+        assert "Missing tests:" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Continuation gate: registration check
+# ---------------------------------------------------------------------------
+
+class TestContinuationGateRegistration:
+
+    def test_gate_script_exists(self):
+        gate_path = Path(__file__).resolve().parent.parent / "scripts" / "go_continuation_gate.py"
+        assert gate_path.exists()
+
+    def test_gate_registered_in_settings(self):
+        settings_path = Path("P:/.claude/settings.json")
+        if settings_path.exists():
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+            stop = data.get("hooks", {}).get("Stop", [])
+            gate_cmd = "go_continuation_gate.py"
+            found = any(
+                gate_cmd in h.get("command", "")
+                for entry in stop
+                for h in entry.get("hooks", [])
+            )
+            assert found, "go_continuation_gate.py not registered in settings.json Stop hooks"

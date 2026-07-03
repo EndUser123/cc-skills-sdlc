@@ -484,6 +484,74 @@ def thought_partner_assessment(prompt: str) -> dict[str, object] | None:
     }
 
 
+# --- Plan review ---
+
+_PLAN_KEYWORDS = {"phase", "step", "stage", "task 1", "task 2", "first", "then", "after that", "finally"}
+
+
+def plan_review(prompt: str) -> dict[str, object] | None:
+    """Analyze a supplied plan and return improvement suggestions."""
+    p = " ".join(prompt.split()).strip().lower()
+    if not p:
+        return None
+
+    plan_signals = sum(p.count(kw) for kw in _PLAN_KEYWORDS)
+    if plan_signals < 2:
+        return None
+
+    improvements: list[str] = []
+    dependencies: list[str] = []
+    conflicts: list[str] = []
+    missing_tests: list[str] = []
+    missing_rollback: list[str] = []
+    unsafe: list[str] = []
+    non_blocking: list[str] = []
+
+    if any(kw in p for kw in ("orchestrat", "stop.py", "settings.json", "router")):
+        conflicts.append("shared files: orchestrate.py, Stop.py, settings.json, router.py may conflict")
+        improvements.append("use disjoint-file lock plan or sequential mutation for shared files")
+
+    if "test" not in p and "verify" not in p:
+        missing_tests.append("add verification step for each phase")
+        improvements.append("add test/verify command after each phase completion")
+
+    if "rollback" not in p and "revert" not in p:
+        missing_rollback.append("define rollback command for each phase")
+        improvements.append("add rollback strategy per phase (git restore / git checkout)")
+
+    if any(kw in p for kw in ("move", "delete", "quarantine", "git mv")):
+        unsafe.append("file move/delete operations need isolation")
+        improvements.append("use isolated worktree or patch bundle for move/delete phases")
+
+    if "phase" in p:
+        improvements.append("explicitly list which phases block which others")
+        dependencies.append("identify blocking dependencies between phases")
+
+    if plan_signals >= 3:
+        non_blocking.append("analysis/review/test-design lanes can run in parallel with implementation")
+        improvements.append("parallelize non-mutating analysis lanes")
+
+    if "authoritative" not in p and ("quarantine" in p or "move" in p or "delete" in p):
+        improvements.append("capture authoritative source output before classification")
+        non_blocking.append("evidence-scout lane for authoritative output capture")
+
+    if not improvements:
+        improvements.append("verify each phase produces expected artifact")
+
+    return {
+        "planProvided": True,
+        "planImprovements": improvements[:6],
+        "dependencies": dependencies[:3],
+        "independentPhases": [],
+        "sharedFileConflicts": conflicts[:2],
+        "missingTests": missing_tests[:2],
+        "missingRollback": missing_rollback[:2],
+        "unsafeMutation": unsafe[:2],
+        "betterExecutionOrder": [],
+        "nonBlockingWork": non_blocking[:3],
+    }
+
+
 # --- Parallel strategy detection ---
 
 _LANE_EVIDENCE_SCOUT: dict[str, object] = {
