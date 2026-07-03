@@ -763,6 +763,29 @@ def task_prompt(task_file: Path) -> str:
         parts.append("    If truncated/missing, mark phase FAILED or restart once. Do not reclassify.")
         parts.append("  Report contract: if user requested strict format, final output must match.")
         parts.append("  Live hook path: Stop hook JSON validation failure = task not complete.")
+    # Phase 6.9: Hook-work contract — only when the task touches hook wiring.
+    _has_hook_pattern = any(kw in _title_obj for kw in (
+        "hook", "settings.json", "hooks.json", "router", "dispatch",
+        "stop hook", "pretooluse", "posttooluse",
+    ))
+    if _has_hook_pattern:
+        parts.append("")
+        parts.append("---")
+        parts.append("Hook-work contract (this task touches hook wiring):")
+        parts.append("  1. Discover the dispatch surface BEFORE wiring: read settings.json,")
+        parts.append("     settings.local.json, plugin hooks.json, and __lib/router.py.")
+        parts.append("     State which surface is live. Do not create a third pattern.")
+        parts.append("  2. Stop output contract: block -> print")
+        parts.append('     {"decision":"block","reason":"continue: ..."};')
+        parts.append("     allow/done/fail-open -> print NOTHING.")
+        parts.append('     Never print {}, {"decision":"approve"}, or other allow payloads.')
+        parts.append("  3. Never claim 'registered', 'live', or 'verified' without evidence:")
+        parts.append("     cite the registration file:line and show real-command smoke output.")
+        parts.append("     Tests-passing is not liveness.")
+        parts.append("  4. Tests must cover three layers: unit logic, direct invocation,")
+        parts.append("     and real registered-dispatch-path smoke.")
+        parts.append("  5. Plugin file changes trigger the mutation checklist where applicable:")
+        parts.append("     version bump + cache rebuild + scope check before 'done'.")
     # Phase 6.8: Mutation-plan requirement (explicit field, not inferred).
     if inner.get("requiresMutationPlan"):
         parts.append("")

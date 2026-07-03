@@ -137,78 +137,105 @@ class TestThoughtPartnerPromptRendering:
 # ---------------------------------------------------------------------------
 
 class TestContinuationGate:
+    """Strict Stop-hook contract: block prints JSON; allow/done/no-state print nothing."""
 
-    def test_no_state_fails_open(self):
-        """When no state dir exists, gate returns empty (allow)."""
-        from go_continuation_gate import check_go_completion
-        # We can't easily mock _find_state_dir here, but we can test the logic
-        # by checking the function exists and is callable
-        assert callable(check_go_completion)
-
-    def test_hook_output_valid_json(self):
-        """Hook output is always valid JSON."""
+    def test_no_state_returns_none(self):
+        """No /go state dir -> None (main prints nothing)."""
         from go_continuation_gate import check_go_completion
         result = check_go_completion()
-        serialized = json.dumps(result)
-        parsed = json.loads(serialized)
-        assert isinstance(parsed, dict)
+        assert result is None
 
-    def test_done_state_approves(self):
-        """When .pr_ready exists, gate approves."""
-        from go_continuation_gate import _find_active_task, check_go_completion
+    def test_blocked_returns_block_dict(self):
+        """Work remaining -> {"decision":"block",...}; never approve/empty."""
         import go_continuation_gate as mod
-        from pathlib import Path
         import tempfile
 
         with tempfile.TemporaryDirectory() as td:
             tdir = Path(td)
-            # Create a task file
-            task_file = tdir / "active-task_test.json"
-            task_file.write_text(json.dumps({"task": {"title": "test task", "status": "selected"}}))
-            # Create .pr_ready marker
-            (tdir / ".pr_ready").touch()
-
-            # Patch the module-level functions
-            old_find = mod._find_state_dir
-            old_task = mod._find_active_task
-            try:
-                mod._find_state_dir = lambda: tdir
-                mod._find_active_task = lambda d: json.loads(task_file.read_text(encoding="utf-8"))
-                result = check_go_completion()
-                assert result["decision"] == "approve"
-                assert "goal met" in result["reason"]
-            finally:
-                mod._find_state_dir = old_find
-                mod._find_active_task = old_task
-
-    def test_blocked_state_blocks(self):
-        """When .blocked exists, gate blocks with reason."""
-        from go_continuation_gate import check_go_completion
-        import go_continuation_gate as mod
-        from pathlib import Path
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as td:
-            tdir = Path(td)
-            task_file = tdir / "active-task_test.json"
-            task_file.write_text(json.dumps({"task": {"title": "test task", "status": "selected"}}))
-            # Create .blocked marker
+            (tdir / "active-task_test.json").write_text(
+                json.dumps({"task": {"title": "test task", "status": "selected"}})
+            )
             (tdir / ".blocked_test").touch()
-            # Create block reason file
-            block_file = tdir / "blocked_test.json"
-            block_file.write_text(json.dumps({"phase": "dispatch", "reason_code": "dispatch_failed"}))
-
-            old_find = mod._find_state_dir
-            old_task = mod._find_active_task
+            (tdir / "blocked_blocked_test.json").write_text(
+                json.dumps({"phase": "dispatch", "reason_code": "dispatch_failed"})
+            )
+            old = mod._find_state_dir
             try:
                 mod._find_state_dir = lambda: tdir
-                mod._find_active_task = lambda d: json.loads(task_file.read_text(encoding="utf-8"))
-                result = check_go_completion()
+                result = mod.check_go_completion()
+                assert isinstance(result, dict)
                 assert result["decision"] == "block"
                 assert "continue:" in result["reason"]
+                assert result["decision"] != "approve"
             finally:
-                mod._find_state_dir = old_find
-                mod._find_active_task = old_task
+                mod._find_state_dir = old
+
+    def test_done_returns_none(self):
+        """Completion marker (.pr_ready) -> None (main prints nothing, NOT approve)."""
+        import go_continuation_gate as mod
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            tdir = Path(td)
+            (tdir / "active-task_test.json").write_text(
+                json.dumps({"task": {"title": "test task", "status": "selected"}})
+            )
+            (tdir / ".pr_ready").touch()
+            old = mod._find_state_dir
+            try:
+                mod._find_state_dir = lambda: tdir
+                assert mod.check_go_completion() is None
+            finally:
+                mod._find_state_dir = old
+
+
+class TestContinuationGateContract:
+    """Mechanical checks: stdout shape through the real registered command path."""
+
+    @pytest.fixture
+    def run_gate(self):
+        import subprocess
+        gate = Path(__file__).resolve().parent.parent / "scripts" / "go_continuation_gate.py"
+        def _run(payload="{}"):
+            p = subprocess.run(
+                [sys.executable, str(gate)],
+                input=payload, capture_output=True, text=True,
+            )
+            return p.stdout, p.stderr, p.returncode
+        return _run
+
+    def test_no_state_emits_empty_stdout(self, run_gate):
+        """No /go state -> exactly empty stdout (never {})."""
+        out, err, rc = run_gate()
+        assert out == "", f"expected empty stdout, got {out!r}"
+        assert rc == 0
+
+    def test_never_emits_approve_or_empty_object(self, run_gate):
+        """Allow path must never print {} or {"decision":"approve"}."""
+        out, _, _ = run_gate()
+        assert out.strip() not in ("{}", '{"decision": "approve"}', '{"decision":"approve"}')
+
+    def test_block_emits_valid_block_json(self, tmp_path, monkeypatch):
+        """When state shows work remaining, stdout is valid block JSON."""
+        import go_continuation_gate as mod
+        sd = tmp_path / "go"
+        sd.mkdir()
+        (sd / "active-task_t.json").write_text(
+            json.dumps({"task": {"title": "t", "status": "selected"}})
+        )
+        (sd / ".blocked_t").touch()
+        (sd / "blocked_blocked_t.json").write_text(
+            json.dumps({"phase": "dispatch", "reason_code": "dispatch_failed"})
+        )
+        monkeypatch.setattr(mod, "_find_state_dir", lambda: sd)
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            mod.main()
+        out = buf.getvalue()
+        parsed = json.loads(out)  # must be valid JSON
+        assert parsed["decision"] == "block"
+        assert "continue:" in parsed["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +330,31 @@ class TestPlanReviewPromptRendering:
         assert "Plan improvements:" in prompt
         assert "add verification step" in prompt
         assert "Missing tests:" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Hook-work contract prompt rendering
+# ---------------------------------------------------------------------------
+
+class TestHookWorkContractRendering:
+
+    def test_renders_for_hook_task(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+        task = {"task": {"title": "fix the Stop hook JSON validation", "objective": "fix"}}
+        p = tmp_path / "active-task_hwc.json"
+        json.dump(task, p.open("w"))
+        prompt = task_prompt(p)
+        assert "Hook-work contract" in prompt
+        assert "dispatch surface" in prompt
+        assert "prints NOTHING" in prompt or "print NOTHING" in prompt
+
+    def test_no_render_for_non_hook_task(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+        task = {"task": {"title": "add a config option", "objective": "add"}}
+        p = tmp_path / "active-task_noop.json"
+        json.dump(task, p.open("w"))
+        prompt = task_prompt(p)
+        assert "Hook-work contract" not in prompt
 
 
 # ---------------------------------------------------------------------------
