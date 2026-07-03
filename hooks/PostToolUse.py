@@ -74,7 +74,7 @@ def main():
         # Taking the first non-None result for decision protocol
         print(json.dumps(results[0]))
     else:
-        print(json.dumps({"decision": "approve"}))
+        print("{}")
     
     sys.exit(0)
 

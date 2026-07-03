@@ -74,7 +74,7 @@ def main():
         except Exception as e:
             _log.error(f"Stop child hook '{name}' crashed: {e}", exc_info=True)
 
-    print(json.dumps({"decision": "approve"}))
+    print("{}")
     sys.exit(0)
 
 if __name__ == "__main__":
