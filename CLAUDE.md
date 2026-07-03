@@ -118,15 +118,19 @@ This gate is wired as a **direct project-settings entry**
 - **Self-scoping & fail-silent:** `_find_state_dir()` returns `None` and the
   gate prints nothing when no `console_go_*/go` state tree exists, so it is
   inert in every non-`/go` session.
-- **Status: temporary, pending dispatch reconciliation (task #1053).** The
-  chosen end state is either (a) keep this direct entry permanently and
-  document it, or (b) migrate into `hooks/hooks.json` + versioned cache for
-  convention consistency. Not decided here — reviving the plugin dispatcher
-  is a separate, deliberate decision.
-- **Dormant surface NOT to revive:** `skills/go/hooks/Stop_enforce_gate.py`
-  exists and is declared in `skills/go/SKILL.md` frontmatter (`hooks.Stop`),
-  but is **not registered in any live dispatch surface**. It is a separate,
-  unrelated dormant gate. Do not wire it as a side effect of gate work.
+- **Status: DECIDED — keep direct-entry permanently (task #1053 closed).**
+  Rationale: the gate must run from source for edit-liveness (settings.json
+  points at the source path); migrating into the versioned cache would couple
+  it to cache state where stale cache silently overrides source fixes. Direct
+  entry is a single, consistent pattern; the plugin dispatcher stays dormant.
+  Full rationale + gate inventory: `skills/go/HOOK_GATE_INVENTORY.md`.
+- **Dormant surfaces NOT to revive:** (a) `skills/go/hooks/Stop_enforce_gate.py`
+  — declared in `skills/go/SKILL.md` frontmatter `hooks.Stop` but not registered
+  in settings.json or plugin hooks.json (live-status unverified); (b)
+  `cc-skills-sdlc/hooks/Stop.py` — exists but plugin dispatcher is dormant,
+  referenced only by `enforce/tests/test_enforce.py`. Both are classified in
+  `HOOK_GATE_INVENTORY.md` (G5, G6). Do not wire either as a side effect of
+  gate work — their retirement/wiring is a separate isolated decision.
 
 The gate is **additive** to the native goal-loop evaluator — it does not
 replace it (no plugin API exists to disable the native evaluator).
