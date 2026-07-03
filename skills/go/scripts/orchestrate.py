@@ -597,6 +597,20 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                     _ps_result = _ps(args.prompt)
                     if _ps_result.get("recommended"):
                         task_data["task"]["parallelStrategy"] = _ps_result
+                _tp = getattr(_preflight, "thought_partner_assessment", None)
+                if _tp:
+                    _tp_result = _tp(args.prompt)
+                    if _tp_result:
+                        task_data["task"]["thoughtPartner"] = _tp_result
+                _cg = getattr(_preflight, "compress_goal", None)
+                if _cg:
+                    _compressed = _cg(args.prompt)
+                    task_data["task"]["goalConditionSize"] = len(_compressed)
+                _pr = getattr(_preflight, "plan_review", None)
+                if _pr:
+                    _pr_result = _pr(args.prompt)
+                    if _pr_result:
+                        task_data["task"]["planReview"] = _pr_result
         except Exception:
             # Verification plan is advisory; never block dispatch on import/parse failure.
             pass
@@ -766,7 +780,55 @@ def task_prompt(task_file: Path) -> str:
         parts.append("  Do NOT mutate files outside the permitted fence.")
         parts.append("  Rollback if verification or fence checks fail.")
         parts.append("  If DONE is claimed but no valid mutation-plan exists, the phase is NOT complete.")
-    # Phase 7: Parallel strategy advisory.
+    # Phase 7: Thought-partner assessment.
+    tp = inner.get("thoughtPartner")
+    if tp:
+        parts.append("")
+        parts.append("---")
+        parts.append("Thought partner assessment:")
+        parts.append(f"  Real goal: {tp.get('taskIntent', 'unknown')[:200]}")
+        if tp.get("impliedRequirements"):
+            parts.append("  Implied requirements:")
+            for item in tp["impliedRequirements"]:
+                parts.append(f"    - {item}")
+        if tp.get("missingImprovements"):
+            parts.append("  Missing high-ROI improvements:")
+            for item in tp["missingImprovements"]:
+                parts.append(f"    - {item}")
+        if tp.get("unsafeAssumptions"):
+            parts.append("  Unsafe assumptions:")
+            for item in tp["unsafeAssumptions"]:
+                parts.append(f"    - {item}")
+        if tp.get("missingVerification"):
+            parts.append("  Missing verification:")
+            for item in tp["missingVerification"]:
+                parts.append(f"    - {item}")
+    # Phase 8: Plan review advisory.
+    pr = inner.get("planReview")
+    if pr and pr.get("planProvided"):
+        parts.append("")
+        parts.append("---")
+        parts.append("Plan improvements:")
+        parts.append("  Before executing the supplied plan, account for these findings:")
+        for item in pr.get("planImprovements", []):
+            parts.append(f"    - {item}")
+        if pr.get("sharedFileConflicts"):
+            parts.append("  Shared-file conflicts:")
+            for item in pr["sharedFileConflicts"]:
+                parts.append(f"    - {item}")
+        if pr.get("missingTests"):
+            parts.append("  Missing tests:")
+            for item in pr["missingTests"]:
+                parts.append(f"    - {item}")
+        if pr.get("missingRollback"):
+            parts.append("  Missing rollback:")
+            for item in pr["missingRollback"]:
+                parts.append(f"    - {item}")
+        if pr.get("nonBlockingWork"):
+            parts.append("  Non-blocking parallel work:")
+            for item in pr["nonBlockingWork"]:
+                parts.append(f"    - {item}")
+    # Phase 9: Parallel strategy advisory.
     ps = inner.get("parallelStrategy")
     if ps and ps.get("recommended"):
         parts.append("")

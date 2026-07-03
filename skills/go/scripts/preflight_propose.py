@@ -355,6 +355,135 @@ def _normalize(prompt: str) -> str:
     return " ".join(prompt.split()).strip()
 
 
+# --- Goal-size guard ---
+
+GOAL_MAX_CHARS = 4000
+
+
+def compress_goal(text: str, max_chars: int = GOAL_MAX_CHARS) -> str:
+    """Compress a goal/prompt to fit within max_chars.
+
+    Preserves: goal statement, requirements, constraints, verification,
+    deliverables. Drops verbose explanation and examples.
+    Returns truncated text with 'Length: N / 4000' suffix when compressed.
+    """
+    if len(text) <= max_chars:
+        return text
+
+    priority_markers = (
+        "mission:", "goal:", "requirements:", "constraints:", "verify",
+        "test", "report:", "deliverables:", "do not", "must", "shall",
+        "phase", "task", "blocked", "fence",
+    )
+    # Footer is ~25 chars: "\n\nLength: NNNN / 4000"
+    footer_budget = 30
+    lines = text.split("\n")
+    kept: list[str] = []
+    budget = max_chars - footer_budget
+
+    # First pass: priority lines
+    for line in lines:
+        stripped = line.strip().lower()
+        if any(m in stripped for m in priority_markers):
+            if budget - len(line) - 1 > 0:
+                kept.append(line)
+                budget -= len(line) + 1
+                budget -= len(line) + 1
+
+    if budget > 100:
+        for line in lines:
+            if line not in kept:
+                if budget - len(line) > 0:
+                    kept.append(line)
+                    budget -= len(line) + 1
+
+    result = "\n".join(kept)
+    # Ensure final output including footer fits within max_chars
+    footer = f"\n\nLength: NNNN / {max_chars}"
+    available = max_chars - len(footer)
+    if len(result) > available:
+        result = result[:available]
+
+    # Recount actual length in footer
+    return result + f"\n\nLength: {len(result) + len(footer)} / {max_chars}"
+
+
+# --- Thought-partner enhancement ---
+
+_THOUGHT_PARTNER_KEYWORDS = {
+    "hook", "gate", "stop", "orchestrat", "rout", "refactor",
+    "audit", "review", "rca", "diagnos", "design", "architect",
+    "multi-phase", "quarantine", "migration", "classif",
+}
+
+
+def thought_partner_assessment(prompt: str) -> dict[str, object] | None:
+    """Generate thought-partner assessment for nontrivial tasks.
+
+    Returns None for trivial prompts. Otherwise returns a dict with:
+      taskIntent, impliedRequirements, missingImprovements,
+      unsafeAssumptions, missingVerification, recommendedStrategy,
+      reasoningSummary
+    """
+    p = " ".join(prompt.split()).strip().lower()
+    if not p or len(p.split()) < 4:
+        return None
+
+    matched = [kw for kw in _THOUGHT_PARTNER_KEYWORDS if kw in p]
+    if not matched:
+        return None
+
+    intent = prompt.strip()
+    if len(intent) > 200:
+        intent = intent[:200] + "..."
+
+    implied: list[str] = []
+    if any(k in p for k in ("hook", "gate", "stop")):
+        implied.append("schema-valid output for all registered hooks")
+        implied.append("fail-open path on exception")
+    if any(k in p for k in ("orchestrat", "rout")):
+        implied.append("CLI smoke test after changes")
+        implied.append("active-task JSON integrity")
+    if any(k in p for k in ("review", "audit", "rca")):
+        implied.append("evidence ledger with file:line citations")
+        implied.append("distinction between observed vs inferred claims")
+    if any(k in p for k in ("refactor", "design")):
+        implied.append("backward-compatible or documented breakage")
+        implied.append("existing tests still pass")
+
+    missing: list[str] = []
+    if "test" not in p and "pytest" not in p:
+        missing.append("add targeted tests (not generic pytest)")
+    if "verify" not in p and "check" not in p:
+        missing.append("define verification commands")
+    if "rollback" not in p and "revert" not in p:
+        missing.append("define rollback strategy")
+    if "plan" not in p and "phase" not in p:
+        missing.append("break into phases if task is broad")
+
+    assumptions: list[str] = []
+    if any(k in p for k in ("hook", "gate")):
+        assumptions.append("may assume current hook output is schema-valid without checking")
+    if any(k in p for k in ("fix", "patch")):
+        assumptions.append("may assume root cause without discriminating test")
+
+    verification: list[str] = []
+    if "test" not in p:
+        verification.append("run existing test suite to confirm no regression")
+    verification.append("verify changes against real data, not just synthetic fixtures")
+
+    return {
+        "taskIntent": intent,
+        "impliedRequirements": implied[:5],
+        "missingImprovements": missing[:4],
+        "unsafeAssumptions": assumptions[:3],
+        "missingVerification": verification[:3],
+        "recommendedStrategy": "serialized-implementation-with-advisory-gates",
+        "reasoningSummary": f"Matched task types: {', '.join(matched)}. "
+        "Apply failure-mode-specific safeguards, verify against real data.",
+    }
+
+
 # --- Parallel strategy detection ---
 
 _LANE_EVIDENCE_SCOUT: dict[str, object] = {
