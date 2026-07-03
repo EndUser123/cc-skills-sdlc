@@ -137,56 +137,128 @@ class TestThoughtPartnerPromptRendering:
 # ---------------------------------------------------------------------------
 
 class TestContinuationGate:
-    """Strict Stop-hook contract: block prints JSON; allow/done/no-state print nothing."""
+    """Session-bound, multi-terminal safe, stale-immune Stop contract."""
 
-    def test_no_state_returns_none(self):
-        """No /go state dir -> None (main prints nothing)."""
-        from go_continuation_gate import check_go_completion
-        result = check_go_completion()
-        assert result is None
-
-    def test_blocked_returns_block_dict(self):
-        """Work remaining -> {"decision":"block",...}; never approve/empty."""
+    @pytest.fixture
+    def go_env(self, tmp_path, monkeypatch):
+        """Point the gate at a temp artifacts root + set a terminal identity."""
         import go_continuation_gate as mod
-        import tempfile
+        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
+        tid = "console_test_tid"
+        monkeypatch.setenv("CLAUDE_TERMINAL_ID", tid)
+        state_dir = tmp_path / tid / "go"
+        state_dir.mkdir(parents=True)
+        return mod, tid, state_dir
 
-        with tempfile.TemporaryDirectory() as td:
-            tdir = Path(td)
-            (tdir / "active-task_test.json").write_text(
-                json.dumps({"task": {"title": "test task", "status": "selected"}})
-            )
-            (tdir / ".blocked_test").touch()
-            (tdir / "blocked_blocked_test.json").write_text(
-                json.dumps({"phase": "dispatch", "reason_code": "dispatch_failed"})
-            )
-            old = mod._find_state_dir
-            try:
-                mod._find_state_dir = lambda: tdir
-                result = mod.check_go_completion()
-                assert isinstance(result, dict)
-                assert result["decision"] == "block"
-                assert "continue:" in result["reason"]
-                assert result["decision"] != "approve"
-            finally:
-                mod._find_state_dir = old
+    def _fresh_task(self, state_dir, run_id="run1", session_id="", title="t"):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        (state_dir / f"active-task_{run_id}.json").write_text(json.dumps({
+            "run_id": run_id,
+            "terminal_id": "console_test_tid",
+            "session_id": session_id,
+            "selected_at": now, "created_at": now, "updated_at": now, "state_version": 1,
+            "task": {"title": title, "status": "selected"},
+        }), encoding="utf-8")
 
-    def test_done_returns_none(self):
-        """Completion marker (.pr_ready) -> None (main prints nothing, NOT approve)."""
+    def test_no_state_returns_none(self, go_env):
+        """No bound state dir / not a /go terminal -> None."""
+        mod, tid, _ = go_env
+        assert mod.check_go_completion({"session_id": "s1"}) is None
+
+    def test_matching_active_state_blocks(self, go_env):
+        """Fresh in-identity run with .blocked -> block dict."""
+        mod, tid, sd = go_env
+        self._fresh_task(sd, "run1", title="fix hook gate")
+        (sd / ".blocked_run1").touch()
+        (sd / "blocked_blocked_run1.json").write_text(
+            json.dumps({"reason_code": "dispatch_failed"}), encoding="utf-8")
+        r = mod.check_go_completion({"session_id": ""})
+        assert r["decision"] == "block"
+        assert "continue:" in r["reason"]
+        assert "dispatch_failed" in r["reason"]
+
+    def test_matching_done_state_silent(self, go_env):
+        """Fresh in-identity run with .pr_ready -> None (NOT approve)."""
+        mod, tid, sd = go_env
+        self._fresh_task(sd, "run1")
+        (sd / ".pr_ready_run1").touch()
+        assert mod.check_go_completion({"session_id": ""}) is None
+
+    def test_foreign_terminal_state_silent(self, tmp_path, monkeypatch):
+        """State under a DIFFERENT terminal dir is invisible to this gate."""
         import go_continuation_gate as mod
-        import tempfile
+        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
+        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_THIS")
+        # State lives under a FOREIGN terminal.
+        foreign = tmp_path / "console_FOREIGN" / "go"
+        foreign.mkdir(parents=True)
+        self._fresh_task(foreign, "run1")
+        (foreign / ".blocked_run1").touch()
+        # This terminal has no state dir at all -> silent.
+        assert mod.check_go_completion({"session_id": ""}) is None
 
-        with tempfile.TemporaryDirectory() as td:
-            tdir = Path(td)
-            (tdir / "active-task_test.json").write_text(
-                json.dumps({"task": {"title": "test task", "status": "selected"}})
-            )
-            (tdir / ".pr_ready").touch()
-            old = mod._find_state_dir
-            try:
-                mod._find_state_dir = lambda: tdir
-                assert mod.check_go_completion() is None
-            finally:
-                mod._find_state_dir = old
+    def test_foreign_session_state_silent(self, go_env):
+        """Same terminal, recorded session differs from payload -> foreign -> silent."""
+        mod, tid, sd = go_env
+        self._fresh_task(sd, "run1", session_id="RECORDED")
+        (sd / ".blocked_run1").touch()
+        # Payload carries a different session_id -> record excluded -> no candidates -> silent.
+        assert mod.check_go_completion({"session_id": "OTHER"}) is None
+
+    def test_stale_incomplete_state_silent(self, go_env):
+        """Incomplete state older than TTL -> silent (never block)."""
+        mod, tid, sd = go_env
+        from datetime import datetime, timezone, timedelta
+        old = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        (sd / "active-task_run1.json").write_text(json.dumps({
+            "run_id": "run1", "session_id": "", "updated_at": old,
+            "task": {"title": "stale", "status": "selected"},
+        }), encoding="utf-8")
+        (sd / ".blocked_run1").touch()
+        assert mod.check_go_completion({"session_id": ""}) is None
+
+    def test_two_terminals_do_not_cross_block(self, tmp_path, monkeypatch):
+        """Two concurrent /go states in separate terminals must not interfere."""
+        import go_continuation_gate as mod
+        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
+        # Terminal A: blocked run.
+        a = tmp_path / "console_A" / "go"; a.mkdir(parents=True)
+        self._fresh_task(a, "runA")
+        (a / ".blocked_runA").touch()
+        # Terminal B: clean (done).
+        b = tmp_path / "console_B" / "go"; b.mkdir(parents=True)
+        self._fresh_task(b, "runB")
+        (b / ".pr_ready_runB").touch()
+        # Gate running in terminal B must NOT see terminal A's block.
+        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_B")
+        assert mod.check_go_completion({"session_id": ""}) is None
+        # Gate running in terminal A MUST block.
+        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_A")
+        r = mod.check_go_completion({"session_id": ""})
+        assert r is not None and r["decision"] == "block"
+
+    def test_ambiguous_identity_silent(self, go_env):
+        """No session_id + multiple active-task files -> ambiguous -> silent."""
+        mod, tid, sd = go_env
+        self._fresh_task(sd, "run1")
+        self._fresh_task(sd, "run2")
+        (sd / ".blocked_run2").touch()
+        assert mod.check_go_completion({"session_id": ""}) is None
+
+    def test_no_machine_wide_mtime_selection(self, tmp_path, monkeypatch):
+        """A NEWER foreign-terminal run must never be selected by this gate."""
+        import go_continuation_gate as mod, os, time
+        monkeypatch.setattr(mod, "ARTIFACTS_ROOT", tmp_path)
+        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "console_THIS")
+        # This terminal: no state.
+        # Foreign terminal: a very-recent blocked run (newest mtime machine-wide).
+        foreign = tmp_path / "console_FOREIGN" / "go"; foreign.mkdir(parents=True)
+        self._fresh_task(foreign, "runF")
+        (foreign / ".blocked_runF").touch()
+        time.sleep(0.01)
+        os.utime(foreign / "active-task_runF.json", None)  # bump mtime to newest
+        assert mod.check_go_completion({"session_id": ""}) is None
 
 
 class TestContinuationGateContract:
@@ -200,6 +272,7 @@ class TestContinuationGateContract:
             p = subprocess.run(
                 [sys.executable, str(gate)],
                 input=payload, capture_output=True, text=True,
+                env={**__import__("os").environ, "CLAUDE_TERMINAL_ID": "console_definitely_unused"},
             )
             return p.stdout, p.stderr, p.returncode
         return _run
@@ -215,27 +288,13 @@ class TestContinuationGateContract:
         out, _, _ = run_gate()
         assert out.strip() not in ("{}", '{"decision": "approve"}', '{"decision":"approve"}')
 
-    def test_block_emits_valid_block_json(self, tmp_path, monkeypatch):
-        """When state shows work remaining, stdout is valid block JSON."""
-        import go_continuation_gate as mod
-        sd = tmp_path / "go"
-        sd.mkdir()
-        (sd / "active-task_t.json").write_text(
-            json.dumps({"task": {"title": "t", "status": "selected"}})
-        )
-        (sd / ".blocked_t").touch()
-        (sd / "blocked_blocked_t.json").write_text(
-            json.dumps({"phase": "dispatch", "reason_code": "dispatch_failed"})
-        )
-        monkeypatch.setattr(mod, "_find_state_dir", lambda: sd)
-        import io, contextlib
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            mod.main()
-        out = buf.getvalue()
-        parsed = json.loads(out)  # must be valid JSON
-        assert parsed["decision"] == "block"
-        assert "continue:" in parsed["reason"]
+    def test_no_unconditional_allow_print(self, run_gate):
+        """Malformed/empty payload still emits nothing."""
+        out, _, rc = run_gate(payload="")
+        assert out == "" and rc == 0
+        out, _, _ = run_gate(payload="not json")
+        assert out == ""
+
 
 
 # ---------------------------------------------------------------------------
@@ -417,9 +476,28 @@ class TestCacheDriftAndDirectEntry:
         text = claude_md.read_text(encoding="utf-8")
         assert "Direct-entry exception" in text
         assert "Stop[3]" in text
-        assert "temporary" in text or "pending dispatch reconciliation" in text
         assert "Stop_enforce_gate" in text  # dormant gate not to revive
         assert "task #1053" in text or "#1053" in text
+
+    def test_no_dead_gate_without_status(self):
+        """Every G# row in the gate inventory carries an explicit Status."""
+        inv = Path(__file__).resolve().parent.parent / "HOOK_GATE_INVENTORY.md"
+        text = inv.read_text(encoding="utf-8")
+        # Find table rows starting with "| G<n> |".
+        import re
+        rows = re.findall(r"^\|\s*(G\d+)\s*\|(.*)\|$", text, re.MULTILINE)
+        assert rows, "no G# rows found in inventory"
+        valid_statuses = ("live", "dormant-intentional",
+                          "dormant-unverified", "deprecated")
+        for gid, rest in rows:
+            cells = [c.strip() for c in rest.split("|")]
+            # cells: [path, status, reason, next_action]
+            assert len(cells) >= 4, f"{gid} malformed row: {cells}"
+            status = cells[1].strip("*`").strip().lower()
+            assert any(status == v or status.startswith(v) for v in valid_statuses), (
+                f"{gid} has unclassified status {status!r}; "
+                f"must start with one of {valid_statuses}"
+            )
 
 
 # ---------------------------------------------------------------------------

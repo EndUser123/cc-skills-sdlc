@@ -329,7 +329,11 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
     task_data: dict[str, Any] = {
         "run_id": run_id,
         "terminal_id": terminal_id,
+        "session_id": os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_AGENT_SESSION_ID") or "",
         "selected_at": selected_at,
+        "created_at": selected_at,
+        "updated_at": selected_at,
+        "state_version": 1,
         "source": "plan-md",
         "source_ref": str(plan_path),
         "task": {
@@ -545,7 +549,11 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
         task_data: dict[str, Any] = {
             "run_id": run_id,
             "terminal_id": terminal_id,
+            "session_id": os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("CLAUDE_AGENT_SESSION_ID") or "",
             "selected_at": selected_at,
+            "created_at": selected_at,
+            "updated_at": selected_at,
+            "state_version": 1,
             "source": "cli",
             "source_ref": "cli",
             "task": {
