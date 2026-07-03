@@ -41,7 +41,28 @@ _BOUNDED_MARKERS = (
     "typo", "bump ", "wire ", "expose ",
     "set ", "configur", "update the ", "change x to y",
 )
+# Conversational prompts — status questions, assertions, pushback, clarifications.
+# These keep dispatch="pi" but do NOT require approval. Detection is intentionally
+# conservative: matched only when the prompt is NOT also broad or bounded, so a
+# task verb ("audit the X", "investigate why Y") takes priority and still gets
+# requiresApproval=true.
+_CONVERSATIONAL_MARKERS = (
+    "did you ", "do you ", "are you ",
+    "is it ", "is there ", "is this ",
+    "will it ", "will this ", "will they ", "will both ", "will the ",
+    "can i ", "can we ", "should i ", "should we ",
+    "what's ", "what is ", "what are ",
+    "why ", "how ", "when ", "where ", "who ",
+    "i think ", "i feel ", "i believe ",
+    "thanks", "thank you",
+    "great.", "perfect.", "good.", "ok.", "okay.",
+)
 _PATH_LIKE = re.compile(r"[\w./\\-]+\.(?:py|js|ts|md|json|toml|yaml|yml|sh)\b")
+# Verification-mode markers — broad/discovery verbs that override the pytest default
+# (which only fits implementation tasks). Review/critique prompts get an evidence-ledger
+# suggestion; diagnose/investigate ones get the same.
+_REVIEW_DECISION_MARKERS = ("review", "critique", "critically", "audit ", "evaluat", "optimal")
+_EVIDENCE_LEDGER_MARKERS = ("diagnos", "investigat", "root cause", "rca")
 
 
 def _normalize(prompt: str) -> str:
@@ -85,6 +106,7 @@ def classify_dispatch(rewritten: str) -> tuple[str, bool, bool]:
     is_broad = any(m in low for m in _BROAD_MARKERS)
     path_hits = _PATH_LIKE.findall(rewritten)
     is_bounded = any(m in low for m in _BOUNDED_MARKERS)
+    is_conversational = any(m in low for m in _CONVERSATIONAL_MARKERS)
 
     if is_broad:
         return ("pi", False, True)
@@ -96,6 +118,13 @@ def classify_dispatch(rewritten: str) -> tuple[str, bool, bool]:
     if is_bounded:
         return ("pi", False, False)
 
+    # Conversational (status question / pushback / assertion) — pi dispatch,
+    # no approval. Detection is conservative: only matches when neither broad
+    # nor bounded markers fired, so a task verb in the same prompt still
+    # routes to the right branch above.
+    if is_conversational:
+        return ("pi", False, False)
+
     # Default: ambiguous → pi, requires approval (no signal either way).
     return ("pi", False, True)
 
@@ -104,6 +133,20 @@ def verification_suggestions(rewritten: str) -> list[str]:
     """Heuristic verification strings. Not wired to task contract yet."""
     low = rewritten.lower()
     out: list[str] = []
+    # Review / critique / decision prompts — no automated verification.
+    # pytest is the wrong default for "please critically review..." because
+    # the work is judgment, not a unit-test change.
+    if any(m in low for m in _REVIEW_DECISION_MARKERS):
+        out.append(
+            "No automated verification applicable; verify by evidence ledger and user decision."
+        )
+        return out
+    # Diagnose / investigate / root-cause prompts — verify by evidence ledger.
+    if any(m in low for m in _EVIDENCE_LEDGER_MARKERS):
+        out.append(
+            "Verify by evidence ledger: files read, commands run, findings, and uncertainty."
+        )
+        return out
     if "test" in low or ".py" in low:
         out.append("python -m pytest -q")
     if "hook" in low or "plugin" in low or "/go" in low:

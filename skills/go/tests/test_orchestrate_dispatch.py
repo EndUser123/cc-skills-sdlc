@@ -632,3 +632,126 @@ def test_non_preflight_prompt_path_unchanged(monkeypatch, tmp_path):
     # Preflight artifacts must NOT exist (normal path).
     assert not (tmp_path / "task-proposal_run-normal.json").exists()
     assert not (tmp_path / ".preflight-proposed_run-normal").exists()
+
+
+# ---------------------------------------------------------------------------
+# Heuristic tunings (small, reversible): conversational classifier + non-impl verify
+# ---------------------------------------------------------------------------
+
+# Helper: import the preflight module under test
+import importlib
+
+_PREFLIGHT = importlib.import_module("preflight_propose")
+
+
+def _classify(prompt: str) -> dict:
+    """Run the public preflight classifier on a single prompt and return a flat dict."""
+    rewritten = _PREFLIGHT.rewrite_goal(prompt)
+    dispatch, local_elig, req_appr = _PREFLIGHT.classify_dispatch(rewritten)
+    verify = _PREFLIGHT.verification_suggestions(rewritten)
+    return {
+        "rewritten": rewritten,
+        "dispatch": dispatch,
+        "localElig": local_elig,
+        "reqAppr": req_appr,
+        "verify": verify,
+    }
+
+
+def test_conversational_prompts_do_not_require_approval():
+    """Status / assertion / clarification / pushback prompts → pi + no approval."""
+    # Each example from the spec, plus one structural edge case.
+    conversational = [
+        "did you update the plugin?",
+        "I think the hook problems have been addressed.",
+        "what's the nah threshold question?",
+        "great. but why would I want to opt in?",
+        "will both zai and minimax quota checks work if you do that?",
+        "thanks",
+        "ok.",
+    ]
+    for prompt in conversational:
+        d = _classify(prompt)
+        assert d["dispatch"] == "pi", f"expected pi dispatch for: {prompt!r} (got {d['dispatch']})"
+        assert d["localElig"] is False, f"localElig should be false for: {prompt!r}"
+        assert d["reqAppr"] is False, (
+            f"reqAppr should be FALSE for conversational: {prompt!r} (got {d['reqAppr']})"
+        )
+
+
+def test_broad_executable_tasks_still_require_approval():
+    """Tasks with broad or bounded verbs must NOT be downgraded to conversational.
+
+    Only assertions about the broad branch (which returns reqAppr=True). The
+    bounded-without-path branch has always returned reqAppr=False (no path = no
+    worker-targetable change yet); that is by existing design, not a regression.
+    """
+    executable_broad = [
+        "audit the SessionStart hook drift",  # broad: "audit "
+        "investigate why pre-commit fails",  # broad: "investigat "
+        "design a freshness contract for the daemon",  # broad: "design "
+        "diagnose the docs validator returning empty",  # broad: "diagnos "
+    ]
+    for prompt in executable_broad:
+        d = _classify(prompt)
+        assert d["dispatch"] == "pi", f"expected pi for executable broad: {prompt!r}"
+        assert d["reqAppr"] is True, (
+            f"reqAppr must remain TRUE for broad task: {prompt!r} (got {d['reqAppr']})"
+        )
+
+
+def test_review_decision_prompts_do_not_get_default_pytest_verification():
+    """Review / critique / decision prompts get the evidence-ledger suggestion, not pytest."""
+    review_prompts = [
+        "please critically review the findings",
+        "review the proposal before we ship",
+        "audit the changes I made last week",
+        "evaluate whether this design is correct",
+        "what's the optimal path forward?",
+    ]
+    for prompt in review_prompts:
+        d = _classify(prompt)
+        # No pytest default line should appear.
+        joined = "\n".join(d["verify"]).lower()
+        assert "pytest" not in joined, (
+            f"review prompt got pytest default: {prompt!r} → verify={d['verify']!r}"
+        )
+        assert "evidence ledger" in joined or "user decision" in joined, (
+            f"review prompt should mention evidence-ledger/user-decision: {prompt!r} → {d['verify']!r}"
+        )
+
+
+def test_implementation_prompts_still_get_pytest_verification():
+    """Code-change / hook / plugin / schema prompts keep pytest (or direct-invoke)."""
+    impl_prompts = [
+        "fix the parser in src/foo.py",
+        "add a test for the new helper",
+        "bump the version in pyproject.toml",
+        "the .py file is missing a return value",
+    ]
+    for prompt in impl_prompts:
+        d = _classify(prompt)
+        joined = "\n".join(d["verify"]).lower()
+        # Implementation prompts should have pytest OR direct-invocation OR schema verify,
+        # not the evidence-ledger default.
+        assert ("pytest" in joined) or ("direct-invocation" in joined) or ("schema" in joined), (
+            f"implementation prompt missing impl-style verify: {prompt!r} → {d['verify']!r}"
+        )
+        assert "no automated verification" not in joined, (
+            f"implementation prompt wrongly got review-style verify: {prompt!r} → {d['verify']!r}"
+        )
+
+
+def test_diagnose_prompts_get_evidence_ledger_suggestion():
+    """Diagnose / investigate / RCA → evidence-ledger verify, not pytest."""
+    diag_prompts = [
+        "diagnose the /s ModuleNotFoundError in llm.providers",
+        "investigate why the hook fires too often",
+        "do a root cause analysis on the empty output",
+    ]
+    for prompt in diag_prompts:
+        d = _classify(prompt)
+        joined = "\n".join(d["verify"]).lower()
+        assert "evidence ledger" in joined, (
+            f"diagnose prompt should mention evidence ledger: {prompt!r} → {d['verify']!r}"
+        )
