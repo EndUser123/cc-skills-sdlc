@@ -1028,9 +1028,11 @@ def derive_report_gate(task_intent, execution_tier) -> dict:
     at full_go / local_rigorous; local_surgical may claim a targeted fix only.
     """
     allow_completion = task_intent == "implement" and execution_tier in (
-        "full_go", "local_rigorous", "local_surgical",
+        "full_go", "local_rigorous",
     )
-    allow_targeted_fix_only = task_intent == "implement" and execution_tier == "local_surgical"
+    allow_targeted_fix_only = (
+        task_intent == "implement" and execution_tier == "local_surgical"
+    )
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,

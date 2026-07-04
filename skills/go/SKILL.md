@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.0.1
+version: 2.1.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -359,6 +359,64 @@ Output: `model-selection_{RUN_ID}.json` with `{tier, model, confidence, signals}
 | T4 | PI routing (see `/ai-cli --pi-model`) | design, planning |
 
 Override: `GO_MODEL_OVERRIDE` env var bypasses classification (use PI model format).
+
+---
+
+## STEP 1.6: Task Intent & Execution Tier (Ceremony Policy)
+
+The preflight artifact (`task-proposal_{RUN_ID}.json`, from `scripts/preflight_propose.py`)
+classifies the prompt on **two orthogonal axes**:
+
+- **`task_type`** (routing axis, in `active-task`): `implementation | refactor | design | planning | validation | testing` — decides *where* a task routes (`/code`, `/refactor`, `/design`, `/planning`, `/t`).
+- **`task_intent`** (ceremony axis, in the proposal): `implement | investigate | validate | decide | mixed` — decides *how* `/go` runs.
+
+`task_intent` drives `execution_tier` and `report_gate`. Read these from the proposal before STEP 2.
+
+**`execution_tier` values** (minimum sufficient ceremony):
+
+| Tier | When | Ceremony |
+|------|------|----------|
+| `direct_answer` | conversational / status / pure evidence lookup | answer directly, no dispatch, no mutation |
+| `local_surgical` | small isolated low-risk patch | local edit → targeted tests → direct smoke → report |
+| `local_rigorous` | local patch touching higher-risk surface | local edit → targeted tests → direct smoke → **registered-path smoke** → report |
+| `full_go` | `pi` dispatch, implementation work | worktree → dispatch → verify → simplify → 7-pass → QA → PR artifacts |
+| `pause_for_authorization` | `decide`, or high-risk without prompt-review support, or `requiresApproval` | emit `decision_advisory` and STOP — no dispatch |
+
+**Ceremony rules by `task_intent`:**
+
+| Intent | Execution | Report gate |
+|--------|-----------|-------------|
+| `investigate` | evidence ledger + recommendation; `local_surgical` if read-only recon else `direct_answer` | **no implementation-completion claim** |
+| `validate` | validation artifact; `local_surgical`/`direct_answer` | **no implementation-completion claim**; no full SDLC gates unless implementation is also requested |
+| `decide` | `decision_advisory` then `pause_for_authorization` (unless `agent_decidable`) | **no implementation-completion claim** |
+| `implement` | tier by risk (`local_surgical`/`local_rigorous`/`full_go`) | completion claim allowed only at `full_go`/`local_rigorous`; `local_surgical` may claim a targeted fix only |
+| `mixed` | split in prose/report; execute only items the user request already authorized; defer decisions with recommendations | **no bundled completion claim** across deferred items |
+
+**`/go` may skip delegation for small tasks, but MUST NOT skip the chosen tier's minimum verification.**
+
+### Report gate (no false completion)
+
+The proposal's `report_gate` field carries `allow_implementation_completion_claim`. If it is `false`:
+
+- Do NOT emit `<promise>PR_READY</promise>` or "Fixed."/"Done."/"Verified." for that run.
+- Emit the evidence ledger / validation artifact / decision advisory instead, with an explicit note that no implementation-completion claim is being made.
+- For `mixed`: name which children were executed and which were deferred. Use this sentence template when splitting:
+
+> This is mixed work. I executed the authorized low-risk item(s) now: `[A]`. I produced evidence for the investigation item(s): `[B]`. I am leaving the design/decision item(s) `[C]` unimplemented until you approve, because `[reason]`.
+
+### `prompt_review_required` (high-risk surfaces)
+
+When the prompt matches a high-risk surface — **hook/gate/state/identity/dispatch/cache/plugin** (`Stop`, `PreToolUse`, `PostToolUse`, `SessionStart`, `router`, `settings.json`, `hooks.json`, `plugin.json`, auth tokens) — the proposal sets `prompt_review_required: true`.
+
+Today `prompt_review_support: "absent"` (no prompt-review artifact gate exists yet). Therefore:
+
+- The execution tier becomes `pause_for_authorization`.
+- `run_preflight` writes a tracked prerequisite artifact: `prompt-review-prerequisite_{RUN_ID}.json`.
+- **Do NOT pretend review occurred.** Either block the high-risk dispatch, or surface the prerequisite and proceed only with explicit director authorization recorded in the run report.
+
+### Artifact freshness
+
+A proposal authorizes dispatch or completion **only when its `runid` matches the current `RUN_ID`**. `assert_fresh(proposal, run_id)` enforces this. A stale or mismatched proposal (different run, or pre-preflight-regeneration) must be regenerated before it can authorize anything. Missing/malformed/ambiguous `task_intent` defaults to `implement` → `full_go` (never a silent direct edit).
 
 ---
 
