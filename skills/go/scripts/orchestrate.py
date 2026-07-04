@@ -276,7 +276,12 @@ def write_session_pointer(state_dir: Path, run_id: str, session_id: str) -> None
     """
     if not session_id:
         return  # cannot write a pointer without a session identity
-    ptr_path = ARTIFACTS_ROOT / 'go-sessions' / f'{session_id}.json'
+    # Resolve at call time, not from the module global. Tests reach this fn
+    # through 3 module identities (orchestrate / skills.go.scripts.orchestrate
+    # / a _load_module alias), each with its own ARTIFACTS_ROOT bound at import;
+    # only an env read sees the per-test monkeypatched root across all of them.
+    artifacts_root = Path(os.environ.get("GO_ARTIFACTS_ROOT", str(ARTIFACTS_ROOT)))
+    ptr_path = artifacts_root / 'go-sessions' / f'{session_id}.json'
     write_json(ptr_path, {
         'go_state_dir': str(state_dir.resolve()),
         'run_id': run_id,
