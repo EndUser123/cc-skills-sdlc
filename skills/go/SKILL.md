@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.1.0
+version: 2.2.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -417,6 +417,36 @@ Today `prompt_review_support: "absent"` (no prompt-review artifact gate exists y
 ### Artifact freshness
 
 A proposal authorizes dispatch or completion **only when its `runid` matches the current `RUN_ID`**. `assert_fresh(proposal, run_id)` enforces this. A stale or mismatched proposal (different run, or pre-preflight-regeneration) must be regenerated before it can authorize anything. Missing/malformed/ambiguous `task_intent` defaults to `implement` → `full_go` (never a silent direct edit).
+
+---
+
+## STEP 1.7: Delegation Policy (Role / Authority / Freshness)
+
+`delegation_policy` is emitted on every proposal. It assigns bounded roles across the surfaces /go can delegate to — **no new multi-agent orchestrator**; the existing preflight classifier computes it deterministically.
+
+**Roles** (`roles.worker`, `roles.advisory_reviewer`):
+- `claude_main` — orchestrator, integrator, final reporter.
+- `claude_subagent` — **default** bounded Claude reviewer/worker when context protection is enough. Preferred over `pi_ccr` whenever the goal is only context protection and no model diversity / failover / local execution is needed.
+- `local_fast` — cheap fast local advisory reviewer; may be the `local_surgical` worker when `dispatch="local"`.
+- `agy` — adversarial outside-model reviewer for prompt/design/ROI/decision tasks (`decide` intent or adversarial markers).
+- `pi_ccr` — model-diverse external worker/reviewer, failover route, or isolated harness route. Selected as worker **only** at `full_go` when a model-diversity marker is present.
+
+**Mutation authority** (`mutation_authority`, fixed per role):
+- Advisory reviewers (`agy`, advisory-mode `local_fast`/`claude_subagent`) **cannot mutate** repo or shared state.
+- `claude_subagent` worker may mutate **only** within the explicitly assigned bounded scope.
+- `local_fast` worker may mutate **only** for explicitly selected `local_surgical` tasks.
+- `pi_ccr` may mutate **only** in an isolated worktree / `full_go` path — never the main tree directly.
+- **Final completion authority stays with the /go evidence gates**, not any worker (`final_authority`).
+
+**Blocking** (`required_review`, `blocking`):
+- Non-blocking advisory review may fail without blocking low-risk tasks.
+- High-risk hook/gate/state/identity/dispatch/cache/plugin tasks set `required_review=true`; at `pause_for_authorization` the review is `blocking=true` — missing/stale/rejecting review blocks dispatch.
+
+**Freshness** (`freshness`):
+- Advisory artifacts must match `run_id` **and** `prompt_hash` (`assert_advisory_fresh`).
+- Diff reviews must also match `diff_hash` (unknown at preflight; required when a diff-review artifact is produced).
+
+**Advisory is evidence, not authority** (`advisory_is_evidence_not_authority: true`): reviewer output is reported as evidence for the director; it never authorizes completion on its own.
 
 ---
 

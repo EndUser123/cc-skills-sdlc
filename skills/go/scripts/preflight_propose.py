@@ -105,6 +105,29 @@ _HIGH_RISK_MARKERS: tuple[str, ...] = (
 
 _PROMPT_REVIEW_SUPPORT = "absent"  # no prompt-review artifact gate exists in go/ yet
 
+# --- Delegation policy (lightweight role/authority/freshness) ----------------
+# /go can delegate to claude_main, claude_subagent, local_fast, agy, pi_ccr.
+# This policy assigns bounded roles without a new multi-agent orchestrator.
+_ROLE_VALUES = ("claude_main", "claude_subagent", "local_fast", "agy", "pi_ccr")
+_MUTATION_AUTHORITY: dict[str, str] = {
+    "claude_main": "final completion authority via /go evidence gates; integrates worker output",
+    "claude_subagent": "bounded worker scope explicitly assigned by /go; no shared-state mutation outside scope",
+    "local_fast": "local_surgical tasks only; no repo/shared-state mutation outside the bounded patch",
+    "agy": "advisory only; cannot mutate repo or shared state",
+    "pi_ccr": "isolated worktree / full_go path only; never mutates the main tree directly",
+}
+# Signals that the advisory review needs an outside / adversarial / model-diverse reviewer.
+_ADVERSARIAL_MARKERS: tuple[str, ...] = (
+    "adversarial", "pre-mortem", "premortem", "red team", "red-team",
+    "roi", "decision", "should we", "compare", "tradeoff", "trade-off",
+    "optimal", "strateg",
+)
+_MODEL_DIVERSITY_MARKERS: tuple[str, ...] = (
+    "model-diverse", "model diverse", "cross-model", "second opinion",
+    "second-opinion", "failover", "isolated harness", "worktree",
+    "external model", "outside model", "pi ", "ccr",
+)
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1058,6 +1081,109 @@ def assert_fresh(proposal, run_id) -> None:
         )
 
 
+def prompt_hash(rewritten: str) -> str:
+    """Stable short hash of the rewritten prompt for advisory freshness."""
+    import hashlib
+    return hashlib.sha256(rewritten.encode("utf-8")).hexdigest()[:16]
+
+
+def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispatch) -> dict:
+    """Lightweight role/authority/freshness policy for /go delegation.
+
+    Assigns bounded advisory/worker roles without a new multi-agent engine.
+    Prefers claude_subagent over pi_ccr when only context protection is needed
+    (goal req. 3). Mutation authority per role is fixed; final completion
+    authority stays with /go evidence gates (goal req. 4).
+    """
+    low = rewritten.lower()
+    high_risk = bool(risk.get("high_risk"))
+    needs_adversarial = task_intent == "decide" or any(m in low for m in _ADVERSARIAL_MARKERS)
+    needs_model_diversity = any(m in low for m in _MODEL_DIVERSITY_MARKERS)
+    context_protection_only = (
+        not high_risk and not needs_model_diversity
+        and execution_tier in ("local_rigorous", "full_go")
+    )
+
+    # Worker role by execution_tier. pi_ccr only when model-diversity / failover
+    # / isolated execution is explicitly needed (goal req. 4).
+    if execution_tier == "direct_answer":
+        worker = "claude_main"
+    elif execution_tier == "local_surgical":
+        worker = "local_fast" if dispatch == "local" else "claude_main"
+    elif execution_tier == "local_rigorous":
+        worker = "claude_subagent"
+    elif execution_tier == "full_go":
+        worker = "pi_ccr" if needs_model_diversity else "claude_subagent"
+    else:  # pause_for_authorization
+        worker = None  # no worker until director authorizes
+
+    # Advisory reviewer selection.
+    if needs_adversarial:
+        advisory = "agy"               # outside-model adversarial reviewer
+        advisory_fallback = "claude_subagent"
+    elif needs_model_diversity:
+        advisory = "pi_ccr"
+        advisory_fallback = "claude_subagent"
+    else:
+        # context-protection-only OR low-risk: claude_subagent preferred over pi_ccr.
+        advisory = "claude_subagent"
+        advisory_fallback = "local_fast"
+
+    required_review = high_risk  # high-risk hook/gate/state/identity/dispatch/cache/plugin
+    blocking = bool(required_review and execution_tier == "pause_for_authorization")
+
+    return {
+        "roles": {
+            "claude_main": "orchestrator, integrator, final reporter",
+            "worker": worker,
+            "advisory_reviewer": advisory,
+            "advisory_fallback": advisory_fallback,
+        },
+        "worker": worker,
+        "advisory_reviewer": advisory,
+        "advisory_fallback": advisory_fallback,
+        "prefer_claude_subagent_over_pi_ccr": context_protection_only,
+        "mutation_authority": dict(_MUTATION_AUTHORITY),
+        "final_authority": "/go evidence gates (not any worker)",
+        "required_review": required_review,
+        "blocking": blocking,
+        "advisory_is_evidence_not_authority": True,
+        "freshness": {
+            "advisory_requires": ["run_id", "prompt_hash"],
+            "diff_review_requires": ["run_id", "prompt_hash", "diff_hash"],
+            "prompt_hash": prompt_hash(rewritten),
+            "diff_hash": None,  # unknown at preflight; required when a diff-review artifact is produced
+        },
+        "rule": (
+            "claude_subagent is the default bounded reviewer/worker (context protection). "
+            "agy for adversarial/decision/ROI/design. pi_ccr only for model-diversity/failover/"
+            "isolated full_go work. Advisory reviewers cannot mutate; workers mutate only in "
+            "their tier scope. Final completion authority stays with /go evidence gates."
+        ),
+    }
+
+
+def assert_advisory_fresh(artifact, run_id, expected_prompt_hash, diff_hash=None) -> None:
+    """Advisory artifact freshness contract (goal req. 6).
+
+    Advisory artifacts must match run_id AND prompt_hash. Diff reviews must
+    also match diff_hash. Stale/mismatched artifacts raise; callers regenerate.
+    """
+    if artifact.get("run_id") != run_id:
+        raise ValueError(
+            f"stale advisory: run_id={artifact.get('run_id')!r} != {run_id!r}"
+        )
+    if artifact.get("prompt_hash") != expected_prompt_hash:
+        raise ValueError(
+            f"stale advisory: prompt_hash={artifact.get('prompt_hash')!r} != "
+            f"{expected_prompt_hash!r} (prompt changed since review)"
+        )
+    if diff_hash is not None and artifact.get("diff_hash") not in (None, diff_hash):
+        raise ValueError(
+            f"stale advisory: diff_hash={artifact.get('diff_hash')!r} != {diff_hash!r}"
+        )
+
+
 def generate_proposal(
     prompt: str,
     run_id: str,
@@ -1073,6 +1199,9 @@ def generate_proposal(
     )
     report_gate = derive_report_gate(task_intent, execution_tier)
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
+    delegation_policy = derive_delegation_policy(
+        rewritten, task_intent, execution_tier, risk, dispatch
+    )
     prompt_review_required = bool(risk["prompt_review_required"])
     notes = [
         "Deterministic heuristic (no LLM). dispatch="
@@ -1102,9 +1231,14 @@ def generate_proposal(
         "prompt_review_support": _PROMPT_REVIEW_SUPPORT,
         "report_gate": report_gate,
         "decision_advisory": decision_advisory,
+        "delegation_policy": delegation_policy,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
-        "freshness": {"run_id": run_id, "must_match_run_id": True},
+        "freshness": {
+            "run_id": run_id,
+            "must_match_run_id": True,
+            "prompt_hash": delegation_policy["freshness"]["prompt_hash"],
+        },
         "notes": notes,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
@@ -1165,6 +1299,11 @@ if __name__ == "__main__":
         "pause_for_authorization",
     )
     assert isinstance(out["report_gate"]["allow_implementation_completion_claim"], bool)
+    dp = out["delegation_policy"]
+    assert dp["worker"] in (None,) + _ROLE_VALUES
+    assert dp["advisory_reviewer"] in _ROLE_VALUES
+    assert dp["advisory_is_evidence_not_authority"] is True
+    assert set(dp["mutation_authority"]) == set(_ROLE_VALUES)
     assert_fresh(out, "run-self")  # freshness contract holds for current run
     # investigate prompts must not enable completion claims.
     inv = generate_proposal("investigate why the hook double-fires", "run-inv", "tid")
