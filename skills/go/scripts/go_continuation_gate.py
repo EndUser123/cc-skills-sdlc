@@ -52,7 +52,7 @@ from pathlib import Path
 # telemetry is optional (fail-open); imported lazily in _emit.
 _emit = None  # deferred import of emit_gate_telemetry
 
-ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
+ARTIFACTS_ROOT = Path(os.environ.get("GO_ARTIFACTS_ROOT", "P:/.claude/.artifacts"))
 SESSIONS_DIR_NAME = "go-sessions"
 STALE_TTL_SECONDS = 6 * 3600  # 6h — see module docstring justification.
 

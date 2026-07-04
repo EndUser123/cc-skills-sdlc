@@ -23,7 +23,7 @@ from typing import Any, Sequence
 VALID_DISPATCHES = ("pi", "claude", "local")
 SKILL_DIR = Path(__file__).resolve().parents[1]
 PLUGIN_ROOT = SKILL_DIR.parent.parent
-ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
+ARTIFACTS_ROOT = Path(os.environ.get("GO_ARTIFACTS_ROOT", "P:/.claude/.artifacts"))
 
 _TRANSCRIPT_PATH_FILE = Path.home() / "claude-log.transcript_path.txt"
 

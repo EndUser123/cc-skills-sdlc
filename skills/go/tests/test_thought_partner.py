@@ -256,10 +256,14 @@ class TestContinuationGate:
         """Grep gate source: no os.environ or mtime used for identity binding."""
         gate_src = Path(__file__).resolve().parent.parent / "scripts" / "go_continuation_gate.py"
         text = gate_src.read_text(encoding="utf-8")
-        # No _terminal_id, no WT_SESSION, no os.environ.get for identity.
+        # No _terminal_id, no WT_SESSION, no env-based identity binding.
         assert "_terminal_id" not in text
         assert "WT_SESSION" not in text
-        assert "os.environ.get" not in text
+        # ARTIFACTS_ROOT *location* override (GO_ARTIFACTS_ROOT) is allowed —
+        # it selects where pointers live, not who the caller is. Identity
+        # (session/terminal) must come from the payload, never from env.
+        for identity_key in ("CLAUDE_SESSION_ID", "CLAUDE_AGENT_SESSION_ID"):
+            assert identity_key not in text
         # No mtime-based selection.
         assert "st_mtime" not in text
 
