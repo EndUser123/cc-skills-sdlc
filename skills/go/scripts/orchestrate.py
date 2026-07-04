@@ -334,6 +334,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tasks", help="Path to tasks.json")
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
     parser.add_argument("--forbidden", nargs="*", default=[], help="Forbidden files")
+    parser.add_argument(
+        "--validation",
+        action="store_true",
+        help="Mark this task as validation/audit type. G5 allows Stop when "
+        "validation contract is satisfied (task_type=validation + .pr-ready "
+        "or status=completed). Implementation tasks always require full SDLC gates.",
+    )
     return parser.parse_args(argv)
 
 
@@ -628,7 +635,7 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
                 "acceptance_criteria": [],
                 "verification_commands": verification_commands,
                 "forbidden_files": args.forbidden or [],
-                "task_type": "implementation",
+                "task_type": "validation" if getattr(args, "validation", False) else "implementation",
             },
         }
         # Phase 5: include the verification plan from the matrix so the

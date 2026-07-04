@@ -4,25 +4,28 @@
 Session-bound via the same pointer model as go_continuation_gate.py (G4):
   payload session_id -> go-sessions/{session_id}.json -> go_state_dir/run_id
 
-Replaces the old env-based authority (GO_STATE_DIR, CLAUDE_TERMINAL_ID,
-mtime globs) which was unreliable in hook subprocesses where those env
-vars are empty.
+Trap prevention uses payload stop_hook_active (CC's recursion flag):
+  - stop_hook_active=True  -> this is a recursive Stop triggered by a prior
+    hook's block. Exit 0 silently to break the recursion loop. The prior
+    hook already blocked; repeating the block would trap the session.
+  - stop_hook_active=False -> this is a normal Stop. Evaluate gates and
+    block if incomplete.
 
 Fail-silent rules:
-  - No session_id in payload -> exit 0 (not a /go session)
-  - No pointer file -> exit 0 (no /go state)
-  - Stale pointer (>6h) -> exit 0 (abandoned run)
-  - Pointer points to missing state dir -> exit 0
-  - Malformed pointer/state -> exit 0
+  - No session_id -> exit 0 (not a /go session)
+  - No pointer / stale pointer -> exit 0 (no /go state)
+  - Pointer -> missing state dir / malformed -> exit 0
+  - stop_hook_active=True -> exit 0 (recursive, prior block stands)
 
 Block rules:
-  - Fresh matching pointer + incomplete hard gates -> exit 2 (BLOCKED)
-  - Validation mode (go-validation-complete marker) -> exit 0 (ALLOW)
+  - stop_hook_active=False + fresh matching pointer + incomplete hard gates
+    -> exit 2 (BLOCKED) with actionable state path
+  - Fully complete gates -> exit 0 (ALLOW)
 
-Prevent hook trap:
-  - If the same session_id+run_id blocked on the PREVIOUS Stop call
-    (tracked via a temp file), emit the block only once and exit 0 on
-    subsequent calls to avoid infinite blocking.
+Validation mode:
+  - task_type=validation/audit in active-task record
+  - Completes via .go-validation-complete* marker OR status=completed/done
+  - Implementation tasks always require SDLC hard gates
 """
 from __future__ import annotations
 
@@ -64,6 +67,11 @@ def _payload_session_id(payload: dict) -> str:
     return sid if isinstance(sid, str) else ""
 
 
+def _payload_stop_hook_active(payload: dict) -> bool:
+    """True when CC is invoking this hook recursively after a prior hook blocked."""
+    return bool(payload.get("stop_hook_active", False))
+
+
 def _read_pointer(session_id: str) -> dict | None:
     ptr = _ARTIFACTS_ROOT / _SESSIONS_DIR / f"{session_id}.json"
     if not ptr.is_file():
@@ -101,62 +109,22 @@ def _parse_iso_timestamp(value) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Hook-trap prevention
-# ---------------------------------------------------------------------------
-
-def _block_fingerprint(session_id: str, run_id: str) -> Path:
-    """Temp file that tracks the last block for this session+run."""
-    return _ARTIFACTS_ROOT / ".go-g5-last-block.json"
-
-
-def _was_already_blocked(session_id: str, run_id: str) -> bool:
-    fp = _block_fingerprint(session_id, run_id)
-    if not fp.is_file():
-        return False
-    try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
-        return data.get("session_id") == session_id and data.get("run_id") == run_id
-    except (json.JSONDecodeError, OSError):
-        return False
-
-
-def _record_block(session_id: str, run_id: str) -> None:
-    fp = _block_fingerprint(session_id, run_id)
-    try:
-        fp.parent.mkdir(parents=True, exist_ok=True)
-        tmp = fp.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"session_id": session_id, "run_id": run_id}), encoding="utf-8")
-        tmp.replace(fp)
-    except OSError:
-        pass
-
-
-def _clear_block(session_id: str, run_id: str) -> None:
-    fp = _block_fingerprint(session_id, run_id)
-    try:
-        fp.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-
-# ---------------------------------------------------------------------------
 # Validation mode
 # ---------------------------------------------------------------------------
 
 def _is_validation_complete(state_dir: Path, run_id: str) -> bool:
     """True if the run was completed in validation/audit mode."""
-    # Check for go-validation-complete marker
+    # Explicit validation-complete marker.
     if list(state_dir.glob(f".go-validation-complete*{run_id}*")) or list(state_dir.glob(".go-validation-complete*")):
         return True
-    # Check task_type in active-task record
+    # Check task_type in active-task record.
     path = state_dir / f"active-task_{run_id}.json"
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             task = data.get("task") or data
             if task.get("task_type") in ("validation", "audit"):
-                # Validation tasks: check if the validation contract is satisfied
-                # (at minimum: .pr-ready or status=completed)
+                # Validation tasks complete via .pr-ready or explicit status.
                 if list(state_dir.glob(f".pr-ready*{run_id}*")) or list(state_dir.glob(f".pr_ready*{run_id}*")):
                     return True
                 status = (task.get("status") or "").lower()
@@ -173,8 +141,13 @@ def _is_validation_complete(state_dir: Path, run_id: str) -> bool:
 
 def main() -> None:
     payload = _parse_payload()
-    session_id = _payload_session_id(payload)
 
+    # Trap prevention: if CC is invoking recursively (stop_hook_active=True),
+    # a prior hook already blocked. Exit 0 to break the recursion loop.
+    if _payload_stop_hook_active(payload):
+        sys.exit(0)
+
+    session_id = _payload_session_id(payload)
     # No session_id -> not a /go session -> fail silent.
     if not session_id:
         sys.exit(0)
@@ -196,7 +169,6 @@ def main() -> None:
 
     # Validation mode: if the validation contract is satisfied, allow.
     if _is_validation_complete(state_dir, run_id):
-        _clear_block(session_id, run_id)
         sys.exit(0)
 
     # Load enforce config.
@@ -210,15 +182,12 @@ def main() -> None:
     except KeyError:
         sys.exit(0)  # no config -> fail silent
 
-    # Build a synthetic env with the resolved state for evaluate_gates.
-    # This replaces the unreliable env-based authority with the pointer-resolved
-    # state dir and run_id.
+    # Build synthetic env with pointer-resolved state (replaces env authority).
     eval_env = {
         "GO_STATE_DIR": str(state_dir),
         "RUN_ID": run_id,
         "CLAUDE_SESSION_ID": session_id,
     }
-    # Also include actual env for fast_mode, GO_SKIP, etc.
     eval_env.update({
         k: v for k, v in os.environ.items()
         if k in ("CLAUDE_CODE_FAST_MODE", "GO_SKIP", "GO_EF_SKIP")
@@ -227,23 +196,12 @@ def main() -> None:
     exit_code, message = evaluate_gates("go", config, eval_env)
 
     if exit_code == 0:
-        # Gates pass -> clear any previous block record.
-        _clear_block(session_id, run_id)
         sys.exit(0)
 
-    # Gates fail -> block.
-    # Check if we already blocked for this session+run (prevent hook trap).
-    if _was_already_blocked(session_id, run_id):
-        # Already blocked once -> fail silent to prevent infinite blocking.
-        sys.exit(0)
-
-    # Record this block and emit.
-    _record_block(session_id, run_id)
+    # Gates fail -> block with actionable state path.
     if message:
-        # Add actionable state path to the message.
         state_path = f"state: {state_dir} (session: {session_id}, run: {run_id})"
-        enhanced = f"{message}\n  {state_path}"
-        print(enhanced, file=sys.stderr)
+        print(f"{message}\n  {state_path}", file=sys.stderr)
     sys.exit(exit_code)
 
 
