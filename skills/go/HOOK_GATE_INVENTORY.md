@@ -29,33 +29,40 @@ Legend:
 | G6 | `cc-skills-sdlc/hooks/Stop.py` | dormant-intentional | Exists in plugin hooks dir but plugin dispatcher (S2) is `{"hooks": {}}`, so it is never dispatched. Referenced only by `enforce/tests/test_enforce.py`. | **Decide:** retire (delete + drop test) OR wire deliberately via S2. Not wired here. |
 | G7 | S1 SubagentStop[0]: `SubagentStop_cjk_drift_detector.py` | live | Different event (SubagentStop, not Stop) | Out of /go scope |
 
-## Decision: dispatch reconciliation (task #1053) — DECIDED
+## Decision: dispatch reconciliation (task #1053) — RATIFIED (2026-07-04)
 
-**Keep G4 as a documented direct-entry exception. Do NOT migrate into the
-plugin dispatcher (S2) or skill frontmatter (S3).**
+Director ratified the following dispatch decisions:
 
-Rationale:
-1. **Source-liveness.** `settings.json` Stop[3] invokes the gate at its SOURCE
-   path (`skills/go/scripts/go_continuation_gate.py`). Edits take effect
-   without a cache rebuild. Migrating to the plugin dispatcher (S2) couples
-   the gate to the version-keyed cache, where a stale cache can silently
-   override source fixes — exactly the drift class we just had to resolve.
-2. **Self-scoping + fail-silent.** The gate prints nothing when identity is
-   absent, the bound state dir is missing, or state is foreign/stale/ambiguous.
-   It is inert in every non-`/go` session, so direct-entry imposes no
-   cross-session cost.
-3. **No mixed patterns.** Keeping G4 on S1 and S2/S3 dormant is a single,
-   consistent pattern (project-settings direct entry). Wiring S2 would create a
-   second active dispatch surface for this plugin and resurrect G5/G6 ambiguity.
+### G4: KEEP (direct-entry at S1 Stop[3])
 
-**G5 resolved (2026-07-04):** Confirmed live via SKILL.md frontmatter dispatch.
-Keep as-is. G5 (enforce gate) and G4 (continuation gate) are complementary:
-G5 enforces SDLC completeness (blocks incomplete runs); G4 handles
-task-completion semantics (blocks when work remains). No conflict; no
-double-fire (different dispatch surfaces, different concerns).
+Session-bound deterministic continuation gate at
+`P:/.claude/settings.json` `hooks.Stop[3]` → source path
+`skills/go/scripts/go_continuation_gate.py`.
 
-**G6 still open:** `cc-skills-sdlc/hooks/Stop.py` remains dormant-intentional.
-Retire or wire deliberately — separate, isolated decision, not a side effect.
+- **Binding:** payload session_id → `go-sessions/{session_id}.json` pointer →
+  `go_state_dir` → active-task. No env/terminal/mtime authority.
+- **Fail-safe:** silent on foreign, stale, missing, ambiguous state.
+- **Source-liveness:** edits take effect without cache rebuild.
+- **Not migrated** to plugin dispatcher (S2) or skill frontmatter (S3).
+
+### G5: KEEP (skill-frontmatter at S3)
+
+Session-bound SDLC hard-gate enforcer at
+`skills/go/hooks/Stop_enforce_gate.py` via SKILL.md frontmatter `hooks.Stop`.
+
+- **Binding:** same pointer model as G4 (payload session_id → pointer → state).
+- **Trap prevention:** uses `stop_hook_active` from Stop payload (not cooldown).
+  If `stop_hook_active=True` (recursive Stop from prior hook block), exit 0.
+  If `stop_hook_active=False`, evaluate gates → block if incomplete.
+- **Validation mode:** `task_type=validation/audit` + `.pr-ready` or
+  `status=completed` → allows Stop. Implementation tasks always require SDLC gates.
+- **Fail-safe:** silent on foreign, stale, missing state.
+- **Order:** fires before G4 (skill-frontmatter before settings.json Stop entries).
+
+### G6: UNRESOLVED (separate decision required)
+
+`cc-skills-sdlc/hooks/Stop.py` remains dormant-intentional. Do NOT revive
+without explicit decision. Retire or wire deliberately — separate, isolated task.
 
 ## Mechanical-check coverage
 

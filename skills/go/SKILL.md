@@ -144,8 +144,18 @@ failures.
 
 The gate is **additive** — it does not disable the native evaluator (no plugin
 API exists for that). It coexists as Stop[3] and is self-scoping: when no
-`console_go_*/go` state tree exists, `_find_state_dir()` returns `None` and the
-gate prints nothing, so it is inert in every non-`/go` session.
+state pointer exists for the current session, the gate prints nothing and is
+inert in every non-`/go` session.
+
+**Validation tasks:** Use `--validation` flag when running `/go` for
+validation/audit/review/field-test tasks. This sets `task_type=validation` in
+the task contract, which allows G5 (SDLC enforce gate) to accept Stop when the
+validation contract is satisfied (`.pr-ready` or `status=completed`) without
+requiring all SDLC hard gates. Implementation tasks always require full gates.
+
+**Never use native `/goal` for state-expressible `/go` validation.** The native
+goal-loop evaluator is flaky and can produce "JSON validation failed" errors.
+Use the deterministic `/go` state checks (G4 + G5) instead.
 
 ---
 
