@@ -235,7 +235,7 @@ class TestDirectInvocation:
 
     def _setup_real_pointer(self, tmp_path, mode):
         state = tmp_path / "state"; state.mkdir()
-        proposal = _proposal(scope=["src/auth.py"])
+        proposal = _proposal(scope=["src/auth.py", "src/auth/"])
         (state / "task-proposal_r1.json").write_text(json.dumps(proposal), encoding="utf-8")
         if mode == "advisory":
             (state / ".delegation-advisory_r1").touch()
