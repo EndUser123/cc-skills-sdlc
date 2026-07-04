@@ -291,6 +291,26 @@ def phase_marker(state_dir: Path, phase: str, run_id: str) -> Path:
     return p
 
 
+def set_delegation_mode(state_dir: Path, mode: str, run_id: str) -> None:
+    """Flip the active delegation mutation-authority mode for this run.
+
+    worker = production phase (worker may mutate in scope); advisory = review
+    phase (advisory roles read-only); off = neither. The PreToolUse gate reads
+    these to enforce delegation_policy at the tool-call boundary.
+    """
+    worker_m = state_dir / f".delegation-worker_{run_id}"
+    advisory_m = state_dir / f".delegation-advisory_{run_id}"
+    if mode == "worker":
+        advisory_m.unlink(missing_ok=True)
+        touch(worker_m)
+    elif mode == "advisory":
+        worker_m.unlink(missing_ok=True)
+        touch(advisory_m)
+    elif mode == "off":
+        worker_m.unlink(missing_ok=True)
+        advisory_m.unlink(missing_ok=True)
+
+
 def write_current_run(state_dir: Path, run_id: str, status: str, dispatch: str) -> None:
     terminal_id = _canonical_terminal_id()
     payload = {
@@ -982,12 +1002,14 @@ def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelIn
     if result.exit_code != 0:
         return False
     phase_marker(state_dir, "dispatched", run_id)
+    set_delegation_mode(state_dir, "worker", run_id)
 
     review_script = script_path("scripts", "adapters", "pi", "review_transcript.py")
     rc = run_script(review_script, [], state_dir, run_id)
     if rc != 0:
         return False
     phase_marker(state_dir, "transcript-reviewed", run_id)
+    set_delegation_mode(state_dir, "advisory", run_id)
 
     verdict_file = state_dir / f"pi-review_{run_id}.json"
     critical: list[str] = []

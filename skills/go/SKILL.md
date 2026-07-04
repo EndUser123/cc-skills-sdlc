@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.2.0
+version: 2.3.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -29,6 +29,12 @@ hooks:
         - type: command
           command: python "$CLAUDE_PLUGIN_ROOT"/skills/go/hooks/Stop_enforce_gate.py
           description: Verify /go phase gates via shared enforce layer
+  PreToolUse:
+    - matcher: .*
+      hooks:
+        - type: command
+          command: python "$CLAUDE_PLUGIN_ROOT"/skills/go/hooks/go_delegation_enforce_PreToolUse.py
+          description: Enforce delegation_policy mutation authority at the tool-call boundary
 ---
 # /go - Evidence-First SDLC Orchestrator
 
@@ -447,6 +453,11 @@ A proposal authorizes dispatch or completion **only when its `runid` matches the
 - Diff reviews must also match `diff_hash` (unknown at preflight; required when a diff-review artifact is produced).
 
 **Advisory is evidence, not authority** (`advisory_is_evidence_not_authority: true`): reviewer output is reported as evidence for the director; it never authorizes completion on its own.
+
+**Enforcement boundary** (`worker_scope`, `worker_enforcement`): mutation authority is enforced at two real boundaries, not in policy text alone.
+- **Tool-call boundary** — `hooks/go_delegation_enforce_PreToolUse.py` (registered via this skill's frontmatter) reads the active proposal + a `.delegation-{advisory|worker}_{run_id}` phase marker and denies disallowed mutations: advisory roles are denied all mutating tools (`Edit`/`Write`/`MultiEdit`/`NotebookEdit` and Bash shared-state subcommands); `claude_subagent`/`local_fast` workers are path-bounded to `worker_scope` when it is resolvable (`worker_enforcement="path-bound"`), else type-bounded (`"type-bound"` — mutating tools allowed in scope but shared-state Bash still denied for `local_fast`); `pi_ccr` direct main-tree edits are denied.
+- **pi subprocess boundary** — `scripts/adapters/pi/harness.py` refuses to spawn if the worktree branch is `main`/`master` (`pi_ccr` mutates only in an isolated feature worktree).
+- Markers are flipped by `orchestrate.set_delegation_mode()`: `worker` at the `dispatched` phase, `advisory` at `transcript-reviewed`. Outside a gated phase the gate is inert (silent allow).
 
 ---
 

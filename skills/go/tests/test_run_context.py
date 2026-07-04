@@ -298,3 +298,42 @@ def test_tid_source_canonical_env(isolated_state):
     ctx = run_context.resolve(state_dir_hint=isolated_state)
     assert ctx.tid_source == "canonical-env"
     assert ctx.terminal_id == TERMINAL_ID
+
+
+# plugin-tree pollution guard (#939) -------------------------------------------
+
+
+def test_no_pollution_when_cwd_in_plugin_tree(monkeypatch, tmp_path):
+    """Regression for #939: when CWD is inside the /go plugin's own source
+    tree (e.g. a script hand-invoked from scripts/), the default state dir
+    must redirect to the user-global artifacts dir — NOT write into the skill
+    tree. Pre-fix this wrote .claude/.artifacts/ under skills/go/scripts/."""
+    user_artifacts = tmp_path / "user-artifacts"
+    monkeypatch.setattr(run_context, "_USER_ARTIFACTS", user_artifacts)
+    monkeypatch.chdir(SCRIPTS)  # CWD = scripts/, inside _PLUGIN_ROOT
+    monkeypatch.setattr(run_context, "canonical_terminal_id_from_env", lambda: "console_pollute_test")
+    for var in ("GO_RUN_ID", "RUN_ID", "CLAUDE_GO_RUN_ID", "GO_STATE_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    ctx = run_context.resolve()  # no hint, no env — exercises the default branch
+    plugin_root = SCRIPTS.parents[1].resolve()  # cc-skills-sdlc/
+    try:
+        ctx.state_dir.relative_to(plugin_root)
+    except ValueError:
+        pass  # good — state_dir is NOT inside the plugin source tree
+    else:
+        pytest.fail(f"state_dir {ctx.state_dir} is inside the plugin source tree (pollution)")
+    assert ctx.state_dir == (user_artifacts / "console_pollute_test" / "go").resolve()
+
+
+def test_normal_worktree_cwd_writes_to_repo(monkeypatch, tmp_path):
+    """Complement to the pollution guard: when CWD is a NORMAL worktree (not
+    the plugin tree), state still writes to <repo>/.claude/.artifacts/ — the
+    worktree-scoping contract is preserved."""
+    repo_root = tmp_path / "some-repo"
+    repo_root.mkdir()
+    monkeypatch.chdir(repo_root)  # CWD outside the plugin tree
+    monkeypatch.setattr(run_context, "canonical_terminal_id_from_env", lambda: "console_wt_test")
+    for var in ("GO_RUN_ID", "RUN_ID", "CLAUDE_GO_RUN_ID", "GO_STATE_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    ctx = run_context.resolve()
+    assert ctx.state_dir == (repo_root / ".claude" / ".artifacts" / "console_wt_test" / "go").resolve()

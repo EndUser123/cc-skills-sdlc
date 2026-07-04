@@ -128,6 +128,28 @@ _MODEL_DIVERSITY_MARKERS: tuple[str, ...] = (
     "external model", "outside model", "pi ", "ccr",
 )
 
+# --- Mutation-authority enforcement (tool-call boundary) ---------------------
+# Tools that mutate repo/shared state. The PreToolUse gate denies these for
+# advisory roles and path-checks them for worker roles against worker_scope.
+_MUTATING_TOOLS: tuple[str, ...] = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+# Bash subcommands that touch shared state beyond the bounded patch. A worker
+# role using one of these is denied (advisory roles are denied all mutating
+# tools regardless).
+_SHARED_STATE_TOOL_MARKERS: tuple[str, ...] = (
+    "git push", "git commit", "git reset", "git checkout", "git rebase",
+    "git stash", "git merge", "git tag", "git rm",
+    "settings.json", "hooks.json", "plugin.json", "marketplace.json",
+    "plugin-audit-and-fix", "--bump", "pip install", "npm install",
+)
+# Concrete-path extractor for worker_scope. Matches dotted relative paths
+# (foo.py, src/bar/baz.py) and absolute Windows/POSIX paths. Intentionally
+# narrow: false positives would over-bound legitimate edits.
+_PATH_RE = re.compile(
+    r"(?:[A-Za-z]:[\\/][\w./\\-]+|"                # P:/... or C:\...
+    r"(?:[\w.-]+/){1,6}[\w.-]+\.[A-Za-z]{1,8}|"    # src/foo/bar.py
+    r"[\w-]+\.(?:py|md|json|sh|ts|tsx|js|toml|yaml|yml))"  # foo.py
+)
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1087,6 +1109,23 @@ def prompt_hash(rewritten: str) -> str:
     return hashlib.sha256(rewritten.encode("utf-8")).hexdigest()[:16]
 
 
+def _extract_worker_scope(rewritten: str) -> list[str]:
+    """Concrete path prefixes the worker may mutate, derived from the prompt.
+
+    Used by the PreToolUse gate to path-bound worker edits. Returns [] when no
+    concrete paths are resolvable — the gate then enforces tool-type
+    restrictions only (advisory=read-only; local_fast=no-shared-state), not
+    path bounds. We never claim path-bound enforcement we can't deliver.
+    """
+    seen: list[str] = []
+    for m in _PATH_RE.finditer(rewritten):
+        p = m.group(0).replace("\\", "/").rstrip(".,;:")
+        # Keep the longest prefix that looks like a real path (drop bare exts).
+        if p and p not in seen:
+            seen.append(p)
+    return seen[:8]  # bounded; a worker patch touching >8 paths is not "bounded"
+
+
 def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispatch) -> dict:
     """Lightweight role/authority/freshness policy for /go delegation.
 
@@ -1094,6 +1133,10 @@ def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispa
     Prefers claude_subagent over pi_ccr when only context protection is needed
     (goal req. 3). Mutation authority per role is fixed; final completion
     authority stays with /go evidence gates (goal req. 4).
+
+    worker_scope (concrete path prefixes) lets the PreToolUse gate path-bound
+    worker edits; worker_enforcement reports whether such bounds are available
+    so callers never over-claim enforcement granularity.
     """
     low = rewritten.lower()
     high_risk = bool(risk.get("high_risk"))
@@ -1116,6 +1159,16 @@ def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispa
         worker = "pi_ccr" if needs_model_diversity else "claude_subagent"
     else:  # pause_for_authorization
         worker = None  # no worker until director authorizes
+
+    # Worker scope: path-bound when concrete paths are resolvable, else the gate
+    # falls back to tool-type enforcement. pi_ccr's scope is the worktree (set
+    # at dispatch by harness.py, not here).
+    worker_scope = _extract_worker_scope(rewritten) if worker in (
+        "claude_subagent", "local_fast") else []
+    worker_enforcement = (
+        "worktree" if worker == "pi_ccr"
+        else ("path-bound" if worker_scope else "type-bound")
+    )
 
     # Advisory reviewer selection.
     if needs_adversarial:
@@ -1144,6 +1197,17 @@ def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispa
         "advisory_fallback": advisory_fallback,
         "prefer_claude_subagent_over_pi_ccr": context_protection_only,
         "mutation_authority": dict(_MUTATION_AUTHORITY),
+        "worker_scope": worker_scope,
+        "worker_enforcement": worker_enforcement,
+        "enforcement": {
+            "mutating_tools": list(_MUTATING_TOOLS),
+            "shared_state_tool_markers": list(_SHARED_STATE_TOOL_MARKERS),
+            "boundary": (
+                "PreToolUse gate (Claude tool calls) + pi harness worktree assertion. "
+                "Advisory roles: mutating tools denied. Workers: edits path-bounded "
+                "when worker_scope resolvable, else tool-type only. pi_ccr: worktree only."
+            ),
+        },
         "final_authority": "/go evidence gates (not any worker)",
         "required_review": required_review,
         "blocking": blocking,
@@ -1304,6 +1368,9 @@ if __name__ == "__main__":
     assert dp["advisory_reviewer"] in _ROLE_VALUES
     assert dp["advisory_is_evidence_not_authority"] is True
     assert set(dp["mutation_authority"]) == set(_ROLE_VALUES)
+    assert isinstance(dp["worker_scope"], list)
+    assert dp["worker_enforcement"] in ("path-bound", "type-bound", "worktree")
+    assert isinstance(dp["enforcement"]["mutating_tools"], list)
     assert_fresh(out, "run-self")  # freshness contract holds for current run
     # investigate prompts must not enable completion claims.
     inv = generate_proposal("investigate why the hook double-fires", "run-inv", "tid")

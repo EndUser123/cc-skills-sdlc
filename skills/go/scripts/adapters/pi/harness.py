@@ -211,6 +211,31 @@ def write_failed_pi_artifacts(
     return result
 
 
+def _worktree_branch(worktree: Path) -> str:
+    """Best-effort read of the worktree's current git branch ('' if unknown)."""
+    head = worktree / ".git" / "HEAD"
+    if not head.is_file():
+        # worktree .git can be a file pointing at the real gitdir
+        git_file = worktree / ".git"
+        if git_file.is_file():
+            try:
+                line = git_file.read_text(encoding="utf-8").strip()
+                if line.startswith("gitdir:"):
+                    head = Path(line.split(":", 1)[1].strip()) / "HEAD"
+            except OSError:
+                return ""
+        else:
+            return ""
+    try:
+        text = head.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if text.startswith("ref:"):
+        # ref: refs/heads/<branch>
+        return text.rsplit("/", 1)[-1]
+    return ""  # detached HEAD
+
+
 def run_pi_harness(
     worktree: Path,
     state_dir: Path,
@@ -232,6 +257,25 @@ def run_pi_harness(
     env["GO_STATE_DIR"] = str(state_dir)
     env["WORKTREE"] = str(worktree)
     env["PI_CODING_AGENT_SESSION_DIR"] = str(session_dir)
+
+    # Delegation mutation-authority: pi_ccr mutates only in an isolated
+    # worktree, never on the main/master branch. Refuse to spawn otherwise —
+    # this is the subprocess-side counterpart to the PreToolUse gate.
+    branch = _worktree_branch(worktree)
+    if branch in ("main", "master"):
+        return write_failed_pi_artifacts(
+            state_dir=state_dir,
+            run_id=run_id,
+            command=command,
+            session_dir=session_dir,
+            worktree=worktree,
+            status="blocked_main_branch",
+            error=RuntimeError(
+                f"pi_ccr mutation authority violated: worktree branch is "
+                f"'{branch}', not an isolated feature branch. Refusing to "
+                f"spawn pi on the main tree."
+            ),
+        )
 
     timeout = int(os.environ.get("GO_PI_TIMEOUT_SECONDS", "1800"))
     try:

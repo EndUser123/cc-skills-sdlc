@@ -89,6 +89,27 @@ def canonical_terminal_id() -> str:
     return f"console_{hashlib.sha1(str(os.getppid()).encode()).hexdigest()[:16]}"
 
 
+# ─── Plugin-tree guard (#939) ─────────────────────────────────────────────────
+# /go's contract writes artifacts to the WORKTREE's .claude/ so state travels
+# with the repo. But Path.cwd() resolves to the skill's own scripts/ dir when a
+# script is hand-invoked or a test runs from there — polluting plugin SOURCE.
+# Detect that degenerate case and fall back to the user-global artifacts dir.
+
+_PLUGIN_ROOT = Path(__file__).resolve().parents[3]
+_USER_ARTIFACTS = Path.home() / ".claude" / ".artifacts"
+
+
+def _artifacts_base() -> Path:
+    """Artifacts base dir: worktree .claude/.artifacts normally; user-global
+    when CWD is inside the plugin's own source tree (prevents skill pollution)."""
+    cwd = Path.cwd().resolve()
+    try:
+        cwd.relative_to(_PLUGIN_ROOT)
+    except ValueError:
+        return cwd / ".claude" / ".artifacts"  # normal worktree CWD
+    return _USER_ARTIFACTS  # CWD inside plugin source — don't pollute it
+
+
 # ─── RunContext ───────────────────────────────────────────────────────────────
 
 
@@ -219,7 +240,7 @@ def _resolve_state_dir(hint: Path | None, terminal_id: str) -> Path:
     env_sd = os.environ.get("GO_STATE_DIR", "").strip()
     if env_sd:
         return Path(env_sd).resolve()
-    return (Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go").resolve()
+    return (_artifacts_base() / terminal_id / "go").resolve()
 
 
 def _most_recent_active_task_run_id(state_dir: Path) -> str:
@@ -247,7 +268,7 @@ def _safe_delete(path: Path) -> None:
 
 
 def _unresolved(terminal_id: str, tid_source: TidSource, hint: Path | None) -> RunContext:
-    state_dir = _resolve_state_dir(hint, terminal_id) if terminal_id else (hint or Path.cwd())
+    state_dir = _resolve_state_dir(hint, terminal_id) if terminal_id else (Path(hint).resolve() if hint else _artifacts_base())
     marker_name = f".unresolved-run_{terminal_id}.json" if terminal_id else ".unresolved-run_unk.json"
     payload = {
         "reason": "all-resolution-tiers-missed",
