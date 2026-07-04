@@ -247,6 +247,7 @@ Usage: `/wiki ingest` (safe only), `/wiki ingest --all` (safe + large-warn), `/w
 | skill, slash command, SKILL.md | `P:/.claude/docs/claude-skills-v3.0.md` |
 | agent, subagent | `P:/.claude/docs/claude-agents-v1.0.md` |
 | claude code, claude-code, settings, permissions | `P:/.claude/docs/claude-code-reference.md` |
+| detection, pattern, marker, matcher, applicability, epistemic, causal, diagnosis, output_patterns | `P:/.claude/hooks/__lib/` (112 .py files — grep for implementation details behind docs) |
 
 **Auto-save high-value results**: If the synthesized answer is substantive (non-trivial insight, new connection, resolved ambiguity, or decision-relevant synthesis), save it directly to the wiki without asking. Write to `wiki/concepts/<slug>.md` with YAML frontmatter. Only ask the user if the synthesis is uncertain or incomplete.
 
