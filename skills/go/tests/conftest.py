@@ -32,3 +32,36 @@ def _isolate_go_artifacts(monkeypatch, tmp_path):
     mod = pytest.importorskip("orchestrate")
     monkeypatch.setattr(mod, "ARTIFACTS_ROOT", artifacts)
     yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _assert_no_real_store_leak():
+    # Suite-level invariant: after the whole /go suite, the REAL go-sessions
+    # pointer store must hold no test-pollution pointer. Catches any writer
+    # that bypasses the per-test GO_ARTIFACTS_ROOT isolation (the run-vp-tel
+    # incident class — see memory: test-module-alias-isolation-leak).
+    # Precise signature: a pointer whose go_state_dir is under the OS temp dir.
+    # Real /go runs write under .claude/.artifacts, never temp, so concurrent
+    # real runs in other terminals can't flake this.
+    import json
+    import tempfile
+
+    yield
+    real_store = pathlib.Path("P:/.claude/.artifacts/go-sessions")
+    if not real_store.is_dir():
+        return
+    tmp_root = pathlib.Path(tempfile.gettempdir()).resolve()
+    leaks = []
+    for p in sorted(real_store.glob("*.json")):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            leaks.append(f"{p.name} (unparseable)")
+            continue
+        sd = pathlib.Path(str(data.get("go_state_dir", ""))).resolve()
+        if sd == tmp_root or tmp_root in sd.parents:
+            leaks.append(f"{p.name} -> {sd}")
+    assert not leaks, (
+        "go-sessions pointer store polluted by tests (pointers under temp dir): "
+        + ", ".join(leaks)
+    )
