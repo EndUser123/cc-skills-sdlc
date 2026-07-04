@@ -213,7 +213,29 @@ Select files to ingest (press Enter for 0 = all safe): _
 Usage: `/wiki ingest` (safe only), `/wiki ingest --all` (safe + large-warn), `/wiki ingest <path>` (explicit single file, skips size check), `/wiki ingest --force <path>` (force large file)
 
 ### Query
-Accept question → run in parallel:
+
+**Step 1 — Scope routing (DEFAULT TO SESSION).** Classify the query BEFORE searching. The Constitution is explicit: "LLM has conversation history — don't build parsers for what's already in context." Running QMD/web for a question the session already answers is the anti-pattern this step exists to prevent.
+
+- **Session scope** (default — answer from chat, NO search): the prompt is
+  vague, conceptual, or open-ended ("what's unique", "what's useful to know",
+  "what should I know", "recap", "summary", "what's the state of", "what did
+  we decide", "what's important here"), OR references current session work
+  ("the proposal", "the current issue", "our work", "this", "that bug").
+  → Synthesize the answer directly from conversation context. Do not invoke
+  `search-research`, QMD, or web search. Cite session evidence by turn/topic.
+
+- **External scope** (escalate to Step 2): the query names a specific tool,
+  library, concept, or prior decision NOT present in the current session, OR
+  explicitly asks for persistent/historical knowledge ("what does the wiki
+  say", "search for", "look up", "research", "prior art", "previous note on").
+  → Run Step 2.
+
+- **Ambiguous → prefer session scope.** Give a one-line answer from context
+  and note "say the word and I'll search the wiki/external" if they want
+  more. Escalate only when the session answer is insufficient AND external
+  knowledge is clearly wanted.
+
+**Step 2 — Parallel search (external scope only).**
 1. `search-research --mode quick "<question>"` (QMD_WIKI backend)
 2. `Grep` against known local doc files matching the question domain (see Known Local Docs below)
 → First quality result wins → LLM synthesizes answer
