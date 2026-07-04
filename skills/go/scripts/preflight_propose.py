@@ -64,6 +64,47 @@ _PATH_LIKE = re.compile(r"[\w./\\-]+\.(?:py|js|ts|md|json|toml|yaml|yml|sh)\b")
 _REVIEW_DECISION_MARKERS = ("review", "critique", "critically", "audit ", "evaluat", "optimal")
 _EVIDENCE_LEDGER_MARKERS = ("diagnos", "investigat", "root cause", "rca")
 
+# --- Task-intent classification (ceremony/rigor axis) -----------------------
+# task_intent is distinct from the routing `task_type` enum in
+# active-task.schema.json. task_intent controls *how* /go runs (ceremony,
+# verification depth, completion-claim eligibility); task_type controls *where*
+# a task routes (/code, /refactor, /design, /planning). The two are orthogonal.
+_INTENT_MARKERS: dict[str, tuple[str, ...]] = {
+    "decide": (
+        "should we", "decide", "decision", "optimal", "recommend",
+        "compare", "strateg", "choose", "pick between", "tradeoff",
+        "trade-off", "which approach", "which option", "evaluate options",
+    ),
+    "investigate": (
+        "investigat", "diagnos", "root cause", "rca", "why is", "why does",
+        "why did", "figure out", "trace", "research", "look into",
+        "find out", "understand why",
+    ),
+    "validate": (
+        "review", "critique", "critically", "audit ", "validat", "verify",
+        "inspect", "assess", "check status", "field-test", "field test",
+        "sanity check", "confirm that",
+    ),
+    "implement": (
+        "fix", "add ", "implement", "refactor", "update", "change", "wire",
+        "expose", "rename", "bump ", "create", "build", "migrate", "patch",
+        "remove", "delete",
+    ),
+}
+_INTENT_VALUES = ("implement", "investigate", "validate", "decide", "mixed")
+
+# High-risk surfaces: prompt_review_required=True when any match. Mirrors the
+# FMM hook/gate row plus state/identity/dispatch/cache/plugin extensions.
+_HIGH_RISK_MARKERS: tuple[str, ...] = (
+    "hook", "gate", "stop hook", "pretooluse", "posttooluse", "pre tool use",
+    "post tool use", "sessionstart", "sessionend",
+    "identity", "dispatch", "router", "settings.json", "hooks.json",
+    "cache rebuild", "plugin cache", "plugin.json", "state dir",
+    "authorization", "credentials", "auth token",
+)
+
+_PROMPT_REVIEW_SUPPORT = "absent"  # no prompt-review artifact gate exists in go/ yet
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -858,6 +899,163 @@ def _verification_policy_key(rewritten: str) -> str | None:
     return None
 
 
+# --- Task-intent + execution-tier classification ----------------------------
+# Formalizes what was implicit in classify_dispatch's marker sets. Pure
+# deterministic transforms over the rewritten prompt.
+
+def classify_intent(rewritten: str) -> str:
+    """Classify prompt intent on the ceremony/rigor axis.
+
+    decide/investigate/validate checked before implement (task verbs like
+    "review the hook fix" outrank the implement-sounding "fix" inside them).
+    >=2 non-implement intents, or implement + another intent => mixed.
+    Ambiguous prompts default to implement (safe overkill: full gates apply).
+    """
+    low = rewritten.lower()
+    matched = []
+    for intent in ("decide", "investigate", "validate", "implement"):
+        if any(m in low for m in _INTENT_MARKERS[intent]):
+            matched.append(intent)
+    if not matched:
+        return "implement"
+    non_implement = [i for i in matched if i != "implement"]
+    if len(non_implement) >= 2:
+        return "mixed"
+    if len(non_implement) == 1 and "implement" in matched:
+        return "mixed"
+    return non_implement[0] if non_implement else "implement"
+
+
+def detect_risk_signals(rewritten: str) -> dict:
+    """Detect high-risk surfaces requiring prompt review."""
+    low = rewritten.lower()
+    matched = [m for m in _HIGH_RISK_MARKERS if m in low]
+    high_risk = bool(matched)
+    return {
+        "high_risk": high_risk,
+        "matched_markers": matched,
+        "prompt_review_required": high_risk,
+    }
+
+
+def derive_execution_tier(task_intent, dispatch, local_eligible, requires_approval, risk) -> str:
+    """Pick the minimum sufficient ceremony.
+
+    Tiers: direct_answer | local_surgical | local_rigorous | full_go |
+    pause_for_authorization. decide always pauses. High-risk + absent
+    prompt-review support forces pause so dispatch cannot silently skip review.
+    """
+    high_risk = bool(risk.get("high_risk"))
+    if task_intent == "decide":
+        return "pause_for_authorization"
+    if high_risk and _PROMPT_REVIEW_SUPPORT == "absent":
+        return "pause_for_authorization"
+    if requires_approval:
+        return "pause_for_authorization"
+    if task_intent in ("investigate", "validate"):
+        return "local_surgical" if local_eligible else "direct_answer"
+    if dispatch == "local" and local_eligible:
+        return "local_rigorous" if high_risk else "local_surgical"
+    return "full_go"
+
+
+def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
+    """Advisory emitted before any needs_decision / pause report (goal req. 6).
+
+    options, recommendation, long_term_roi, reversibility,
+    safest_low_regret_action, exact_authorization_needed.
+    """
+    snippet = rewritten if len(rewritten) <= 160 else rewritten[:160] + "..."
+    options = {
+        "decide": [
+            "Pause and emit this advisory; defer the decision to the director.",
+            "If agent_decidable (low-regret, reversible), proceed and record the rationale.",
+        ],
+        "mixed": [
+            "Execute only the authorized low-risk implementation child now.",
+            "Produce evidence for any investigation child.",
+            "Defer every decide child with a recommendation.",
+        ],
+        "investigate": [
+            "Read relevant files and produce an evidence ledger; make no code changes.",
+            "If root cause is found, propose a follow-up implement task rather than fixing inline.",
+        ],
+        "validate": [
+            "Run targeted verification and emit a validation artifact.",
+            "Do not enter full SDLC implementation gates unless implementation is requested.",
+        ],
+        "implement": [
+            "Proceed at the derived execution_tier with the tier's minimum verification.",
+        ],
+    }.get(task_intent, ["Proceed at the derived execution_tier."])
+    recommendation = options[0]
+    long_term_roi = (
+        "Avoids false completion claims and ceremony mismatch; preserves reviewability."
+    )
+    reversibility = (
+        "High: advisory + pause is reversible; director resumes by authorizing a child."
+    )
+    if execution_tier == "pause_for_authorization":
+        safest_low_regret = (
+            "pause_for_authorization: emit advisory, change nothing, await authorization."
+        )
+        authorization_needed = (
+            "Director approval required to dispatch high-risk work without prompt-review support."
+        )
+    else:
+        safest_low_regret = (
+            f"Proceed at {execution_tier} with its minimum verification; defer anything undecided."
+        )
+        authorization_needed = (
+            "None beyond the current /go invocation (tier is self-authorized by the prompt)."
+        )
+    return {
+        "prompt_snippet": snippet,
+        "options": options,
+        "recommendation": recommendation,
+        "long_term_roi": long_term_roi,
+        "reversibility": reversibility,
+        "safest_low_regret_action": safest_low_regret,
+        "exact_authorization_needed": authorization_needed,
+    }
+
+
+def derive_report_gate(task_intent, execution_tier) -> dict:
+    """Completion-claim eligibility (goal req. 8).
+
+    investigate/validate/decide never enable implementation-completion claims.
+    mixed must defer unauthorized children. implement may claim completion only
+    at full_go / local_rigorous; local_surgical may claim a targeted fix only.
+    """
+    allow_completion = task_intent == "implement" and execution_tier in (
+        "full_go", "local_rigorous", "local_surgical",
+    )
+    allow_targeted_fix_only = task_intent == "implement" and execution_tier == "local_surgical"
+    return {
+        "allow_implementation_completion_claim": allow_completion,
+        "allow_targeted_fix_claim_only": allow_targeted_fix_only,
+        "must_defer_unauthorized_children": task_intent == "mixed",
+        "rule": (
+            "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
+            "mixed reports split + deferred items, no bundled completion claim."
+        ),
+    }
+
+
+def assert_fresh(proposal, run_id) -> None:
+    """Artifact freshness contract (goal req. 9).
+
+    A proposal authorizes dispatch / completion only when its runid matches the
+    current run. Stale/mismatched proposals raise; callers regenerate.
+    """
+    prop_run = proposal.get("runid") or proposal.get("run_id")
+    if prop_run != run_id:
+        raise ValueError(
+            f"stale proposal: runid={prop_run!r} != current run_id={run_id!r}; "
+            "regenerate before dispatch or completion."
+        )
+
+
 def generate_proposal(
     prompt: str,
     run_id: str,
@@ -866,8 +1064,28 @@ def generate_proposal(
     """Build the proposal dict. Matches the spec'd JSON shape exactly."""
     rewritten = rewrite_goal(prompt)
     dispatch, local_eligible, requires_approval = classify_dispatch(rewritten)
+    task_intent = classify_intent(rewritten)
+    risk = detect_risk_signals(rewritten)
+    execution_tier = derive_execution_tier(
+        task_intent, dispatch, local_eligible, requires_approval, risk
+    )
+    report_gate = derive_report_gate(task_intent, execution_tier)
+    decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
+    prompt_review_required = bool(risk["prompt_review_required"])
+    notes = [
+        "Deterministic heuristic (no LLM). dispatch="
+        f"{dispatch} localEligible={local_eligible}",
+        f"task_intent={task_intent} execution_tier={execution_tier} "
+        f"prompt_review_required={prompt_review_required}",
+    ]
+    if execution_tier == "pause_for_authorization":
+        notes.append(
+            "PAUSE: emit decision_advisory before any dispatch; do not proceed "
+            "without director authorization."
+        )
     return {
         "runid": run_id,
+        "run_id": run_id,
         "terminalid": terminal_id,
         "source": "cli-preflight",
         "originalPrompt": prompt,
@@ -875,12 +1093,17 @@ def generate_proposal(
         "suggestedDispatch": dispatch,
         "localEligible": local_eligible,
         "requiresApproval": requires_approval,
+        "task_intent": task_intent,
+        "execution_tier": execution_tier,
+        "risk_signals": risk,
+        "prompt_review_required": prompt_review_required,
+        "prompt_review_support": _PROMPT_REVIEW_SUPPORT,
+        "report_gate": report_gate,
+        "decision_advisory": decision_advisory,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
-        "notes": [
-            "Deterministic heuristic (no LLM). dispatch="
-            f"{dispatch} localEligible={local_eligible}",
-        ],
+        "freshness": {"run_id": run_id, "must_match_run_id": True},
+        "notes": notes,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -897,10 +1120,34 @@ def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> 
 
     Returns the artifact path. The orchestrator owns phase markers and
     ``current-run.json`` updates so existing marker conventions stay coherent.
+
+    When the prompt is high-risk (prompt_review_required) and prompt-review
+    support is absent, also write a tracked prerequisite artifact so the gap is
+    visible instead of silently skipped (goal req. 7).
     """
     proposal = generate_proposal(args.prompt, run_id, terminal_id)
     artifact = state_dir / f"task-proposal_{run_id}.json"
     _atomic_write_json(artifact, proposal)
+
+    if (
+        proposal.get("prompt_review_required")
+        and proposal.get("prompt_review_support") == "absent"
+    ):
+        prereq = state_dir / f"prompt-review-prerequisite_{run_id}.json"
+        _atomic_write_json(prereq, {
+            "run_id": run_id,
+            "terminal_id": terminal_id,
+            "kind": "missing-prompt-review-support",
+            "reason": (
+                "High-risk surface detected but no prompt-review artifact gate "
+                "exists in skills/go yet. High-risk dispatch must be blocked or "
+                "authorized by the director; do not pretend review occurred."
+            ),
+            "matched_markers": proposal["risk_signals"]["matched_markers"],
+            "execution_tier": proposal["execution_tier"],
+            "blocking": proposal["execution_tier"] == "pause_for_authorization",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
     return artifact
 
 
@@ -910,4 +1157,18 @@ if __name__ == "__main__":
     out = generate_proposal(sample, "run-self", "tid-self")
     assert out["suggestedDispatch"] in ("pi", "local", "claude")
     assert "rewrittenGoal" in out and out["rewrittenGoal"].startswith("fix")
-    print(f"preflight_propose: self-check OK (dispatch={out['suggestedDispatch']})")
+    assert out["task_intent"] in _INTENT_VALUES
+    assert out["execution_tier"] in (
+        "direct_answer", "local_surgical", "local_rigorous", "full_go",
+        "pause_for_authorization",
+    )
+    assert isinstance(out["report_gate"]["allow_implementation_completion_claim"], bool)
+    assert_fresh(out, "run-self")  # freshness contract holds for current run
+    # investigate prompts must not enable completion claims.
+    inv = generate_proposal("investigate why the hook double-fires", "run-inv", "tid")
+    assert inv["task_intent"] in ("investigate", "mixed")
+    assert not inv["report_gate"]["allow_implementation_completion_claim"]
+    print(
+        f"preflight_propose: self-check OK (dispatch={out['suggestedDispatch']}, "
+        f"intent={out['task_intent']}, tier={out['execution_tier']})"
+    )

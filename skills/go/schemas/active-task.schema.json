@@ -105,8 +105,14 @@
         },
         "task_type": {
           "type": "string",
-          "enum": ["planning", "design", "implementation", "refactor", "unknown"],
-          "default": "implementation"
+          "enum": ["planning", "design", "implementation", "refactor", "validation", "audit", "testing", "unknown"],
+          "default": "implementation",
+          "description": "Routing axis: which skill consumes this task (/code, /refactor, /design, /planning, /t). Orthogonal to task_intent."
+        },
+        "task_intent": {
+          "type": "string",
+          "enum": ["implement", "investigate", "validate", "decide", "mixed"],
+          "description": "Ceremony/rigor axis: controls execution_tier, verification depth, and completion-claim eligibility. Computed by preflight_propose.classify_intent for prompt-synthesized tasks; may be set explicitly on queued tasks. Missing/ambiguous defaults to 'implement'."
         },
         "selected_by": {
           "type": "string",
