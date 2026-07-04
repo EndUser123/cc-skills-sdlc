@@ -688,6 +688,21 @@ Plans, findings, and review summaries are stored as separate files. See `referen
 - Required plan artifact structure (status header, must-include/must-not-include)
 - Disposition table format for review summaries
 
+## ROI Ranking Output Order
+
+When asked to rank solutions by ROI:
+
+1. **State the binding-constraint assumption in one line** ("correctness vs
+   throughput vs attention") before any ranking — the lever you optimize
+   determines the order.
+2. **Deliver the ranked list with a one-sentence rationale and explicit
+   assumption per lever.** Answer the ranking question first.
+3. **Only then comment on gates/guardrails.** Do not lead with gate critique
+   or measurement caveats; if a gate is misbehaving, note it in ≤1 sentence
+   and move on — do not let it derail the primary answer.
+4. **Rank = debug-time saved × recurrence ÷ effort.** Never fabricate timing
+   — if recurrence is undocumented, say so and rank on structural evidence.
+
 ## File Locations
 
 ```
