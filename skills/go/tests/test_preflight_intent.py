@@ -800,3 +800,107 @@ def test_smoke_operational_discovery_real_path():
     assert "discovery_evidence" in p["plain_english_report"]
     assert p["plain_english_report"]["discovery_evidence"]["worktree_prune_predicate"]
 
+
+class TestWordBoundarySurfaceMatch:
+    """reqs 1, 2: 'gate' must NOT match inside 'investigate'; legit surfaces still fire."""
+
+    @pytest.mark.parametrize("prompt", [
+        "investigate the flaky test",
+        "please investigate why latency spiked",
+        "we investigate then decide",
+    ])
+    def test_investigate_does_not_trigger_gate(self, prompt):
+        od = classify_operational_discovery(prompt, "investigate")
+        assert "gate" not in od["surfaces"], (
+            f"word-boundary regression: 'gate' matched inside 'investigate' for {prompt!r}"
+        )
+
+    def test_investigate_still_triggers_hook_surface(self):
+        # 'hook' is its own surface and must still fire for a hook-prompt.
+        od = classify_operational_discovery("investigate why the hook double-fires", "investigate")
+        assert "hook" in od["surfaces"]
+        assert "gate" not in od["surfaces"]
+
+    @pytest.mark.parametrize("prompt,expected", [
+        ("where is the gate registered?", "gate"),
+        ("do git worktrees accumulate?", "worktree"),
+        ("why is the plugin cache stale?", "cache"),
+        ("where do phase markers get written?", "markers"),
+        ("how does the dispatch router resolve?", "gate"),
+        ("where is the session pointer stored?", "session"),
+    ])
+    def test_legit_surfaces_still_detected(self, prompt, expected):
+        od = classify_operational_discovery(prompt, "investigate")
+        assert expected in od["surfaces"], (
+            f"legit surface {expected!r} dropped for {prompt!r}: got {od['surfaces']!r}"
+        )
+
+
+class TestDiscoveryEvidenceReportGate:
+    """reqs 4-7: required=true with no/invalid discovery_evidence → discovery_incomplete
+    and the recommendation is demoted to advisory, not presented as verified."""
+
+    def _od_required(self):
+        return classify_operational_discovery(
+            "investigate where the gate is registered", "investigate")
+
+    def test_required_no_evidence_is_incomplete(self):
+        od = self._od_required()
+        assert od["required"] is True
+        gate = derive_report_gate("investigate", "local_surgical",
+                                  operational_discovery=od, discovery_evidence=None)
+        assert gate["discovery_evidence_required"] is True
+        assert gate["discovery_evidence_passes"] is False
+        assert gate["discovery_incomplete"] is True
+        assert gate["allow_recommendation_as_verified"] is False
+
+    def test_required_evidence_without_provenance_is_incomplete(self):
+        od = self._od_required()
+        bad = {"findings": [{"surface": "gate", "note": "found it"}]}  # no provenance
+        gate = derive_report_gate("investigate", "local_surgical",
+                                  operational_discovery=od, discovery_evidence=bad)
+        assert gate["discovery_incomplete"] is True
+
+    def test_required_evidence_with_bad_provenance_tier_is_incomplete(self):
+        od = self._od_required()
+        bad = {"findings": [{"surface": "gate", "provenance": "guess"}]}
+        gate = derive_report_gate("investigate", "local_surgical",
+                                  operational_discovery=od, discovery_evidence=bad)
+        assert gate["discovery_incomplete"] is True
+
+    def test_required_evidence_with_valid_provenance_passes(self):
+        od = self._od_required()
+        good = {"findings": [
+            {"surface": "gate", "provenance": "verified"},
+            {"surface": "state", "provenance": "inference"},
+        ]}
+        gate = derive_report_gate("investigate", "local_surgical",
+                                  operational_discovery=od, discovery_evidence=good)
+        assert gate["discovery_incomplete"] is False
+        assert gate["allow_recommendation_as_verified"] is True
+
+    def test_not_required_skips_gate(self):
+        # Non-operational prompt: required=False → gate never marks incomplete.
+        od = classify_operational_discovery("add a docstring to foo.py", "implement")
+        assert od["required"] is False
+        gate = derive_report_gate("implement", "local_surgical",
+                                  operational_discovery=od, discovery_evidence=None)
+        assert gate["discovery_incomplete"] is False
+        assert gate["discovery_evidence_passes"] is True  # vacuously
+
+    def test_real_path_recommendation_demoted_to_advisory(self):
+        """Smoke: operational prompt with no findings → report says advisory, not verified."""
+        p = generate_proposal(
+            "investigate where the gate is registered",
+            "run-gate-smoke", "tid-gate-smoke")
+        report = p["plain_english_report"]
+        assert report["discovery_incomplete"] is True
+        assert report["recommendation_is_advisory"] is True
+        recommend_text = " ".join(report["what_i_recommend"]).lower()
+        assert "advisory" in recommend_text
+        assert "not verified" in recommend_text
+        # And it shows up in what_is_blocked too.
+        blocked_text = " ".join(report["what_is_blocked"]).lower()
+        assert "discovery_incomplete" in blocked_text
+
+

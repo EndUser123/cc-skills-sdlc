@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.8.0
+version: 2.9.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -471,7 +471,9 @@ Do not guess from memory or trace only the easiest path — discover the real wr
 
 Never auto-delete unverified work. SessionStart may surface the reclaimable count but must not delete.
 
-**Report evidence (reqs. 7, 8):** when `operational_discovery.required`, `plain_english_report.discovery_evidence` scaffolds **before** `what_i_recommend`. Each finding carries a `provenance` tier ∈ {`verified`, `inference`, `assumption`} — verified fact, inference, and assumption are visibly distinct, never flattened into one claim.
+**Report evidence (reqs. 7, 8) — gate-enforced, not scaffold-only:** when `operational_discovery.required`, `plain_english_report.discovery_evidence` scaffolds **before** `what_i_recommend` and the report gate refuses to present the recommendation as verified until findings exist and each carries a valid `provenance` tier ∈ {`verified`, `inference`, `assumption`}. If findings are empty or any provenance is missing/invalid, the gate sets `discovery_incomplete = true`, `allow_recommendation_as_verified = false`, demotes `what_i_recommend` to advisory ("advisory, NOT verified — discovery incomplete"), and adds a `discovery_incomplete` line to `what_is_blocked`. Verified fact, inference, and assumption stay visibly distinct, never flattened into one claim.
+
+**Surface matching (reqs. 1, 2):** operational surfaces are detected by **word-boundary** token match (`\bmarker(s)?\b` for alphanumeric markers; literal substring for symbolic ones like `.artifacts`, `router.py`), so a bare marker like `gate` does **not** fire inside `investigate`. Plural form (`worktrees`, `markers`, `branches`) is tolerated.
 
 **No silent cleanup (req. 9):** `operational_discovery.cleanup_requires_approval = true`. No cleanup action runs without explicit approval.
 

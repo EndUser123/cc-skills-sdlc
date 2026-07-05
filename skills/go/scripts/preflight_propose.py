@@ -276,11 +276,12 @@ _VERIFICATION_RANKING: tuple[tuple[str, str, str], ...] = (
 def _word_boundary_match(marker: str, text: str) -> bool:
     """Token/word-boundary match so bare markers like "gate" don't fire inside
     "investi-gate-". Markers that start AND end with an alphanumeric use
-    ``\\b…\\b``; symbolic markers (``.artifacts``, ``router.py`` edges, etc.)
-    fall back to literal substring since they can't collide with real words.
+    ``\\b…(s?)\\b`` (optional plural so "worktree" matches "worktrees");
+    symbolic markers (``.artifacts``, ``router.py`` edges, etc.) fall back to
+    literal substring since they can't collide with real words.
     """
     if marker and marker[0].isalnum() and marker[-1].isalnum():
-        return re.search(r"\b" + re.escape(marker) + r"\b", text) is not None
+        return re.search(r"\b" + re.escape(marker) + r"s?\b", text) is not None
     return marker in text
 
 
