@@ -838,7 +838,22 @@ _PARALLEL_KEYWORDS: dict[str, list[str]] = {
     "architect": ["evidence-scout", "test-designer", "critic", "alternative-designer"],
 }
 
-_MUTATION_KEYWORDS = {"quarantine", "move", "delete", "git mv", "git rm", "cleanup"}
+_MUTATION_KEYWORDS = {
+    "quarantine", "move", "delete", "git mv", "git rm", "cleanup",
+    "refactor", "edit", "add", "modify", "rewrite", "replace", "update",
+    "implement", "rename", "split", "extract",
+}
+# TASK-001.3: positive pure-analysis allowlist. A prompt is eligible for
+# full-parallel ONLY when it matches read-only analysis AND carries no mutation
+# verb. Caller-declared ``read_only`` envelope is the preferred future signal;
+# this keyword set is the fallback discriminator.
+_PURE_ANALYSIS_KEYWORDS = {
+    "audit", "review", "investigate", "analyze", "inspect", "assess",
+    "evaluate", "scan", "examine", "survey", "map", "trace",
+}
+# Word-boundary design-ambiguity detector. Replaces the bare substring list
+# (the old ``"rout"`` matched route/routing but also routine/scout/throughout).
+_DESIGN_AMBIGUITY_RE = re.compile(r"\b(?:refactor|design|architect|route|routes|routing|router)\b")
 _TRIVIAL_KEYWORDS = {"typo", "rename variable", "fix whitespace", "update comment", "say hi"}
 
 _LANE_MAP = {
@@ -881,7 +896,7 @@ def parallel_strategy_for_task(prompt: str) -> dict[str, object]:
             }
 
     is_mutation = any(kw in p for kw in _MUTATION_KEYWORDS)
-    has_design_ambiguity = any(kw in p for kw in ("refactor", "design", "architect", "rout"))
+    has_design_ambiguity = bool(_DESIGN_AMBIGUITY_RE.search(p))
 
     matched_lanes: set[str] = set()
     for kw, lanes in _PARALLEL_KEYWORDS.items():
@@ -904,12 +919,16 @@ def parallel_strategy_for_task(prompt: str) -> dict[str, object]:
 
     lanes = [_LANE_MAP[name] for name in sorted(matched_lanes) if name in _LANE_MAP]
 
-    if is_mutation:
-        mode = "analysis-parallel-mutation-serialized"
-        mutation_policy = "parent-only unless isolated worktree or patch bundle"
+    # TASK-001.3: full-parallel requires positive pure-analysis signal AND no
+    # mutation verb. Anything else serializes mutations (no recombination
+    # contract exists today — see plan-go-dispatch-safe-rollout decision #4).
+    is_pure_analysis = any(kw in p for kw in _PURE_ANALYSIS_KEYWORDS)
+    if is_pure_analysis and not is_mutation:
+        mode = "full-parallel"
+        mutation_policy = "parallel"
     else:
         mode = "analysis-parallel-mutation-serialized"
-        mutation_policy = "serialized"
+        mutation_policy = "parent-only unless isolated worktree or patch bundle"
 
     lane_count = len(lanes)
     if lane_count >= 4:

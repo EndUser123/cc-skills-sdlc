@@ -617,11 +617,18 @@ def require_recon(
 
 def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     if args.prompt:
+        # SEC-2: scrub secrets from the prompt before any state write or worker
+        # dispatch. scrub_prompt is pure + idempotent + fail-closed; an import
+        # failure fails open (deployment issue, not a secret-leak path).
+        try:
+            prompt = importlib.import_module("scrub_prompt").scrub(args.prompt)
+        except Exception:
+            prompt = args.prompt
         # Recon-before-dispatch gate (Phase 1 of agentic-reliability ladder).
         # Blocks dispatch for high-risk prompts until a recon artifact exists.
         if not getattr(args, "preflight_only", False) and not getattr(args, "recon_only", False):
             try:
-                require_recon(args, state_dir, run_id, args.prompt)
+                require_recon(args, state_dir, run_id, prompt)
             except ReconMissingError:
                 return None
         explicit_verification = os.environ.get("GO_DEFAULT_VERIFICATION_COMMANDS", "").strip()
@@ -651,8 +658,8 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             "source_ref": "cli",
             "task": {
                 "id": f"prompt-{run_id[:8]}",
-                "title": args.prompt[:60],
-                "objective": args.prompt,
+                "title": prompt[:60],
+                "objective": prompt,
                 "status": "selected",
                 "priority": "P1",
                 "scope_in": args.scope_in or [],
@@ -674,42 +681,42 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             _vp_fmm = getattr(_preflight, "verification_policy_from_fmm", None)
             _rewrite = getattr(_preflight, "rewrite_goal", None)
             if _classify and _suggest and _vp_fmm and _rewrite:
-                _rewritten = _rewrite(args.prompt)
+                _rewritten = _rewrite(prompt)
                 _classify(_rewritten)
                 task_data["task"]["verificationSuggestions"] = _suggest(_rewritten)
-                _vp, _vp_source = _vp_fmm(args.prompt)
+                _vp, _vp_source = _vp_fmm(prompt)
                 if _vp is not None:
                     task_data["task"]["verificationPolicy"] = _vp
                     task_data["task"]["verificationPolicySource"] = _vp_source
                 _fmm = getattr(_preflight, "failure_mode_guidance_all", None)
                 if _fmm:
-                    _fmm_result = _fmm(args.prompt)
+                    _fmm_result = _fmm(prompt)
                     if _fmm_result:
                         task_data["task"]["failureModeGuidance"] = _fmm_result
                 _mp = getattr(_preflight, "requires_mutation_plan", None)
                 if _mp:
-                    _mp_result = _mp(args.prompt)
+                    _mp_result = _mp(prompt)
                     if _mp_result:
                         task_data["task"]["requiresMutationPlan"] = True
                         task_data["task"]["mutationPlanReason"] = _mp_result["reason"]
                         task_data["task"]["mutationPlanKinds"] = _mp_result["kinds"]
                 _ps = getattr(_preflight, "parallel_strategy_for_task", None)
                 if _ps:
-                    _ps_result = _ps(args.prompt)
+                    _ps_result = _ps(prompt)
                     if _ps_result.get("recommended"):
                         task_data["task"]["parallelStrategy"] = _ps_result
                 _tp = getattr(_preflight, "thought_partner_assessment", None)
                 if _tp:
-                    _tp_result = _tp(args.prompt)
+                    _tp_result = _tp(prompt)
                     if _tp_result:
                         task_data["task"]["thoughtPartner"] = _tp_result
                 _cg = getattr(_preflight, "compress_goal", None)
                 if _cg:
-                    _compressed = _cg(args.prompt)
+                    _compressed = _cg(prompt)
                     task_data["task"]["goalConditionSize"] = len(_compressed)
                 _pr = getattr(_preflight, "plan_review", None)
                 if _pr:
-                    _pr_result = _pr(args.prompt)
+                    _pr_result = _pr(prompt)
                     if _pr_result:
                         task_data["task"]["planReview"] = _pr_result
         except Exception:
