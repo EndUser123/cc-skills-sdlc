@@ -23,6 +23,9 @@ from preflight_propose import (  # noqa: E402
     derive_execution_tier,
     build_decision_advisory,
     derive_report_gate,
+    classify_mixed_work_status,
+    classify_decision_kind,
+    build_plain_english_report,
     assert_fresh,
     generate_proposal,
     run_preflight,
@@ -272,3 +275,144 @@ def test_smoke_mixed_request_split_and_defer():
     assert "defer" in options_text  # defer-decisions
     assert p["report_gate"]["allow_implementation_completion_claim"] is False
     assert p["report_gate"]["must_defer_unauthorized_children"] is True
+
+
+# ---------------------------------------------------------------------------
+# Goal req. 16 d-g: mixed-work status taxonomy + decision_kind
+# ---------------------------------------------------------------------------
+
+class TestMixedWorkStatusTaxonomy:
+    """Splits the old single pause bucket into blocked_* / pause / readonly."""
+
+    def _risk(self, prompt):
+        return detect_risk_signals(prompt)
+
+    def test_d_safe_readonly_narrowing_proceeds_without_pause(self):
+        # req 16.d: investigate/validate read-only -> partial_readonly_done,
+        # decision_kind safe_readonly_next_step. No pause, no blocked_*.
+        prompt = "investigate why the parser crashes on None"
+        p = generate_proposal(prompt, "r-d", "t-d")
+        assert p["task_intent"] == "investigate"
+        assert p["execution_tier"] != "pause_for_authorization"
+        assert p["mixed_work_status"] == "partial_readonly_done"
+        assert p["decision_kind"] == "safe_readonly_next_step"
+        # Safe read-only narrowing does NOT ask the user for anything.
+        per = p["plain_english_report"]
+        assert "what_i_need_from_you" in per["section_order"]
+        assert any("Nothing right now" in n for n in per["what_i_need_from_you"])
+
+    def test_e_missing_corpus_becomes_blocked_prerequisite_not_pause(self):
+        # req 16.e: missing corpus/evidence -> blocked_prerequisite, NEVER
+        # pause_for_authorization (/go must not ask the user to approve).
+        prompt = "validate the router against the missing corpus"
+        risk = self._risk(prompt)
+        status = classify_mixed_work_status(
+            prompt, "validate", "local_surgical", risk, "absent")
+        assert status == "blocked_prerequisite"
+        assert status != "pause_for_authorization"
+
+    def test_e_blocked_prerequisite_decision_kind(self):
+        prompt = "audit the gate using the missing corpus"
+        risk = self._risk(prompt)
+        kind = classify_decision_kind(prompt, "validate", "local_surgical", risk)
+        assert kind == "blocked_by_missing_evidence"
+
+    def test_f_policy_blocked_gate_weakening_becomes_blocked_policy(self):
+        # req 16.f: gate-weakening intent -> blocked_policy, NEVER pause.
+        prompt = "weaken the gate to demote to warn for this hook"
+        p = generate_proposal(prompt, "r-f", "t-f")
+        assert p["mixed_work_status"] == "blocked_policy"
+        assert p["decision_kind"] == "blocked_by_policy"
+        assert p["mixed_work_status"] != "pause_for_authorization"
+
+    def test_g_shared_config_mutation_remains_pause_for_authorization(self):
+        # req 16.g: shared-state mutation -> pause_for_authorization (genuine
+        # user authority), distinct from blocked_*.
+        prompt = "update settings.json to add the new permission entry"
+        p = generate_proposal(prompt, "r-g", "t-g")
+        # Shared-state implement -> pause (user authority), not blocked_*.
+        assert p["mixed_work_status"] == "pause_for_authorization"
+        assert p["decision_kind"] == "shared_state_authorization"
+
+    def test_recommendation_ready_for_decide(self):
+        prompt = "should we adopt option A or option B"
+        p = generate_proposal(prompt, "r-rec", "t-rec")
+        assert p["mixed_work_status"] == "recommendation_ready"
+        assert p["decision_kind"] == "user_preference"
+
+    def test_blocked_does_not_request_user_approval(self):
+        # req 7: blocked_* must NOT ask the user to approve.
+        prompt = "weaken the gate to fail-open"
+        p = generate_proposal(prompt, "r-b7", "t-b7")
+        per = p["plain_english_report"]
+        assert any("not asked of you" in b for b in per["what_is_blocked"]) or \
+               any("no approval is requested" in n for n in per["what_i_need_from_you"])
+
+
+# ---------------------------------------------------------------------------
+# Goal req. 16 k-l: report format
+# ---------------------------------------------------------------------------
+
+class TestPlainEnglishReportFormat:
+    """Recommendation-before-labels (k) and git-status evidence mandate (l)."""
+
+    def test_k_section_order_recommendation_before_labels(self):
+        # req 16.k: plain-English sections appear BEFORE internal labels.
+        p = generate_proposal("investigate why the hook double-fires", "r-k", "t-k")
+        per = p["plain_english_report"]
+        assert per["section_order"] == [
+            "what_i_did", "what_i_recommend", "what_is_blocked",
+            "what_i_need_from_you",
+        ]
+        assert per["labels_after_plain_english"] is True
+        # Recommendation section is non-empty and precedes any label mention.
+        assert per["what_i_recommend"]
+        assert per["what_i_did"]
+
+    def test_l_no_mutation_claim_requires_git_status_evidence(self):
+        # req 16.l: the report flags that a no-mutation claim requires
+        # git status --short (or equivalent); SKILL.md must document the rule.
+        p = generate_proposal("review the diff for correctness", "r-l", "t-l")
+        assert p["plain_english_report"]["no_mutation_evidence_required"] is True
+        skill = Path(__file__).resolve().parent.parent / "SKILL.md"
+        text = skill.read_text(encoding="utf-8")
+        assert "git status --short" in text
+        assert "no mutation" in text.lower() or "no-mutation" in text.lower()
+
+    def test_blocked_report_names_blocker_and_evidence_step(self):
+        # req 7: blocked report states the blocker + the next evidence step.
+        p = generate_proposal("weaken the gate to bypass the hook", "r-bk", "t-bk")
+        per = p["plain_english_report"]
+        assert per["what_is_blocked"]
+        assert any("evidence" in r.lower() or "policy" in r.lower()
+                   for r in per["what_i_recommend"])
+
+    def test_pause_report_names_exact_authorization(self):
+        # req 9/16.g: pause_for_authorization surfaces exact_authorization_needed.
+        p = generate_proposal("update settings.json to add the permission",
+                              "r-pa", "t-pa")
+        per = p["plain_english_report"]
+        assert p["mixed_work_status"] == "pause_for_authorization"
+        assert any("authorization" in n.lower() or "director" in n.lower()
+                   for n in per["what_i_need_from_you"])
+
+
+def test_smoke_end_to_end_status_taxonomy_real_path():
+    """Direct smoke through generate_proposal: real preflight path, no mocks.
+
+    Exercises classify_intent -> derive_execution_tier ->
+    classify_mixed_work_status -> classify_decision_kind ->
+    build_plain_english_report in the same call path the orchestrator uses.
+    """
+    cases = [
+        ("investigate why X fails", "partial_readonly_done"),
+        ("should we adopt A or B", "recommendation_ready"),
+        ("update settings.json to add x", "pause_for_authorization"),
+        ("weaken the gate to fail-open", "blocked_policy"),
+    ]
+    for prompt, expected_status in cases:
+        p = generate_proposal(prompt, f"run-{expected_status}", f"tid-{expected_status}")
+        assert p["mixed_work_status"] == expected_status, (
+            f"{prompt!r} -> {p['mixed_work_status']!r}, expected {expected_status!r}")
+        assert "plain_english_report" in p
+        assert len(p["plain_english_report"]["section_order"]) == 4

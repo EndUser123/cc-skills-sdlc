@@ -1445,19 +1445,29 @@ def generate_proposal(
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
     )
+    mixed_work_status = classify_mixed_work_status(
+        rewritten, task_intent, execution_tier, risk, _PROMPT_REVIEW_SUPPORT
+    )
+    decision_kind = classify_decision_kind(rewritten, task_intent, execution_tier, risk)
     prompt_review_required = bool(risk["prompt_review_required"])
     notes = [
         "Deterministic heuristic (no LLM). dispatch="
         f"{dispatch} localEligible={local_eligible}",
         f"task_intent={task_intent} execution_tier={execution_tier} "
         f"prompt_review_required={prompt_review_required}",
+        f"mixed_work_status={mixed_work_status} decision_kind={decision_kind}",
     ]
     if execution_tier == "pause_for_authorization":
         notes.append(
             "PAUSE: emit decision_advisory before any dispatch; do not proceed "
             "without director authorization."
         )
-    return {
+    if mixed_work_status in ("blocked_prerequisite", "blocked_policy"):
+        notes.append(
+            f"BLOCKED ({mixed_work_status}): do NOT ask the user to approve. "
+            "State the blocker and the next evidence-gathering step (req. 7)."
+        )
+    proposal = {
         "runid": run_id,
         "run_id": run_id,
         "terminalid": terminal_id,
@@ -1475,6 +1485,8 @@ def generate_proposal(
         "report_gate": report_gate,
         "decision_advisory": decision_advisory,
         "delegation_policy": delegation_policy,
+        "mixed_work_status": mixed_work_status,
+        "decision_kind": decision_kind,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
         "freshness": {
@@ -1485,6 +1497,8 @@ def generate_proposal(
         "notes": notes,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
+    proposal["plain_english_report"] = build_plain_english_report(proposal)
+    return proposal
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
