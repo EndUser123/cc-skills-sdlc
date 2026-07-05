@@ -227,6 +227,51 @@ _CANNOT_REPRODUCE_MARKERS: tuple[str, ...] = (
 # High-risk surface closure: confirm-closed must use the actual entry point or
 # registered path where practical (req. 7). Reuses _HIGH_RISK_MARKERS.
 
+# --- Discovery-first / lifecycle hygiene (goal: discovery-first + verification) ---
+# Operational surfaces where /go must discover writer/storage/reader/lifecycle
+# BEFORE prescribing implementation. Each entry: (markers, surface label).
+_OPERATIONAL_SURFACES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("worktree", "work tree", "git worktree"), "worktree"),
+    (("hook", "stop gate", "pretooluse", "posttooluse", "sessionstart"), "hook"),
+    (("gate", "enforce", "router.py", "dispatcher", "dispatch"), "gate"),
+    (("state dir", "go_state_dir", "session state", "state tree"), "state"),
+    (("phase marker", "task-selected", ".dispatched", "marker file"), "markers"),
+    (("plugin cache", "version-keyed cache", "cache copy", "stale cache"), "cache"),
+    (("session pointer", "go-sessions", "pointer store", "session id"), "session"),
+    (("export", "transcript", "session export"), "export"),
+    (("artifact lifecycle", "temp artifact", ".artifacts"), "artifact-lifecycle"),
+    (("branch", "feature branch", "merged branch"), "branch"),
+)
+# /go-created resources that carry a lifecycle/cleanup obligation.
+_LIFECYCLE_RESOURCES: tuple[str, ...] = (
+    "worktree", "branch", "state dir", "session pointer",
+    "marker", "cache copy", "temporary export", "artifact",
+)
+# Safe worktree prune predicate (req. 6): ALL conditions must hold before /go
+# will even propose prune. Dry-run/report-only first; never auto-delete.
+_WORKTREE_PRUNE_PREDICATE: tuple[str, ...] = (
+    "age >= threshold (default 14d since creation)",
+    "git status clean (no uncommitted / unstaged work)",
+    "branch merged into main OR explicitly marked disposable by director",
+    "report-only dry run first (list, do not remove)",
+    "no removal without explicit director approval",
+)
+# Verification paths ranked by confidence-per-effort (req. 4). Order matters:
+# higher confidence first. The worker picks the highest affordable path.
+_VERIFICATION_RANKING: tuple[tuple[str, str, str], ...] = (
+    # (path, confidence, effort)
+    ("empirical end-to-end reproduction against a real oracle",
+     "highest", "high"),
+    ("direct invocation of the registered entry point (hook/router)",
+     "high", "medium"),
+    ("integration test crossing the real state/dispatch boundary",
+     "high", "medium"),
+    ("targeted unit test on the pure-logic transform",
+     "medium", "low"),
+    ("static code trace (grep/read of the writer/reader path)",
+     "medium-low", "low"),
+)
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1375,6 +1420,56 @@ def confirm_closed_passes(closure_check: dict) -> bool:
     return has_evidence and has_after
 
 
+def classify_operational_discovery(rewritten: str, task_intent: str) -> dict:
+    """Discovery-first + verification-ranking + lifecycle-hygiene policy.
+
+    Operational questions (hooks/gates/worktrees/state/markers/cache/dispatch/
+    sessions/exports/artifact lifecycle) get a discovery contract: identify
+    writer/storage/reader/lifecycle/authority/stale-direction/observed-state
+    BEFORE prescribing implementation, and rank verification paths by
+    confidence-per-effort. Worktree and other /go-created resources carry a
+    lifecycle/cleanup obligation; cleanup never auto-runs.
+    """
+    low = rewritten.lower()
+    surfaces = sorted({label for markers, label in _OPERATIONAL_SURFACES
+                       if any(m in low for m in markers)})
+    required = bool(surfaces) and task_intent in ("investigate", "validate", "decide", "mixed", "implement")
+    # Confidence uncertain ⇒ the worker must list ≥2 verification paths.
+    confidence_uncertain = required and task_intent in ("investigate", "mixed", "decide")
+    return {
+        "required": required,
+        "surfaces": surfaces,
+        "identify_checklist": [
+            "writer/creator", "storage/location", "reader/consumer",
+            "lifecycle/cleanup path", "authority", "stale/failure direction",
+            "observed current state (when cheap to inspect)",
+        ] if required else [],
+        "verification_paths": (
+            [{"path": p, "confidence": c, "effort": e} for p, c, e in _VERIFICATION_RANKING]
+            if confidence_uncertain else []
+        ),
+        "empirical_oracle_preferred": confidence_uncertain,
+        "empirical_trace_gap": (
+            "Empirical reproduction proves the symptom is gone for the tested path; "
+            "it does NOT prove the writer/reader invariant holds in every branch or "
+            "under concurrency. Code trace proves the invariant but not the runtime."
+            if confidence_uncertain else ""
+        ),
+        "lifecycle_resources": [r for r in _LIFECYCLE_RESOURCES if r in low or any(r in s for s in surfaces)] if required else [],
+        "worktree_prune_predicate": _WORKTREE_PRUNE_PREDICATE if "worktree" in surfaces else [],
+        "cleanup_requires_approval": True,  # reqs. 6, 9: never auto-delete
+        "rule": (
+            "Before recommending implementation, identify the writer/storage/reader/"
+            "lifecycle/authority/stale-direction, and (when cheap) inspect the actual "
+            "current state. Rank ≥2 verification paths by confidence-per-effort; prefer "
+            "empirical end-to-end reproduction against a real oracle. Cleanup of /go-"
+            "created resources (worktrees, branches, state dirs, markers, cache, "
+            "exports) is NEVER auto-run — report-only dry run, then director approval."
+            if required else ""
+        ),
+    }
+
+
 def build_plain_english_report(proposal: dict) -> dict:
     """Four-section plain-English report (goal reqs. 8, 10, 11).
 
@@ -1477,6 +1572,26 @@ def build_plain_english_report(proposal: dict) -> dict:
             "confirm_closed_via_registered_path": closure.get("registered_path_required", False),
             "remaining_risk": None,               # residual risk after the fix
             "may_claim_fixed": confirm_closed_passes(closure),
+        }
+
+    # Discovery evidence (reqs. 7, 8): scaffolds writer/storage/reader/lifecycle
+    # findings BEFORE recommendations when the question is operational. Each
+    # finding carries a provenance tier so verified fact, inference, and
+    # assumption are visibly distinct — not flattened into one claim.
+    disc = proposal.get("operational_discovery") or {}
+    if disc.get("required"):
+        report["discovery_evidence"] = {
+            "section_order_position": "before what_i_recommend",
+            "surfaces": disc.get("surfaces", []),
+            "findings": [],  # worker fills: {item, value, provenance ∈ verified|inference|assumption, source}
+            "identify_checklist": disc.get("identify_checklist", []),
+            "verification_paths": disc.get("verification_paths", []),
+            "empirical_oracle_preferred": disc.get("empirical_oracle_preferred", False),
+            "empirical_trace_gap": disc.get("empirical_trace_gap", ""),
+            "provenance_tiers": ["verified", "inference", "assumption"],
+            "lifecycle_resources": disc.get("lifecycle_resources", []),
+            "worktree_prune_predicate": disc.get("worktree_prune_predicate", []),
+            "cleanup_requires_approval": disc.get("cleanup_requires_approval", True),
         }
 
     return report
@@ -1682,6 +1797,7 @@ def generate_proposal(
     )
     closure_check = classify_closure_check(rewritten, task_intent)
     repro_policy = derive_repro_policy(rewritten, task_intent, closure_check)
+    operational_discovery = classify_operational_discovery(rewritten, task_intent)
     report_gate = derive_report_gate(task_intent, execution_tier, closure_check)
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
@@ -1716,6 +1832,13 @@ def generate_proposal(
             "authorize Fixed/Done; produce pre-fix repro + post-fix symptom-gone "
             "evidence, or an explicit cannot_reproduce/unavailable_reason artifact."
         )
+    if operational_discovery["required"]:
+        notes.append(
+            f"DISCOVERY_FIRST required (surfaces={operational_discovery['surfaces']}): "
+            "identify writer/storage/reader/lifecycle/authority/stale-direction + "
+            "observed state before prescribing. Rank ≥2 verification paths by "
+            "confidence-per-effort. Cleanup is report-only + approval-gated."
+        )
     proposal = {
         "runid": run_id,
         "run_id": run_id,
@@ -1738,6 +1861,7 @@ def generate_proposal(
         "decision_kind": decision_kind,
         "closure_check": closure_check,
         "repro_policy": repro_policy,
+        "operational_discovery": operational_discovery,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
         "freshness": {
@@ -1834,8 +1958,24 @@ if __name__ == "__main__":
     assert not inv["report_gate"]["allow_implementation_completion_claim"]
     # investigate intent does NOT require closure_check (req. 8).
     assert inv["closure_check"]["required"] is False
+    # operational discovery: the hook-double-fires investigate prompt hits a surface.
+    od = inv["operational_discovery"]
+    assert od["required"] is True, "hook investigate prompt must trigger discovery_first"
+    assert "hook" in od["surfaces"]
+    assert od["cleanup_requires_approval"] is True
+    assert od["identify_checklist"] and od["empirical_oracle_preferred"] is True
+    assert od["verification_paths"], "investigate must list ≥2 verification paths"
+    assert od["verification_paths"][0]["path"].startswith("empirical")
+    assert inv["plain_english_report"].get("discovery_evidence"), "report must scaffold discovery_evidence"
+    # worktree lifecycle question → safe prune predicate, no blind deletion.
+    wt = generate_proposal("do git worktrees accumulate over time?", "run-wt", "tid")
+    assert wt["operational_discovery"]["required"] is True
+    assert "worktree" in wt["operational_discovery"]["surfaces"]
+    assert wt["operational_discovery"]["worktree_prune_predicate"]
+    assert "explicit director approval" in " ".join(wt["operational_discovery"]["worktree_prune_predicate"]).lower()
     print(
         f"preflight_propose: self-check OK (dispatch={out['suggestedDispatch']}, "
         f"intent={out['task_intent']}, tier={out['execution_tier']}, "
-        f"closure_required={out['closure_check']['required']})"
+        f"closure_required={out['closure_check']['required']}, "
+        f"discovery_required={od['required']})"
     )

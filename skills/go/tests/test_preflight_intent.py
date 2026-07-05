@@ -32,6 +32,7 @@ from preflight_propose import (  # noqa: E402
     classify_closure_check,
     derive_repro_policy,
     confirm_closed_passes,
+    classify_operational_discovery,
 )
 
 
@@ -677,3 +678,125 @@ def test_smoke_closure_check_real_path():
     inv = generate_proposal("investigate why X fails", "run-cc-inv", "tid-cc-inv")
     assert inv["closure_check"]["required"] is False
     assert "closure_report" not in inv["plain_english_report"]
+
+
+# ---------------------------------------------------------------------------
+# Discovery-first / verification-ranking / lifecycle hygiene (goal: discovery)
+# ---------------------------------------------------------------------------
+
+class TestOperationalDiscoveryTrigger:
+    """reqs. 2, 3: operational surface questions trigger discovery-first."""
+
+    @pytest.mark.parametrize("prompt,expected_surface", [
+        ("do git worktrees accumulate over time?", "worktree"),
+        ("why does the Stop hook double-fire?", "hook"),
+        ("where is the gate registered?", "gate"),
+        ("how does the session pointer get cleaned up?", "session"),
+        ("why is the plugin cache stale?", "cache"),
+        ("where do phase markers get written?", "markers"),
+    ])
+    def test_surface_detected(self, prompt, expected_surface):
+        d = classify_operational_discovery(prompt, "investigate")
+        assert d["required"] is True
+        assert expected_surface in d["surfaces"]
+        assert d["cleanup_requires_approval"] is True
+
+    def test_non_operational_does_not_trigger(self):
+        d = classify_operational_discovery("add a flag to foo.py", "implement")
+        assert d["required"] is False
+        assert d["surfaces"] == []
+        assert d["identify_checklist"] == []
+
+    def test_identify_checklist_present(self):
+        d = classify_operational_discovery(
+            "investigate the worktree lifecycle", "investigate")
+        assert "writer/creator" in d["identify_checklist"]
+        assert "lifecycle/cleanup path" in d["identify_checklist"]
+        assert "stale/failure direction" in d["identify_checklist"]
+
+
+class TestVerificationRanking:
+    """req. 4: ≥2 paths ranked by confidence-per-effort; oracle above trace."""
+
+    def test_paths_listed_for_investigate(self):
+        d = classify_operational_discovery(
+            "investigate why the hook misfires", "investigate")
+        assert len(d["verification_paths"]) >= 2
+        # Empirical oracle ranked first.
+        first = d["verification_paths"][0]
+        assert first["path"].startswith("empirical")
+        assert first["confidence"] == "highest"
+        assert d["empirical_oracle_preferred"] is True
+
+    def test_trace_gap_stated(self):
+        d = classify_operational_discovery(
+            "decide whether to gate the dispatch router", "decide")
+        assert d["empirical_trace_gap"]  # non-empty
+        assert "concurrency" in d["empirical_trace_gap"] or "runtime" in d["empirical_trace_gap"]
+
+    def test_implement_operational_no_empirical_list(self):
+        # implement intent over an operational surface: discovery required, but
+        # the ≥2-paths ranking is reserved for uncertain intents.
+        d = classify_operational_discovery(
+            "fix the cache invalidation bug", "implement")
+        assert d["required"] is True
+        assert d["empirical_oracle_preferred"] is False
+
+
+class TestWorktreeLifecycle:
+    """req. 6: worktree prune predicate — safe, never blind deletion."""
+
+    def test_prune_predicate_requires_all_conditions(self):
+        wt = generate_proposal(
+            "do worktrees accumulate? investigate the worktree lifecycle",
+            "run-wt", "tid-wt")
+        pred = wt["operational_discovery"]["worktree_prune_predicate"]
+        assert pred, "worktree surface must produce a prune predicate"
+        joined = " ".join(pred).lower()
+        # age, clean status, merged/disposable, dry-run, approval — all required.
+        for term in ("age", "clean", "merged", "dry run", "approval"):
+            assert term in joined, f"prune predicate missing '{term}'"
+
+    def test_no_cleanup_action_without_approval(self):
+        wt = generate_proposal(
+            "do worktrees accumulate?", "run-wt2", "tid-wt2")
+        assert wt["operational_discovery"]["cleanup_requires_approval"] is True
+        # The proposal must NOT contain a scheduled/auto cleanup command.
+        notes_joined = " ".join(wt.get("notes", [])).lower()
+        assert "auto-delete" not in notes_joined
+        assert "rm -rf" not in notes_joined
+
+
+class TestDiscoveryReportEvidence:
+    """reqs. 7, 8: discovery_evidence scaffold + provenance tiers."""
+
+    def test_report_has_discovery_evidence(self):
+        p = generate_proposal(
+            "investigate the worktree accumulation question",
+            "run-disc", "tid-disc")
+        de = p["plain_english_report"].get("discovery_evidence")
+        assert de, "operational investigate must scaffold discovery_evidence"
+        assert de["section_order_position"] == "before what_i_recommend"
+        assert "verified" in de["provenance_tiers"]
+        assert "inference" in de["provenance_tiers"]
+        assert "assumption" in de["provenance_tiers"]
+        assert de["findings"] == []  # worker fills
+
+    def test_non_operational_no_discovery_evidence(self):
+        p = generate_proposal(
+            "add a docstring to foo.py", "run-no-disc", "tid-no-disc")
+        assert "discovery_evidence" not in p["plain_english_report"]
+
+
+def test_smoke_operational_discovery_real_path():
+    """End-to-end: worktree question surfaces discovery contract in proposal + report."""
+    p = generate_proposal(
+        "investigate: do git worktrees accumulate, and what cleans them up?",
+        "run-od-smoke", "tid-od-smoke")
+    od = p["operational_discovery"]
+    assert od["required"] is True
+    assert "worktree" in od["surfaces"]
+    assert od["worktree_prune_predicate"]
+    assert "discovery_evidence" in p["plain_english_report"]
+    assert p["plain_english_report"]["discovery_evidence"]["worktree_prune_predicate"]
+
