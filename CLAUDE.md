@@ -2,7 +2,7 @@
 
 SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (44)
+## Skills (43)
 
 | Skill | Purpose |
 |-------|---------|
@@ -24,7 +24,6 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | go-ct | Task orchestrator (execution-contract migration) |
 | go-pi | Task orchestrator (Pi model variant) |
 | go-ef | Task orchestrator (evidence-first, canonical) |
-| harden | /harden |
 | mermaid-c4 | Mermaid Diagrams |
 | meta-review | Meta-Review Skill |
 | multi-file-refactor | Code Editing Patterns |
