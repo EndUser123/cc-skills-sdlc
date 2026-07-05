@@ -11,6 +11,39 @@ contract_type: workflow-execution
 
 Persistent knowledge management: LLM maintains an Obsidian wiki (ingest/synthesize/lint), searchable via QMD CLI, exposed as `search-research` backend `QMD_WIKI`.
 
+## Default (no argument)
+
+When invoked as `/wiki` with no operation and no argument, **default to session-ingest**: distill the current session's unique, durable findings into one or more wiki pages.
+
+**Why default to session-ingest**: the conversation is the freshest possible source, and the wiki's purpose is persistence of exactly this kind of finding. The session always exists; file-based sources (Downloads, yt-is) require files to be present. The constitution is explicit — "LLM has conversation history" — so synthesize from context, do not build a transcript parser.
+
+**Procedure (main session, no subagent dispatch)**:
+1. Scan the conversation for durable findings: non-obvious fixes/root causes, measured benchmark results, decisions with rationale not in code/commits, and rejected alternatives with the rejection reason.
+2. **Deduplicate against existing wiki** before writing. Grep `P:/.data/wiki/concepts/` and `P:/.data/wiki/log.md` for slugs, titles, or content that already captures each finding. Read candidates to confirm overlap, not just title match.
+3. If nothing unique survives dedup → report "nothing new to ingest" with the 1-2 candidates considered, and stop. Do NOT write a low-value page just to write something.
+4. If multiple distinct findings survive → write one page per finding (Option A, one-page-per-unit). Do not aggregate unrelated findings into a single session-recap page.
+5. Write each page using the standard wiki page format defined under Ingest (YAML frontmatter + Summary / Key Findings / Related / Sources body sections). `source: session-<YYYY-MM-DD>`.
+6. Append to `P:/.data/wiki/log.md` for each page:
+   `## [YYYY-MM-DD] ingest | <title>\nSource: session\nTranscript: <transcript_path>\n`
+7. Run the post-phase QMD update:
+   ```powershell
+   pwsh -NoProfile -File "P:/.claude/hooks/scripts/qmd_update_wrapper.ps1"
+   ```
+8. Report: pages written (title → path) and pages skipped (which finding, which existing page covered it).
+
+**What counts as unique/durable**:
+- A non-obvious fix or root cause (e.g., "cc-ccr probe was hitting LM Studio port, not llama.cpp")
+- A measured benchmark result future sessions would benefit from (numbers + conditions)
+- A decision with rationale that isn't in code, commit messages, or CLAUDE.md
+- A rejected alternative with the rejection reason
+
+**What does NOT count (skip these)**:
+- Ephemeral task state, in-progress work, narrative session summaries without durable insight
+- Findings already documented in CLAUDE.md, code comments, existing wiki pages, or commit messages
+- Debugging recipes that live in the commit, not the wiki
+
+Usage: `/wiki`
+
 ## Operations
 
 ### Ingest
