@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.6.0
+version: 2.7.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -410,6 +410,33 @@ The proposal's `report_gate` field carries `allow_implementation_completion_clai
 - For `mixed`: name which children were executed and which were deferred. Use this sentence template when splitting:
 
 > This is mixed work. I executed the authorized low-risk item(s) now: `[A]`. I produced evidence for the investigation item(s): `[B]`. I am leaving the design/decision item(s) `[C]` unimplemented until you approve, because `[reason]`.
+
+### Closure check — reproduce-first + confirm-closed (reqs. 1-11)
+
+Bugfix / regression / hook-FP / stale-warning tasks must prove the **original symptom** is gone, not just that a related test passes. The proposal carries a `closure_check` block and a `repro_policy` block, derived deterministically from prompt markers.
+
+`closure_check` schema (req. 2):
+
+| Field | Meaning |
+|-------|---------|
+| `required` | true for bugfix/regression/hook-FP/stale-warning intents (req. 3) |
+| `source` | `user_reported_symptom` \| `repro_command` \| `field_failure` \| `hook_fp` \| `regression` \| `none` |
+| `command_or_procedure` | the repro / closure command — **worker fills** |
+| `expected_before` | the failing repro / observed symptom — **worker fills** |
+| `expected_after` | what the symptom looks like AFTER the fix — **worker fills** |
+| `evidence_path` / `evidence_summary` | pre-fix failing repro + post-fix symptom-gone evidence — **worker fills** |
+| `unavailable_reason` | set ONLY when direct closure is genuinely impossible (req. 4) |
+| `reproduce_first_required` | mirrors `required` (req. 5) |
+| `cannot_reproduce_artifact_allowed` | true when prompt signals flaky/intermittent/non-deterministic |
+| `registered_path_required` | true for hook-FP / high-risk surfaces — use the actual entry point or registered path (req. 7) |
+
+**Reproduce-first (req. 5):** for required tasks the worker produces either a **pre-fix failing repro/test**, or a `cannot_reproduce` / `no_pre_fix_repro` artifact with evidence. A cannot-reproduce artifact lets the report *proceed* but does **NOT** authorize a "Fixed" claim over the original symptom.
+
+**Confirm-closed (reqs. 4, 6, 11):** a task may NOT claim `fixed` / `complete` / `Done` / `Verified` unless `confirm_closed_passes(closure_check)` — which requires `evidence_path`/`evidence_summary` **AND** `expected_after` — OR `unavailable_reason` is set. **A passing unit test alone is NOT sufficient** (`report_gate.unit_test_alone_is_insufficient: true`). Confirm-closed must re-check the **original reported symptom** (req. 6); for hook/gate/state/identity/cache/plugin issues it must use the **actual entry point or registered path** (req. 7).
+
+**Defaults (req. 9):** missing/malformed `closure_check` on a required task blocks silent completion (`allow_implementation_completion_claim: false` at preflight; `notes` surfaces `CLOSURE_CHECK required`). investigate/validate/decide tasks default to `required=false` (req. 8) and MUST NOT use fixed/completed language.
+
+**Report content (req. 10):** when `closure_check.required`, `plain_english_report.closure_report` scaffolds five content fields the worker fills — `original_symptom`, `reproduce_first_evidence` (or `reproduce_first_unavailable_reason`), `verification_tests`, `confirm_closed_evidence`, `remaining_risk` — plus `may_claim_fixed` (the `confirm_closed_passes` verdict). Until these are populated, the report may not claim completion.
 
 ### Mixed-work status (`mixed_work_status`)
 

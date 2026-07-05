@@ -240,9 +240,11 @@ class TestAmbiguousDefaults:
 
     def test_implement_no_path_routes_to_full_go(self):
         # Bounded implement marker, no path -> pi dispatch, no approval -> full_go.
-        p = generate_proposal("fix the bug", "r7", "t7")
+        # Non-bugfix prompt so the closure_check gate does not collide.
+        p = generate_proposal("bump the version", "r7", "t7")
         assert p["task_intent"] == "implement"
         assert p["execution_tier"] == "full_go"
+        assert p["closure_check"]["required"] is False  # not a bugfix
         assert p["report_gate"]["allow_implementation_completion_claim"] is True
 
 
