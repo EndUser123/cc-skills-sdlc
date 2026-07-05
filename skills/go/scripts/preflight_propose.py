@@ -175,6 +175,58 @@ _SHARED_STATE_MARKERS: tuple[str, ...] = (
     ".env", "provider-config", "marketplace.json",
 )
 
+# --- Closure check (reproduce-first + confirm-closed) -------------------------
+# Bugfix/regression/hook-FP/stale-warning tasks must prove the original symptom
+# is gone, not just that a related test passes. Detected at preflight; the worker
+# fills command_or_procedure / expected_before / expected_after / evidence during
+# the run. A task may NOT claim fixed/complete unless confirm_closed_passes()
+# (or the report explicitly explains why direct closure is impossible).
+_CLOSURE_SOURCE_VALUES = (
+    "user_reported_symptom", "repro_command", "field_failure",
+    "hook_fp", "regression", "none",
+)
+# Prompts that describe fixing a reported defect / broken behavior.
+_BUGFIX_MARKERS: tuple[str, ...] = (
+    "fix ", "fixes", "fixed", "bug", "defect", "broken", "crash", "crashes",
+    "fails", "failure", "incorrect", "wrong result", "error when",
+    "exception when", "no longer works", "stopped working",
+)
+# Regression: used-to-work framing — strongest closure signal.
+_REGRESSION_MARKERS: tuple[str, ...] = (
+    "regression", "used to work", "previously worked", "broke in",
+    "broke after", "no longer", "regressed",
+)
+# Hook/gate false positive (matches FMM hook vocabulary).
+_HOOK_FP_MARKERS: tuple[str, ...] = (
+    "false positive", "false-positive", " fp ", "misfire", "misfires",
+    "misfired", "spurious", "phantom", "overblocks", "over-blocks",
+    "overfires", "over-fires", "wrongly blocks",
+)
+# Stale warning / reminder that keeps firing after its condition is satisfied.
+_STALE_WARNING_MARKERS: tuple[str, ...] = (
+    "stale warning", "stale reminder", "keeps firing", "re-fires",
+    "refires", "re-firing", "still fires", "already satisfied",
+    "already fixed", "already done",
+)
+# Source-classification markers — pick the closure_check.source enum value.
+_USER_REPORTED_MARKERS: tuple[str, ...] = (
+    "user reported", "user-reported", "reported symptom", "reports that",
+    "they report", "director reports", "i report",
+)
+_FIELD_FAILURE_MARKERS: tuple[str, ...] = (
+    "field-test", "field test", "in production", "in the field",
+    "live failure", "live bug", "on a real",
+)
+# Reproduce-first gating: cannot-reproduce artifact allows a report but not a
+# "Fixed" completion claim over the original symptom.
+_CANNOT_REPRODUCE_MARKERS: tuple[str, ...] = (
+    "cannot reproduce", "can't reproduce", "no repro", "not reproducible",
+    "intermittent", "flaky", "non-deterministic", "nondeterministic",
+    "race condition", "only happens sometimes",
+)
+# High-risk surface closure: confirm-closed must use the actual entry point or
+# registered path where practical (req. 7). Reuses _HIGH_RISK_MARKERS.
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1094,26 +1146,44 @@ def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
     }
 
 
-def derive_report_gate(task_intent, execution_tier) -> dict:
-    """Completion-claim eligibility (goal req. 8).
+def derive_report_gate(task_intent, execution_tier, closure_check=None) -> dict:
+    """Completion-claim eligibility (goal reqs. 4, 8, 9).
 
     investigate/validate/decide never enable implementation-completion claims.
     mixed must defer unauthorized children. implement may claim completion only
     at full_go / local_rigorous; local_surgical may claim a targeted fix only.
+    When closure_check.required is true, completion is additionally gated by
+    confirm_closed_passes() — a passing related test is NOT sufficient (req. 11).
+    Missing/malformed closure_check on a required task blocks silent completion
+    (req. 9): the worker must produce evidence or an explicit unavailable_reason.
     """
-    allow_completion = task_intent == "implement" and execution_tier in (
-        "full_go", "local_rigorous",
+    cc = closure_check or {}
+    cc_required = bool(cc.get("required"))
+    cc_passes = confirm_closed_passes(cc)
+    allow_completion = (
+        task_intent == "implement"
+        and execution_tier in ("full_go", "local_rigorous")
+        and (not cc_required or cc_passes)
     )
     allow_targeted_fix_only = (
-        task_intent == "implement" and execution_tier == "local_surgical"
+        task_intent == "implement"
+        and execution_tier == "local_surgical"
+        and (not cc_required or cc_passes)
     )
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,
         "must_defer_unauthorized_children": task_intent == "mixed",
+        "closure_check_required": cc_required,
+        "confirm_closed_required": cc_required,
+        "confirm_closed_passes": cc_passes,
+        "unit_test_alone_is_insufficient": cc_required,  # req. 11
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
-            "mixed reports split + deferred items, no bundled completion claim."
+            "mixed reports split + deferred items, no bundled completion claim. "
+            + ("closure_check.required: a passing unit test alone does NOT authorize Fixed/Done; "
+               "confirm-closed evidence (or an explicit unavailable_reason) is required. "
+               if cc_required else "")
         ),
     }
 
@@ -1190,6 +1260,121 @@ def classify_decision_kind(
     return "user_preference"  # full_go / pause — defer to director
 
 
+# --- Closure check (reproduce-first + confirm-closed) -------------------------
+
+def _classify_closure_source(rewritten: str) -> str:
+    """Pick the closure_check.source enum from prompt markers (req. 2).
+
+    Order: hook_fp -> regression -> field_failure -> user_reported_symptom ->
+    repro_command -> none. Hook-FP first so "regression of the FP hook" still
+    anchors on the false positive.
+    """
+    low = rewritten.lower()
+    if any(m in low for m in _HOOK_FP_MARKERS) or any(m in low for m in _STALE_WARNING_MARKERS):
+        return "hook_fp"
+    if any(m in low for m in _REGRESSION_MARKERS):
+        return "regression"
+    if any(m in low for m in _FIELD_FAILURE_MARKERS):
+        return "field_failure"
+    if any(m in low for m in _USER_REPORTED_MARKERS):
+        return "user_reported_symptom"
+    # Repro command: a quoted/inline shell command or pytest path present.
+    if any(t in low for t in ("pytest ", "python -m", "repro ", "reproduce",
+                              "to repro", "./", "repro command")):
+        return "repro_command"
+    return "none"
+
+
+def classify_closure_check(rewritten: str, task_intent: str) -> dict:
+    """Derive the default closure_check schema (goal reqs. 2, 3).
+
+    required=true for bugfix/regression/hook-FP/stale-warning intents
+    (including the implement children of a mixed prompt that name a defect).
+    The worker fills command_or_procedure / expected_before / expected_after /
+    evidence during the run; confirm_closed_passes() gates the completion claim.
+
+    investigate/validate/decide tasks default to required=false (req. 8) — they
+    emit evidence/advisory, not implementation-completion language.
+    """
+    low = rewritten.lower()
+    is_bugfix = bool(
+        task_intent in ("implement", "mixed")
+        and any(m in low for m in _BUGFIX_MARKERS)
+    )
+    is_regression = any(m in low for m in _REGRESSION_MARKERS)
+    is_hook_fp = any(m in low for m in _HOOK_FP_MARKERS)
+    is_stale_warning = any(m in low for m in _STALE_WARNING_MARKERS)
+    required = is_bugfix or is_regression or is_hook_fp or is_stale_warning
+    source = _classify_closure_source(rewritten) if required else "none"
+    cannot_reproduce = any(m in low for m in _CANNOT_REPRODUCE_MARKERS)
+    high_risk_surface = any(m in low for m in _HIGH_RISK_MARKERS)
+    return {
+        "required": required,
+        "source": source,
+        "command_or_procedure": None,        # worker fills
+        "expected_before": None,             # worker fills (failing repro / observed symptom)
+        "expected_after": None,              # worker fills (symptom gone after fix)
+        "evidence_path": None,               # path to pre-fix failing repro + post-fix passing evidence
+        "evidence_summary": None,            # short summary when a path is impractical
+        "unavailable_reason": None,          # set ONLY when direct closure is genuinely impossible
+        "reproduce_first_required": required,            # req. 5: pre-fix failing repro expected
+        "cannot_reproduce_artifact_allowed": cannot_reproduce,  # req. 5: cannot-reproduce is a valid artifact
+        "registered_path_required": is_hook_fp or high_risk_surface,  # req. 7: use actual entry point
+        "rule": (
+            "A task may NOT claim fixed/complete unless confirm_closed_passes() OR the "
+            "report explicitly explains why direct closure is impossible (unavailable_reason)."
+        ),
+    }
+
+
+def derive_repro_policy(rewritten: str, task_intent: str, closure_check: dict) -> dict:
+    """Reproduce-first policy for bugfix/regression tasks (goal req. 5).
+
+    When required, the worker must produce either a pre-fix failing repro/test
+    OR a cannot_reproduce / no_pre_fix_repro artifact with evidence. The artifact
+    presence is what lets the report proceed; it does NOT by itself authorize a
+    "Fixed" completion claim (that still needs confirm-closed).
+    """
+    required = bool(closure_check.get("required"))
+    cannot_reproduce = bool(closure_check.get("cannot_reproduce_artifact_allowed"))
+    if not required:
+        return {
+            "required": False,
+            "artifact_required": "none",
+            "rule": "reproduce-first not required for this task_intent.",
+        }
+    artifact = "cannot_reproduce_or_no_repro" if cannot_reproduce else "pre_fix_repro"
+    return {
+        "required": True,
+        "artifact_required": artifact,
+        "cannot_reproduce_allows_report_but_not_overclaim": cannot_reproduce,
+        "rule": (
+            "Produce a pre-fix failing repro/test. If that is not practical, produce a "
+            "cannot_reproduce / no_pre_fix_repro artifact with evidence. A cannot-reproduce "
+            "artifact lets the report proceed but does NOT authorize a Fixed claim over "
+            "the original symptom."
+        ),
+    }
+
+
+def confirm_closed_passes(closure_check: dict) -> bool:
+    """Whether the report may claim fixed/complete (goal req. 4).
+
+    Passes when closure_check is not required, OR when evidence
+    (evidence_path/evidence_summary + expected_after) is present, OR when
+    unavailable_reason is set (the report explicitly explains why direct closure
+    is impossible — the task is reported, not claimed Fixed).
+    """
+    cc = closure_check or {}
+    if not cc.get("required"):
+        return True
+    if cc.get("unavailable_reason"):
+        return True  # report proceeds; SKILL rule forbids "Fixed" wording here
+    has_evidence = bool(cc.get("evidence_path") or cc.get("evidence_summary"))
+    has_after = bool(cc.get("expected_after"))
+    return has_evidence and has_after
+
+
 def build_plain_english_report(proposal: dict) -> dict:
     """Four-section plain-English report (goal reqs. 8, 10, 11).
 
@@ -1262,7 +1447,7 @@ def build_plain_english_report(proposal: dict) -> dict:
     else:
         need = "Nothing right now — proceed at the recommended tier."
 
-    return {
+    report: dict[str, object] = {
         "section_order": [
             "what_i_did",
             "what_i_recommend",
@@ -1276,6 +1461,25 @@ def build_plain_english_report(proposal: dict) -> dict:
         "labels_after_plain_english": True,
         "no_mutation_evidence_required": True,
     }
+
+    # Closure report (reqs. 4, 6, 10): scaffolds the five required content
+    # fields when closure_check is required. The worker fills the values during
+    # the run; until then confirm_closed_passes is False and the report may NOT
+    # use fixed/completed wording.
+    closure = proposal.get("closure_check") or {}
+    if closure.get("required"):
+        report["closure_report"] = {
+            "original_symptom": proposal.get("originalPrompt", ""),
+            "reproduce_first_evidence": None,     # pre-fix failing repro OR why unavailable
+            "reproduce_first_unavailable_reason": None,
+            "verification_tests": None,           # the unit/integration tests actually run
+            "confirm_closed_evidence": None,      # post-fix re-check of the ORIGINAL symptom
+            "confirm_closed_via_registered_path": closure.get("registered_path_required", False),
+            "remaining_risk": None,               # residual risk after the fix
+            "may_claim_fixed": confirm_closed_passes(closure),
+        }
+
+    return report
 
 
 def assert_fresh(proposal, run_id) -> None:
@@ -1476,7 +1680,9 @@ def generate_proposal(
     execution_tier = derive_execution_tier(
         task_intent, dispatch, local_eligible, requires_approval, risk
     )
-    report_gate = derive_report_gate(task_intent, execution_tier)
+    closure_check = classify_closure_check(rewritten, task_intent)
+    repro_policy = derive_repro_policy(rewritten, task_intent, closure_check)
+    report_gate = derive_report_gate(task_intent, execution_tier, closure_check)
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
@@ -1503,6 +1709,13 @@ def generate_proposal(
             f"BLOCKED ({mixed_work_status}): do NOT ask the user to approve. "
             "State the blocker and the next evidence-gathering step (req. 7)."
         )
+    if closure_check["required"]:
+        notes.append(
+            f"CLOSURE_CHECK required (source={closure_check['source']}): "
+            "reproduce-first + confirm-closed. A passing unit test alone does NOT "
+            "authorize Fixed/Done; produce pre-fix repro + post-fix symptom-gone "
+            "evidence, or an explicit cannot_reproduce/unavailable_reason artifact."
+        )
     proposal = {
         "runid": run_id,
         "run_id": run_id,
@@ -1523,6 +1736,8 @@ def generate_proposal(
         "delegation_policy": delegation_policy,
         "mixed_work_status": mixed_work_status,
         "decision_kind": decision_kind,
+        "closure_check": closure_check,
+        "repro_policy": repro_policy,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
         "freshness": {
@@ -1601,11 +1816,26 @@ if __name__ == "__main__":
     assert dp["worker_enforcement"] in ("path-bound", "type-bound", "worktree")
     assert isinstance(dp["enforcement"]["mutating_tools"], list)
     assert_fresh(out, "run-self")  # freshness contract holds for current run
+    # closure_check: bugfix prompts require closure + confirm-closed gating.
+    cc = out["closure_check"]
+    assert cc["required"] is True, "fix prompt must require closure_check"
+    assert cc["source"] in _CLOSURE_SOURCE_VALUES
+    assert out["report_gate"]["closure_check_required"] is True
+    assert out["report_gate"]["confirm_closed_required"] is True
+    assert out["report_gate"]["confirm_closed_passes"] is False  # no evidence yet
+    # confirm_closed_passes: evidence + expected_after satisfy; unavailable_reason alone passes.
+    cc_pass = dict(cc, evidence_summary="ran repro", expected_after="symptom gone")
+    assert confirm_closed_passes(cc_pass) is True
+    cc_unavail = dict(cc, unavailable_reason="flaky; cannot reproduce deterministically")
+    assert confirm_closed_passes(cc_unavail) is True
     # investigate prompts must not enable completion claims.
     inv = generate_proposal("investigate why the hook double-fires", "run-inv", "tid")
     assert inv["task_intent"] in ("investigate", "mixed")
     assert not inv["report_gate"]["allow_implementation_completion_claim"]
+    # investigate intent does NOT require closure_check (req. 8).
+    assert inv["closure_check"]["required"] is False
     print(
         f"preflight_propose: self-check OK (dispatch={out['suggestedDispatch']}, "
-        f"intent={out['task_intent']}, tier={out['execution_tier']})"
+        f"intent={out['task_intent']}, tier={out['execution_tier']}, "
+        f"closure_required={out['closure_check']['required']})"
     )

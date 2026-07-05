@@ -29,6 +29,9 @@ from preflight_propose import (  # noqa: E402
     assert_fresh,
     generate_proposal,
     run_preflight,
+    classify_closure_check,
+    derive_repro_policy,
+    confirm_closed_passes,
 )
 
 
@@ -124,9 +127,12 @@ class TestDecideAdvisoryAndPause:
 class TestSmallImplementLocalSurgical:
     def test_small_bounded_patch_is_local_surgical(self):
         # Concrete path + bounded marker + short -> classify_dispatch returns local/eligible.
-        p = generate_proposal("fix the typo in foo.py", "r3", "t3")
+        # Non-bugfix prompt so the closure_check gate does not collide with the
+        # tier-classification assertion (bugfix prompts legitimately gate completion).
+        p = generate_proposal("add a flag to foo.py", "r3", "t3")
         assert p["task_intent"] == "implement"
         assert p["execution_tier"] == "local_surgical"
+        assert p["closure_check"]["required"] is False  # not a bugfix
         # local_surgical allows a targeted fix claim, NOT full completion.
         assert p["report_gate"]["allow_targeted_fix_claim_only"] is True
 
@@ -492,3 +498,180 @@ class TestMixedDisclaimerWording:
         joined = " ".join(per["what_i_did"])
         assert "This is mixed work" in joined
         assert "not claiming blocked or decision-dependent work is done" in joined
+
+
+# ---------------------------------------------------------------------------
+# Goal reqs 1-11: closure_check (reproduce-first + confirm-closed)
+# ---------------------------------------------------------------------------
+
+class TestClosureCheckRequired:
+    """bugfix/regression/hook-FP/stale-warning tasks require closure_check (reqs 2, 3)."""
+
+    @pytest.mark.parametrize("prompt,source", [
+        ("fix the parser crash on None", "none"),              # bugfix w/o a source marker -> none
+        ("fix the regression in the hook dispatch", "regression"),
+        ("fix the stop hook false positive on copy-paste", "hook_fp"),
+        ("fix the stale warning that keeps firing after cleanup", "hook_fp"),
+    ])
+    def test_bugfix_requires_closure(self, prompt, source):
+        cc = classify_closure_check(prompt, "implement")
+        assert cc["required"] is True, f"{prompt!r} should require closure"
+        assert cc["source"] == source, f"{prompt!r} -> source={cc['source']!r}, want {source!r}"
+        assert cc["reproduce_first_required"] is True
+
+    def test_bugfix_closure_propagates_to_report_gate(self):
+        p = generate_proposal("fix the regression in the hook dispatch", "r-cc1", "t-cc1")
+        assert p["closure_check"]["required"] is True
+        gate = p["report_gate"]
+        assert gate["closure_check_required"] is True
+        assert gate["confirm_closed_required"] is True
+        # No evidence yet at preflight -> may NOT claim completion.
+        assert gate["confirm_closed_passes"] is False
+        assert gate["allow_implementation_completion_claim"] is False
+
+    def test_investigate_does_not_require_closure(self):
+        # req 8: investigate/validate/decide do NOT require closure_check.
+        p = generate_proposal("investigate why the hook double-fires", "r-cc2", "t-cc2")
+        assert p["closure_check"]["required"] is False
+        assert p["report_gate"]["closure_check_required"] is False
+
+    def test_decide_does_not_require_closure(self):
+        p = generate_proposal("should we adopt option A or option B", "r-cc3", "t-cc3")
+        assert p["closure_check"]["required"] is False
+
+
+class TestConfirmClosedGate:
+    """A bugfix must not claim fixed/complete without confirm-closed (reqs 4, 6, 11)."""
+
+    def test_unit_test_alone_is_insufficient(self):
+        # req 11: a passing unit test alone does NOT satisfy closure.
+        cc = classify_closure_check("fix the regression in foo.py", "implement")
+        # Only verification_tests present (simulating "unit test passed") — no
+        # symptom-gone evidence, no unavailable_reason -> gate stays closed.
+        assert confirm_closed_passes(cc) is False
+
+    def test_evidence_plus_expected_after_passes(self):
+        cc = classify_closure_check("fix the regression in foo.py", "implement")
+        cc["evidence_summary"] = "re-ran the failing repro; symptom gone"
+        cc["expected_after"] = "no crash; exit 0 on the original repro"
+        assert confirm_closed_passes(cc) is True
+
+    def test_evidence_without_expected_after_still_fails(self):
+        # Evidence alone (no expected_after) is NOT enough — must re-state what
+        # the symptom looks like AFTER the fix, not just "I ran something".
+        cc = classify_closure_check("fix the regression in foo.py", "implement")
+        cc["evidence_summary"] = "ran the test"
+        assert confirm_closed_passes(cc) is False
+
+    def test_unavailable_reason_passes_but_report_must_not_overclaim(self):
+        # req 5 / cannot-reproduce: artifact lets the report proceed but does
+        # NOT authorize a Fixed claim. confirm_closed_passes returns True so the
+        # gate doesn't hard-block, but the closure_report must record the reason.
+        cc = classify_closure_check("fix the intermittent crash in foo.py", "implement")
+        assert cc["cannot_reproduce_artifact_allowed"] is True
+        cc["unavailable_reason"] = "flaky; cannot reproduce deterministically"
+        assert confirm_closed_passes(cc) is True
+
+    def test_bugfix_cannot_claim_fixed_without_confirm_closed(self):
+        p = generate_proposal("fix the regression in the hook dispatch", "r-cc4", "t-cc4")
+        # Simulate the worker updating closure_check with evidence mid-run.
+        p["closure_check"]["evidence_summary"] = "ran repro; symptom gone"
+        p["closure_check"]["expected_after"] = "no double-fire on the original repro"
+        # Re-derive the gate with the updated closure_check.
+        gate = derive_report_gate("implement", "full_go", p["closure_check"])
+        assert gate["allow_implementation_completion_claim"] is True
+
+
+class TestReproPolicy:
+    """Reproduce-first behavior for bugfix/regression (req 5)."""
+
+    def test_bugfix_requires_pre_fix_repro(self):
+        cc = classify_closure_check("fix the regression in foo.py", "implement")
+        rp = derive_repro_policy("fix the regression in foo.py", "implement", cc)
+        assert rp["required"] is True
+        assert rp["artifact_required"] == "pre_fix_repro"
+
+    def test_cannot_reproduce_artifact_allowed_for_flaky(self):
+        cc = classify_closure_check("fix the intermittent flaky crash", "implement")
+        rp = derive_repro_policy("fix the intermittent flaky crash", "implement", cc)
+        assert rp["cannot_reproduce_allows_report_but_not_overclaim"] is True
+        assert rp["artifact_required"] == "cannot_reproduce_or_no_repro"
+
+    def test_non_bugfix_has_no_repro_requirement(self):
+        cc = classify_closure_check("add a new banner component", "implement")
+        rp = derive_repro_policy("add a new banner component", "implement", cc)
+        assert rp["required"] is False
+
+
+class TestHookFpRegisteredPathClosure:
+    """Hook-FP / high-risk closure must use the registered path where practical (req 7)."""
+
+    def test_hook_fp_sets_registered_path_required(self):
+        p = generate_proposal("fix the stop hook false positive on copy-paste",
+                              "r-cc5", "t-cc5")
+        cc = p["closure_check"]
+        assert cc["required"] is True
+        assert cc["source"] == "hook_fp"
+        assert cc["registered_path_required"] is True
+
+    def test_closure_report_includes_registered_path_flag(self):
+        p = generate_proposal("fix the PreToolUse gate false positive", "r-cc6", "t-cc6")
+        per = p["plain_english_report"]
+        assert "closure_report" in per
+        assert per["closure_report"]["confirm_closed_via_registered_path"] is True
+
+    def test_closure_report_has_five_required_content_fields(self):
+        # req 10: original_symptom, reproduce-first evidence, verification tests,
+        # confirm-closed evidence, remaining risk.
+        p = generate_proposal("fix the regression in foo.py", "r-cc7", "t-cc7")
+        cr = p["plain_english_report"]["closure_report"]
+        for key in ("original_symptom", "reproduce_first_evidence",
+                    "verification_tests", "confirm_closed_evidence",
+                    "remaining_risk", "may_claim_fixed"):
+            assert key in cr, f"closure_report missing {key}"
+        assert cr["may_claim_fixed"] is False  # no evidence at preflight
+
+
+class TestClosureMissingDefaultsToBlock:
+    """Missing/malformed closure on a required task blocks silent completion (req 9)."""
+
+    def test_required_closure_with_no_evidence_blocks_completion(self):
+        p = generate_proposal("fix the regression in foo.py", "r-cc8", "t-cc8")
+        # The proposal must NOT silently enable completion at preflight.
+        assert p["report_gate"]["allow_implementation_completion_claim"] is False
+        # Notes surface the closure requirement so it is not silent.
+        assert any("CLOSURE_CHECK required" in n for n in p["notes"])
+
+    def test_investigate_does_not_use_fixed_language(self):
+        # req 8: investigate/decide reports must not claim fixed/completed.
+        p = generate_proposal("investigate why the parser crashes on None",
+                              "r-cc9", "t-cc9")
+        assert p["closure_check"]["required"] is False
+        per = p["plain_english_report"]
+        assert "closure_report" not in per  # no closure scaffolding for non-required
+
+
+def test_smoke_closure_check_real_path():
+    """Direct smoke through generate_proposal: real preflight path, no mocks.
+
+    Exercises classify_closure_check -> derive_repro_policy -> derive_report_gate
+    (with closure_check) -> build_plain_english_report (with closure_report) in
+    the same call path the orchestrator uses.
+    """
+    # Bugfix prompt: required closure, gate blocks completion at preflight.
+    p = generate_proposal("fix the regression in the stop hook dispatch",
+                          "run-cc-smoke", "tid-cc-smoke")
+    assert p["closure_check"]["required"] is True
+    assert p["report_gate"]["confirm_closed_required"] is True
+    assert p["report_gate"]["confirm_closed_passes"] is False
+    assert "closure_report" in p["plain_english_report"]
+    # Fill the closure_check as the worker would -> gate now permits completion.
+    p["closure_check"]["evidence_summary"] = "re-ran the failing repro; symptom gone"
+    p["closure_check"]["expected_after"] = "exit 0, no double-fire"
+    gate = derive_report_gate(p["task_intent"], p["execution_tier"], p["closure_check"])
+    assert gate["confirm_closed_passes"] is True
+    assert gate["allow_implementation_completion_claim"] in (True, False)  # tier-dependent
+    # Investigate prompt: closure not required, no closure_report.
+    inv = generate_proposal("investigate why X fails", "run-cc-inv", "tid-cc-inv")
+    assert inv["closure_check"]["required"] is False
+    assert "closure_report" not in inv["plain_english_report"]
