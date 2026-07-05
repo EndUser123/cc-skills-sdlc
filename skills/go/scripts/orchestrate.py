@@ -104,13 +104,11 @@ def inject_route_decision(
     task_data = json.loads(task_file.read_text(encoding="utf-8"))
     task = task_data.get("task", task_data)
 
-    # Determine model source
+    # Determine model source. NOTE: dispatch=="local" is verification-only
+    # (TASK-002 Option B) — no worker, no model. GO_LOCAL_LLM was dead code.
     override = os.environ.get("GO_MODEL_OVERRIDE", "").strip()
-    local_llm = os.environ.get("GO_LOCAL_LLM", "").strip()
     if override:
         model_source = "GO_MODEL_OVERRIDE"
-    elif dispatch == "local" and local_llm:
-        model_source = "GO_LOCAL_LLM"
     elif dispatch == "pi" and pi_info is not None:
         model_source = "complexity-classifier"
     else:
@@ -124,10 +122,8 @@ def inject_route_decision(
     ]:
         rejected.append({"harness": harness, "reason": reason})
     if dispatch != "local":
-        if local_llm:
-            rejected.append({"harness": "local", "reason": "not-selected"})
-        else:
-            rejected.append({"harness": "local", "reason": "unavailable: GO_LOCAL_LLM not set"})
+        # local mode is verification-only; if not selected, it simply wasn't chosen.
+        rejected.append({"harness": "local", "reason": "not-selected"})
     if dispatch != "pi":
         rejected.append({"harness": "pi", "reason": "not-selected"})
 
@@ -140,8 +136,6 @@ def inject_route_decision(
         complexity_tier = pi_info.tier
     elif override:
         chosen_model = override
-    elif dispatch == "local" and local_llm:
-        chosen_model = local_llm
     else:
         chosen_model = None
 
@@ -1065,29 +1059,12 @@ def dispatch_claude(state_dir: Path, run_id: str) -> bool:
     return False
 
 
-def dispatch_local(state_dir: Path, run_id: str) -> bool:
-    # Check for local LLM dispatch path
-    local_llm = os.environ.get("GO_LOCAL_LLM", "").strip()
-    if local_llm:
-        # Dispatch to local LLM (LM Studio, Ollama, vLLM)
-        dispatch_script = script_path("scripts", "adapters", "local", "dispatch_local.py")
-        rc = run_script(dispatch_script, [], state_dir, run_id, cwd=Path.cwd())
-        if rc != 0:
-            write_json(
-                state_dir / f"dispatch-result_{run_id}.json",
-                {
-                    "dispatch": "local",
-                    "status": "failed",
-                    "reason": f"Local LLM dispatch failed: {local_llm}",
-                },
-            )
-            return False
-        phase_marker(state_dir, "worktree-ready", run_id)
-        phase_marker(state_dir, "dispatched", run_id)
-        phase_marker(state_dir, "coded", run_id)
-        return True
-
-    # Default: skipped worker (verify current checkout)
+def run_local_verification(state_dir: Path, run_id: str) -> bool:
+    # /go --dispatch local: no worker spawn. The user made the edit by hand;
+    # /go runs its verification/review/artifact gates over the current checkout.
+    # Renamed from dispatch_local (TASK-002 Option B): the function performs no
+    # dispatch, so the old name was an active lie. The dead GO_LOCAL_LLM
+    # local-LLM-adapter branch and adapters/local/ were removed with it.
     write_json(
         state_dir / f"dispatch-result_{run_id}.json",
         {
