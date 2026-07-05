@@ -42,8 +42,19 @@ When `qmd` CLI is unavailable:
 - Ingest still works (filesystem write)
 - Lint still works (filesystem read)
 
+## Wiki Search Contract (FTS5 safety)
+
+**Internal CLI callers MUST use `scripts/wiki_search.py`, not bare `qmd search`.**
+
+qmd-py v0.1.1's `build_fts5_query` does `query.strip()` with no FTS5 escaping, so raw queries containing `-`, `*`, `()`, `"`, or `:` either parse wrong (`two-levers` → `two NOT levers` → zero hits) or raise a syntax error. Two layers defend:
+
+- **Python callers** (`QMDWikiBackend`, `wiki_after_write.py`) sanitize inline before calling qmd.
+- **Non-Python callers** (manual CLI use, red-team planner prospect pass, ad-hoc scripts) use the wrapper: `python skills/wiki/scripts/wiki_search.py "<query>" [--limit N]`.
+
+Upstream fix prepared: `P:/.claude/.artifacts/qmd-upstream-patch/`. Once a pinned qmd-py release ships it, the wrapper's sanitize becomes an idempotent no-op and callers can return to bare `qmd search`. See #1064.
+
 ## Security Notes
 
 - YAML frontmatter uses `yaml.safe_dump` exclusively
-- Query sanitization: limited to 500 chars, strips non-printable
+- Query sanitization: limited to 500 chars, strips non-printable + FTS5 operator punctuation (`[^\w\s]` → space, Unicode-aware)
 - Path traversal prevention: resolved paths validated against vault root
