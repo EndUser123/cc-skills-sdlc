@@ -92,27 +92,43 @@ class TestRouteDecisionPI:
 # ---------------------------------------------------------------------------
 
 class TestRouteDecisionLocal:
+    """TASK-002 Option B: dispatch=="local" is verification-only.
+
+    No worker is spawned, no model is chosen. GO_LOCAL_LLM is dead and removed.
+    These tests pin the verification-only semantics: modelSource is "unknown",
+    chosenModel is None, and the harness label still records "local" as the
+    chosen dispatch mode (it's the mode the user selected, just workerless).
+    """
+
     def test_local_dispatch_records_flat_single_harness(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GO_LOCAL_LLM", "ollama;http://localhost:11434;codellama")
+        monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "local")
         route = _read_route(tmp_path)
 
         assert route["dispatchMode"] == "flat-single-harness"
         assert route["singleDispatchHarness"] == "local"
-        assert route["singleDispatchModel"] == "ollama;http://localhost:11434;codellama"
         assert route["chosenDispatch"] == "local"
 
-    def test_local_model_source(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GO_LOCAL_LLM", "ollama;http://localhost:11434;codellama")
+    def test_local_model_source_unknown(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "local")
         route = _read_route(tmp_path)
 
-        assert route["modelSource"] == "GO_LOCAL_LLM"
+        assert route["modelSource"] == "unknown"
 
-    def test_local_dispatch_pi_not_in_rejected(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GO_LOCAL_LLM", "ollama;http://localhost:11434;codellama")
+    def test_local_chosen_model_is_none(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
+        _make_active_task(tmp_path)
+        inject_route_decision(tmp_path, "test-run", "local")
+        route = _read_route(tmp_path)
+
+        assert route["chosenModel"] is None
+        assert route["singleDispatchModel"] is None
+
+    def test_local_dispatch_pi_in_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "local")
         route = _read_route(tmp_path)
@@ -121,7 +137,7 @@ class TestRouteDecisionLocal:
         assert "pi" in rejected_names
 
     def test_local_pi_transcript_review_false(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GO_LOCAL_LLM", "ollama;http://localhost:11434;codellama")
+        monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "local")
         route = _read_route(tmp_path)
