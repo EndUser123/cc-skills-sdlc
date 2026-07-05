@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.3.0
+version: 2.4.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -409,6 +409,44 @@ The proposal's `report_gate` field carries `allow_implementation_completion_clai
 - For `mixed`: name which children were executed and which were deferred. Use this sentence template when splitting:
 
 > This is mixed work. I executed the authorized low-risk item(s) now: `[A]`. I produced evidence for the investigation item(s): `[B]`. I am leaving the design/decision item(s) `[C]` unimplemented until you approve, because `[reason]`.
+
+### Mixed-work status (`mixed_work_status`)
+
+The single old `pause_for_authorization` bucket conflated four different situations. The proposal now carries `mixed_work_status` so the report can say *why* `/go` paused:
+
+| Status | Means | Ask the user? |
+|--------|-------|---------------|
+| `partial_readonly_done` | Safe read-only narrowing already proceeded (investigate/validate, no mutation) | No |
+| `recommendation_ready` | `decide` intent; advisory produced, awaiting director | Yes — for a decision, not approval |
+| `pause_for_authorization` | Genuine shared-state authority (e.g. `settings.json`/`hooks.json`/`router.py` mutation) | Yes |
+| `blocked_prerequisite` | Missing evidence (corpus/baseline/transcript) or high-risk surface without prompt-review support | **No** — state the blocker + next evidence step |
+| `blocked_policy` | Prompt tries to weaken a gate/hook (fail-open, demote-to-warn, bypass, exempt) | **No** — state the policy block; propose as a separate decision |
+
+**Req. 7 (do not ask the user to approve a blocker):** `blocked_prerequisite` and `blocked_policy` MUST NOT request user approval. State the blocker and the next evidence-gathering step (e.g. "produce the missing corpus, then re-run"). Only `pause_for_authorization` and `recommendation_ready` may address the user.
+
+### Per-item authority (`decision_kind`)
+
+| Kind | When | Ask the user? |
+|------|------|---------------|
+| `safe_readonly_next_step` | investigate/validate or `direct_answer` | No — auto-execute |
+| `agent_decidable` | low-regret reversible implement at `local_surgical`/`local_rigorous` | No |
+| `user_preference` | `decide` intent | Yes — decision |
+| `shared_state_authorization` | shared config mutation (`settings.json`, `hooks.json`, `plugin.json`, `router.py`, `.env`, marketplace) | Yes — authority |
+| `blocked_by_missing_evidence` | missing corpus/baseline/transcript | **No** — evidence step |
+| `blocked_by_policy` | gate-weakening intent | **No** — policy block |
+
+### Plain-English report format (reqs. 8, 10, 11, 16.l)
+
+Every `/go` report carries `plain_english_report` with four sections, emitted in this fixed order — **before** any internal label (`pause_for_authorization`, `blocked_prerequisite`, `prompt_review_required`, `prompt_review_support=absent`):
+
+1. **What I did** — concrete actions taken (files read, commands run, mutations made or none).
+2. **What I recommend** — the recommendation and the next step (evidence-gathering for blockers, the advisory for `decide`).
+3. **What is blocked** — only `blocked_prerequisite`/`blocked_policy` items; explicitly note "not asked of you (req. 7)".
+4. **What I need from you** — only `pause_for_authorization`/`recommendation_ready` items; for `partial_readonly_done` this is "Nothing right now."
+
+Internal labels (`mixed_work_status`, `decision_kind`, `execution_tier`) appear **only after** these four sections.
+
+**No-mutation evidence requirement (req. 16.l):** any "no mutation performed" / "read-only" claim in **What I did** MUST be backed by `git status --short` (or equivalent) evidence shown in the report. The proposal sets `plain_english_report.no_mutation_evidence_required: true` to flag this. Do not claim "no mutation" without showing `git status --short` output.
 
 ### `prompt_review_required` (high-risk surfaces)
 

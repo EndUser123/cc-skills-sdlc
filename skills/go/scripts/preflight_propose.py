@@ -96,7 +96,7 @@ _INTENT_VALUES = ("implement", "investigate", "validate", "decide", "mixed")
 # High-risk surfaces: prompt_review_required=True when any match. Mirrors the
 # FMM hook/gate row plus state/identity/dispatch/cache/plugin extensions.
 _HIGH_RISK_MARKERS: tuple[str, ...] = (
-    "hook", "gate", "stop hook", "pretooluse", "posttooluse", "pre tool use",
+    "hook", "stop hook", "pretooluse", "posttooluse", "pre tool use",
     "post tool use", "sessionstart", "sessionend",
     "identity", "dispatch", "router", "settings.json", "hooks.json",
     "cache rebuild", "plugin cache", "plugin.json", "state dir",
