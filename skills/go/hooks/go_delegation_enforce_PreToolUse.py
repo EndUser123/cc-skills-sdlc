@@ -45,6 +45,25 @@ _SHARED_STATE_TOOL_MARKERS = (
     "plugin-audit-and-fix", "--bump", "pip install", "npm install",
 )
 
+# TASK-001.4: role-enum drift protection. The authoritative role set lives in
+# preflight_propose._ROLE_VALUES; this policy dict MUST cover every role there
+# and no role not there. ``test_role_enum_contract.py`` asserts
+# ``set(_ROLE_POLICY) == set(preflight_propose._ROLE_VALUES)`` so dropping or
+# adding a role in one place without the other fails the drift test.
+#
+# worker_mode values:
+#   orchestrator                  -> allow (claude_main; final auth = evidence gates)
+#   path_bound                    -> Edit/Write path-checked against worker_scope
+#   path_bound_no_shared_state    -> path_bound + Bash shared-state denied (local_fast)
+#   worktree_only                 -> deny direct main-tree mutation; mutates in own worktree
+_ROLE_POLICY: dict[str, dict[str, str]] = {
+    "claude_main":     {"worker_mode": "orchestrator"},
+    "claude_subagent": {"worker_mode": "path_bound"},
+    "local_fast":      {"worker_mode": "path_bound_no_shared_state"},
+    "pi_ccr":          {"worker_mode": "worktree_only"},
+    "agy":             {"worker_mode": "worktree_only"},
+}
+
 
 # ---------------------------------------------------------------------------
 # Payload + pointer resolution (mirrors G5 — kept local for edit-liveness)
@@ -220,22 +239,33 @@ def _decide(payload: dict) -> int:
             f"(run_id={run_id})"
         )
 
-    # worker mode
-    if role in (None, "claude_main"):
-        return 0  # orchestrator; final authority = evidence gates
-    if role == "pi_ccr":
+    # worker mode — dispatch through _ROLE_POLICY (single source of truth).
+    if role is None:
+        role = "claude_main"  # missing worker label defaults to orchestrator
+    policy = _ROLE_POLICY.get(role)
+    if policy is None:
+        # Drift between preflight_propose._ROLE_VALUES and this gate. Fail-closed:
+        # an unlabeled role is denied, not silently allowed.
         return _deny(
-            f"/go delegation: worker role 'pi_ccr' must mutate only in its "
-            f"isolated worktree via the pi harness, not via direct {tool_name} "
-            f"on the main tree. (run_id={run_id})"
-        )
-    if role == "local_fast" and tool_name == "Bash":
-        return _deny(
-            f"/go delegation: worker role 'local_fast' (local_surgical) may "
-            f"not touch shared state via Bash. Denied: {target[:80]!r}. "
+            f"/go delegation: worker role {role!r} has no mutation-authority "
+            f"policy in this gate (role-enum drift). Denied pending policy update. "
             f"(run_id={run_id})"
         )
-    # claude_subagent or local_fast Edit/Write: path-bound when scope resolvable
+    mode_kind = policy["worker_mode"]
+    if mode_kind == "orchestrator":
+        return 0  # final authority = evidence gates
+    if mode_kind == "worktree_only":
+        return _deny(
+            f"/go delegation: worker role '{role}' must mutate only in its "
+            f"isolated worktree, not via direct {tool_name} on the main tree. "
+            f"(run_id={run_id})"
+        )
+    if mode_kind == "path_bound_no_shared_state" and tool_name == "Bash":
+        return _deny(
+            f"/go delegation: worker role '{role}' may not touch shared state "
+            f"via Bash. Denied: {target[:80]!r}. (run_id={run_id})"
+        )
+    # path_bound / path_bound_no_shared_state (non-Bash): check target in scope
     if scope and target and not _is_under_scope(target, scope):
         return _deny(
             f"/go delegation: worker role '{role}' mutation outside "

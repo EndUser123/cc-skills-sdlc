@@ -44,17 +44,16 @@ When `qmd` CLI is unavailable:
 
 ## Wiki Search Contract (FTS5 safety)
 
-**Internal CLI callers MUST use `scripts/wiki_search.py`, not bare `qmd search`.**
+FTS5 operator escaping for hyphenated/punctuated queries (`two-levers`, `foo*bar`) is **fixed at the root** in our forked `qmd.build_fts5_query`. The owned patch lives at `P:/packages/.claude-marketplace/plugins/cc-skills-utils/__lib/qmd_fts5_patch.patch` and is applied in-place to the installed qmd package. See #1064.
 
-qmd-py v0.1.1's `build_fts5_query` does `query.strip()` with no FTS5 escaping, so raw queries containing `-`, `*`, `()`, `"`, or `:` either parse wrong (`two-levers` → `two NOT levers` → zero hits) or raise a syntax error. Two layers defend:
+Consequences:
 
-- **Python callers** (`QMDWikiBackend`, `wiki_after_write.py`) sanitize inline before calling qmd.
-- **Non-Python callers** (manual CLI use, red-team planner prospect pass, ad-hoc scripts) use the wrapper: `python skills/wiki/scripts/wiki_search.py "<query>" [--limit N]`.
-
-Upstream fix prepared: `P:/.claude/.artifacts/qmd-upstream-patch/`. Once a pinned qmd-py release ships it, the wrapper's sanitize becomes an idempotent no-op and callers can return to bare `qmd search`. See #1064.
+- **Bare `qmd search` is safe** — no caller-side sanitize needed. All invocation paths (Python `QMDWikiBackend`, `wiki_after_write.py`, the `wiki_search.py` wrapper, ad-hoc CLI, the red-team planner prospect pass) go through the one root fix.
+- **`wiki_search.py`** is now a thin wrapper retained only for the Windows subprocess capture+forward quirk — not for FTS5 safety.
+- **Reinstall protocol**: `pip install --upgrade qmd` (or a Python reinstall) silently loses the patch. Re-apply from the `.patch` file; verify with `python -c "from qmd.core.retrieval import build_fts5_query as f; assert f('two-levers')=='two levers'"`. qmd is pinned to 0.1.1 — do not auto-upgrade.
 
 ## Security Notes
 
 - YAML frontmatter uses `yaml.safe_dump` exclusively
-- Query sanitization: limited to 500 chars, strips non-printable + FTS5 operator punctuation (`[^\w\s]` → space, Unicode-aware)
+- Query length: truncated to 500 chars; non-printables stripped by the base backend
 - Path traversal prevention: resolved paths validated against vault root

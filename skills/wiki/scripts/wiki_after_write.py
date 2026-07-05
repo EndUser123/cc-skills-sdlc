@@ -64,20 +64,14 @@ def read_frontmatter(text: str) -> dict:
 
 
 def build_query(meta: dict) -> str:
-    r"""Build a QMD-safe query from title+summary.
+    """Build a QMD query from title+summary, truncated to MAX_QUERY_CHARS.
 
-    QMD's FTS5 tokenizer treats `/`, `-`, backticks, parens, etc. as token
-    separators or query syntax, so raw frontmatter values return zero hits
-    (see #1064 QMD hyphenation bug). Strip FTS5 operator punctuation but keep
-    Unicode word characters — `[^\w\s]` is Unicode-aware by default, so Latin,
-    CJK, Cyrillic, etc. letters survive while hyphens/dots/parens are dropped.
+    FTS5 operator stripping is handled at the root in our forked
+    qmd.build_fts5_query (see __lib/qmd_fts5_patch.patch in cc-skills-utils),
+    so no caller-side sanitization is needed here.
     """
     parts = [meta.get("title", ""), meta.get("summary", "")]
-    raw = " ".join(p for p in parts if p)
-    # keep Unicode word chars + spaces; drop FTS5 operator punctuation/markup
-    cleaned = re.sub(r"[^\w\s]", " ", raw)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned[:MAX_QUERY_CHARS]
+    return " ".join(p for p in parts if p)[:MAX_QUERY_CHARS]
 
 
 def query_qmd(query: str, limit: int, qmd_bin: str) -> list[dict]:
