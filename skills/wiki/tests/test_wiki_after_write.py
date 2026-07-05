@@ -67,6 +67,13 @@ class TestBuildQuery:
     def test_empty_meta(self):
         assert waw.build_query({}) == ""
 
+    def test_preserves_unicode_letters(self):
+        # Regression: ASCII-only sanitizer used to strip CJK/Cyrillic/accented letters.
+        q = waw.build_query({"title": "方法论 café résumé", "summary": ""})
+        assert "方法" in q
+        assert "café" in q
+        assert "résumé" in q
+
 
 # ---------- slug-from-file filter ----------
 

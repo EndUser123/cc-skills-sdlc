@@ -68,13 +68,14 @@ def build_query(meta: dict) -> str:
 
     QMD's FTS5 tokenizer treats `/`, `-`, backticks, parens, etc. as token
     separators or query syntax, so raw frontmatter values return zero hits
-    (see #1064 QMD hyphenation bug). Sanitize to plain whitespace-separated
-    words, keep alphanumeric only.
+    (see #1064 QMD hyphenation bug). Strip FTS5 operator punctuation but keep
+    Unicode word characters — `[^\w\s]` is Unicode-aware by default, so Latin,
+    CJK, Cyrillic, etc. letters survive while hyphens/dots/parens are dropped.
     """
     parts = [meta.get("title", ""), meta.get("summary", "")]
     raw = " ".join(p for p in parts if p)
-    # keep alphanumerics + spaces; drop everything else (punctuation, markup)
-    cleaned = re.sub(r"[^A-Za-z0-9\s]", " ", raw)
+    # keep Unicode word chars + spaces; drop FTS5 operator punctuation/markup
+    cleaned = re.sub(r"[^\w\s]", " ", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned[:MAX_QUERY_CHARS]
 
