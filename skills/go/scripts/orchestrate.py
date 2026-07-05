@@ -1258,7 +1258,7 @@ def orchestrate(args: argparse.Namespace) -> str:
 
     if args.dispatch == "local":
         inject_route_decision(state_dir, run_id, "local")
-        if not dispatch_local(state_dir, run_id):
+        if not run_local_verification(state_dir, run_id):
             return finish("blocked")
         if not run_common_tail(Path.cwd(), state_dir, run_id):
             return finish("blocked")

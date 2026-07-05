@@ -1,1 +1,0 @@
-"""Local LLM adapters for /go orchestrator."""
