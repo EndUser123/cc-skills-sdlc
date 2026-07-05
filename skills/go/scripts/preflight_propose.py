@@ -272,6 +272,35 @@ _VERIFICATION_RANKING: tuple[tuple[str, str, str], ...] = (
      "medium-low", "low"),
 )
 
+
+def _word_boundary_match(marker: str, text: str) -> bool:
+    """Token/word-boundary match so bare markers like "gate" don't fire inside
+    "investi-gate-". Markers that start AND end with an alphanumeric use
+    ``\\b…\\b``; symbolic markers (``.artifacts``, ``router.py`` edges, etc.)
+    fall back to literal substring since they can't collide with real words.
+    """
+    if marker and marker[0].isalnum() and marker[-1].isalnum():
+        return re.search(r"\b" + re.escape(marker) + r"\b", text) is not None
+    return marker in text
+
+
+# Precompiled per-surface regexes are not used because matching must respect
+# marker shape (alphabetic vs symbolic); _word_boundary_match handles both.
+_PROVENANCE_TIERS = ("verified", "inference", "assumption")
+
+
+def _discovery_evidence_passes(discovery_evidence: dict) -> bool:
+    """Findings non-empty AND every finding carries a valid provenance tier."""
+    de = discovery_evidence or {}
+    findings = de.get("findings")
+    if not isinstance(findings, list) or not findings:
+        return False
+    for f in findings:
+        prov = (f or {}).get("provenance")
+        if prov not in _PROVENANCE_TIERS:
+            return False
+    return True
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1191,7 +1220,8 @@ def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
     }
 
 
-def derive_report_gate(task_intent, execution_tier, closure_check=None) -> dict:
+def derive_report_gate(task_intent, execution_tier, closure_check=None,
+                       operational_discovery=None, discovery_evidence=None) -> dict:
     """Completion-claim eligibility (goal reqs. 4, 8, 9).
 
     investigate/validate/decide never enable implementation-completion claims.
@@ -1201,6 +1231,12 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None) -> dict:
     confirm_closed_passes() — a passing related test is NOT sufficient (req. 11).
     Missing/malformed closure_check on a required task blocks silent completion
     (req. 9): the worker must produce evidence or an explicit unavailable_reason.
+
+    Discovery gate (discovery goal reqs. 4-6): when operational_discovery.required,
+    a recommendation may not be presented as verified unless discovery_evidence
+    has ≥1 finding and every finding carries a provenance tier (verified |
+    inference | assumption). If incomplete, the report must say discovery_incomplete
+    and present the recommendation as advisory, not verified.
     """
     cc = closure_check or {}
     cc_required = bool(cc.get("required"))
@@ -1215,6 +1251,11 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None) -> dict:
         and execution_tier == "local_surgical"
         and (not cc_required or cc_passes)
     )
+    od = operational_discovery or {}
+    od_required = bool(od.get("required"))
+    de_passes = _discovery_evidence_passes(discovery_evidence)
+    discovery_incomplete = od_required and not de_passes
+    allow_recommendation_as_verified = not discovery_incomplete
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,
@@ -1223,12 +1264,20 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None) -> dict:
         "confirm_closed_required": cc_required,
         "confirm_closed_passes": cc_passes,
         "unit_test_alone_is_insufficient": cc_required,  # req. 11
+        "discovery_evidence_required": od_required,
+        "discovery_evidence_passes": de_passes if od_required else True,
+        "discovery_incomplete": discovery_incomplete,
+        "allow_recommendation_as_verified": allow_recommendation_as_verified,
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim. "
             + ("closure_check.required: a passing unit test alone does NOT authorize Fixed/Done; "
                "confirm-closed evidence (or an explicit unavailable_reason) is required. "
                if cc_required else "")
+            + ("operational_discovery.required: recommendation must carry discovery_evidence "
+               "with provenance (verified|inference|assumption); until then discovery_incomplete "
+               "and the recommendation is advisory, NOT verified. "
+               if od_required else "")
         ),
     }
 
@@ -1432,7 +1481,7 @@ def classify_operational_discovery(rewritten: str, task_intent: str) -> dict:
     """
     low = rewritten.lower()
     surfaces = sorted({label for markers, label in _OPERATIONAL_SURFACES
-                       if any(m in low for m in markers)})
+                       if any(_word_boundary_match(m, low) for m in markers)})
     required = bool(surfaces) and task_intent in ("investigate", "validate", "decide", "mixed", "implement")
     # Confidence uncertain ⇒ the worker must list ≥2 verification paths.
     confidence_uncertain = required and task_intent in ("investigate", "mixed", "decide")
@@ -1516,6 +1565,17 @@ def build_plain_english_report(proposal: dict) -> dict:
             "Policy block: /go will not weaken the gate. Propose the change as a "
             "separate, explicitly-authorized decision rather than asking to approve it inline."
         )
+    # Discovery gate (discovery goal req. 6): if discovery is incomplete, the
+    # recommendation is advisory — never presented as verified.
+    discovery_incomplete = bool(gate.get("discovery_incomplete"))
+    recommendation_is_advisory = discovery_incomplete
+    if discovery_incomplete:
+        what_i_recommend.insert(
+            0,
+            "Discovery incomplete — the recommendation below is advisory, NOT verified: "
+            "discovery_evidence must list ≥1 finding with provenance "
+            "(verified|inference|assumption) before it can be presented as verified."
+        )
 
     what_is_blocked: list[str] = []
     if status == "blocked_prerequisite":
@@ -1525,6 +1585,10 @@ def build_plain_english_report(proposal: dict) -> dict:
     if gate.get("must_defer_unauthorized_children"):
         what_is_blocked.append(
             "Unauthorized / deferred children of the mixed request — not bundled into completion."
+        )
+    if discovery_incomplete:
+        what_is_blocked.append(
+            "discovery_incomplete — recommendation demoted to advisory; cannot be presented as verified."
         )
 
     if status == "pause_for_authorization":
@@ -1555,6 +1619,8 @@ def build_plain_english_report(proposal: dict) -> dict:
         "what_i_need_from_you": [need],
         "labels_after_plain_english": True,
         "no_mutation_evidence_required": True,
+        "discovery_incomplete": discovery_incomplete,
+        "recommendation_is_advisory": recommendation_is_advisory,
     }
 
     # Closure report (reqs. 4, 6, 10): scaffolds the five required content
@@ -1798,7 +1864,11 @@ def generate_proposal(
     closure_check = classify_closure_check(rewritten, task_intent)
     repro_policy = derive_repro_policy(rewritten, task_intent, closure_check)
     operational_discovery = classify_operational_discovery(rewritten, task_intent)
-    report_gate = derive_report_gate(task_intent, execution_tier, closure_check)
+    report_gate = derive_report_gate(
+        task_intent, execution_tier, closure_check,
+        operational_discovery=operational_discovery,
+        discovery_evidence=None,  # scaffold — worker fills findings during the run
+    )
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
