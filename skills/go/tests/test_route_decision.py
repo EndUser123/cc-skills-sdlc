@@ -181,28 +181,30 @@ class TestRouteDecisionAgy:
 
 
 # ---------------------------------------------------------------------------
-# GO_LOCAL_LLM unset
+# Local not selected (verification-only mode is workerless; GO_LOCAL_LLM is dead)
 # ---------------------------------------------------------------------------
 
-class TestRouteDecisionLocalUnavailable:
-    def test_unset_go_local_llm_recorded_as_unavailable_when_not_chosen(self, tmp_path, monkeypatch):
-        """When dispatch is pi and GO_LOCAL_LLM is unset, local is rejected as unavailable."""
+class TestRouteDecisionLocalNotSelected:
+    def test_local_rejected_as_not_selected_when_pi_chosen(self, tmp_path, monkeypatch):
+        """When dispatch is pi, local is rejected as not-selected (no unavailable branch)."""
         monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
-        inject_route_decision(tmp_path, "test-run", "pi")
+        pi_info = PiModelInfo("M3", "T2", "minimax/MiniMax-M3")
+        inject_route_decision(tmp_path, "test-run", "pi", pi_info)
         route = _read_route(tmp_path)
 
         rejected = {r["harness"]: r["reason"] for r in route["rejectedHarnesses"]}
-        assert "local" in rejected
-        assert "unavailable" in rejected["local"].lower()
+        assert rejected["local"] == "not-selected"
 
-    def test_unset_go_local_llm_model_is_none(self, tmp_path, monkeypatch):
+    def test_local_chosen_model_is_none_when_local_chosen(self, tmp_path, monkeypatch):
+        """dispatch=local is verification-only; no model is selected."""
         monkeypatch.delenv("GO_LOCAL_LLM", raising=False)
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "local")
         route = _read_route(tmp_path)
 
         assert route["singleDispatchModel"] is None
+        assert route["chosenModel"] is None
 
 
 # ---------------------------------------------------------------------------

@@ -552,7 +552,7 @@ def test_preflight_only_does_not_write_active_task_or_dispatch(monkeypatch, tmp_
 
     monkeypatch.setattr(_ORCHESTRATE, "load_or_create_task", forbid)
     monkeypatch.setattr(_ORCHESTRATE, "create_worktree", forbid)
-    monkeypatch.setattr(_ORCHESTRATE, "dispatch_local", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "run_local_verification", forbid)
     monkeypatch.setattr(_ORCHESTRATE, "dispatch_claude", forbid)
     monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", forbid)
 

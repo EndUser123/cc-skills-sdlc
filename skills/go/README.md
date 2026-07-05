@@ -29,26 +29,10 @@ mkdir -p "$GO_STATE_DIR"
 
 ## Professional SDLC Enhancements (v2.0.0)
 
-### Local LLM Adapters
-- **ollama_adapter.py**: HTTP API adapter for Ollama (`/api/generate`)
-- **lmstudio_adapter.py**: HTTP API adapter for LM Studio (`/v1/chat/completions`)
-- **vllm_adapter.py**: HTTP API adapter for vLLM (`/v1/chat/completions`)
-- **dispatch_local.py**: Local dispatch orchestrator
-- **resolve_local.py**: Config parser for `GO_LOCAL_LLM` env var
-
 ### Quality Gates
 - **coverage-gate.py**: Enforces minimum test coverage (default 80%)
 - **regression-runner.py**: Baseline comparison with tolerance support
 - **refactor-review.py**: Analyzes git diff for API surface changes
-
-### Error Codes (Local LLM Adapters)
-| Code | Meaning |
-|------|---------|
-| 0 | success |
-| 1 | timeout |
-| 2 | model_unavailable |
-| 3 | rate_limit |
-| 9 | unknown |
 
 ## Usage
 
