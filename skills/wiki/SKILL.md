@@ -311,7 +311,7 @@ Per wiki policy (`CLAUDE.md:22`): **never suppress a broken red-link just becaus
 python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --fix [--dry-run]
 ```
 
-**Automated periodic linting**: Phase 1 of `/wiki lint` is included in the `/main` health check workflow on every `/main` invocation; `/main --fix` applies the safe-subset with a 7-day throttle (sentinel at `P:/.claude/.artifacts/_main/wiki_autofix_last_run.txt`).
+**Automated periodic linting**: Phase 1 of `/wiki lint` is included in the `/main` health check workflow on every `/main` invocation; `/main --fix` applies the safe-subset through a **needs-based gate** — it re-runs only when the vault mtime fingerprint changed since the last fix (sentinel at `P:/.claude/.artifacts/_main/wiki_autofix_fingerprint.txt`). No time throttle: edit a page and the next `/main --fix` re-evaluates; leave the vault untouched and it skips.
 
 Usage: `/wiki lint [--fix] [--dry-run]`
 
