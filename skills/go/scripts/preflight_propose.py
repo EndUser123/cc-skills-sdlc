@@ -236,7 +236,7 @@ _OPERATIONAL_SURFACES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("gate", "enforce", "router.py", "dispatcher", "dispatch"), "gate"),
     (("state dir", "go_state_dir", "session state", "state tree"), "state"),
     (("phase marker", "task-selected", ".dispatched", "marker file"), "markers"),
-    (("plugin cache", "version-keyed cache", "cache copy", "stale cache"), "cache"),
+    (("plugin cache", "version-keyed cache", "cache copy", "stale cache", "cache"), "cache"),
     (("session pointer", "go-sessions", "pointer store", "session id"), "session"),
     (("export", "transcript", "session export"), "export"),
     (("artifact lifecycle", "temp artifact", ".artifacts"), "artifact-lifecycle"),

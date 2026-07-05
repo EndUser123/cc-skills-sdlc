@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.7.0
+version: 2.8.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -437,6 +437,43 @@ Bugfix / regression / hook-FP / stale-warning tasks must prove the **original sy
 **Defaults (req. 9):** missing/malformed `closure_check` on a required task blocks silent completion (`allow_implementation_completion_claim: false` at preflight; `notes` surfaces `CLOSURE_CHECK required`). investigate/validate/decide tasks default to `required=false` (req. 8) and MUST NOT use fixed/completed language.
 
 **Report content (req. 10):** when `closure_check.required`, `plain_english_report.closure_report` scaffolds five content fields the worker fills — `original_symptom`, `reproduce_first_evidence` (or `reproduce_first_unavailable_reason`), `verification_tests`, `confirm_closed_evidence`, `remaining_risk` — plus `may_claim_fixed` (the `confirm_closed_passes` verdict). Until these are populated, the report may not claim completion.
+
+### Discovery-first — operational questions, verification ranking, lifecycle hygiene
+
+Operational questions involving **hooks, gates, worktrees, state, markers, cache, dispatch, sessions, exports, or artifact lifecycle** get a discovery contract before any implementation prescription. The proposal carries an `operational_discovery` block.
+
+**Discovery-first (reqs. 2, 3):** before recommending implementation, identify and (when cheap to inspect) observe:
+1. writer/creator · 2. storage/location · 3. reader/consumer · 4. lifecycle/cleanup path · 5. authority · 6. stale/failure direction · 7. observed current state
+
+Do not guess from memory or trace only the easiest path — discover the real writer/reader/lifecycle by reading the code, then state what was observed vs. what was only inferred.
+
+**Verification ranking (req. 4):** when confidence is uncertain (investigate/decide/mixed), `operational_discovery.verification_paths` lists ≥2 paths ranked by confidence-per-effort:
+
+| Path | Confidence | Effort |
+|------|-----------|--------|
+| empirical end-to-end reproduction against a real oracle | highest | high |
+| direct invocation of the registered entry point (hook/router) | high | medium |
+| integration test crossing the real state/dispatch boundary | high | medium |
+| targeted unit test on the pure-logic transform | medium | low |
+| static code trace (grep/read of writer/reader path) | medium-low | low |
+
+`empirical_oracle_preferred = true`. State what tracing proves and misses: empirical reproduction proves the symptom is gone **for the tested path** but not the writer/reader invariant in every branch or under concurrency; static trace proves the invariant but not the runtime.
+
+**Lifecycle hygiene (req. 5):** `/go`-created resources — worktrees, branches, state dirs, session pointers, markers, cache copies, temporary exports/artifacts — carry a cleanup obligation. `operational_discovery.lifecycle_resources` enumerates which the prompt touches.
+
+**Worktree prune predicate (req. 6):** `operational_discovery.worktree_prune_predicate` is the *only* authorized prune path, and it is **report-only + approval-gated** — ALL conditions must hold:
+
+- age ≥ threshold (default 14d since creation)
+- `git status` clean (no uncommitted / unstaged work)
+- branch merged into main OR explicitly marked disposable by the director
+- report-only dry run first (list, do not remove)
+- **no removal without explicit director approval**
+
+Never auto-delete unverified work. SessionStart may surface the reclaimable count but must not delete.
+
+**Report evidence (reqs. 7, 8):** when `operational_discovery.required`, `plain_english_report.discovery_evidence` scaffolds **before** `what_i_recommend`. Each finding carries a `provenance` tier ∈ {`verified`, `inference`, `assumption`} — verified fact, inference, and assumption are visibly distinct, never flattened into one claim.
+
+**No silent cleanup (req. 9):** `operational_discovery.cleanup_requires_approval = true`. No cleanup action runs without explicit approval.
 
 ### Mixed-work status (`mixed_work_status`)
 
