@@ -1018,12 +1018,16 @@ def derive_execution_tier(task_intent, dispatch, local_eligible, requires_approv
     high_risk = bool(risk.get("high_risk"))
     if task_intent == "decide":
         return "pause_for_authorization"
+    # Safe read-only narrowing (goal req. 6 / 16.d): investigate/validate make
+    # no mutation, so they never require authorization regardless of an
+    # ambiguous dispatch default. Checked BEFORE requires_approval so a
+    # path-less "investigate why X" prompt does not collapse to pause.
+    if task_intent in ("investigate", "validate"):
+        return "local_surgical" if local_eligible else "direct_answer"
     if high_risk and _PROMPT_REVIEW_SUPPORT == "absent":
         return "pause_for_authorization"
     if requires_approval:
         return "pause_for_authorization"
-    if task_intent in ("investigate", "validate"):
-        return "local_surgical" if local_eligible else "direct_answer"
     if dispatch == "local" and local_eligible:
         return "local_rigorous" if high_risk else "local_surgical"
     return "full_go"
