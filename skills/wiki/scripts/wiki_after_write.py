@@ -64,7 +64,7 @@ def read_frontmatter(text: str) -> dict:
 
 
 def build_query(meta: dict) -> str:
-    """Build a QMD-safe query from title+summary.
+    r"""Build a QMD-safe query from title+summary.
 
     QMD's FTS5 tokenizer treats `/`, `-`, backticks, parens, etc. as token
     separators or query syntax, so raw frontmatter values return zero hits
