@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.9.0
+version: 2.10.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -188,12 +188,13 @@ mkdir -p "$GO_STATE_DIR"
 | Source | Env Var | Description |
 |--------|---------|-------------|
 | Direct prompt | `GO_PROMPT` | User's task description at invocation |
+| Plan-handoff (bare `/go`) | — | Auto-bind freshest implementation-ready plan with `go_next_task` (see STEP 0.4) |
 | Current session transcript | `identity.json` | Path to this session's transcript (read directly by the orchestrator) |
 | Handoff transcript | `HANDOFF_TRANSCRIPT` | Path to prior session transcript |
 | Plan file | `GO_PLAN_FILE` | Path to `.md` plan file |
 | Task queue | `GO_TASKS_FILE` | JSON file with queued tasks |
 
-Priority: `GO_PROMPT` > **current session transcript** > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
+Priority: `GO_PROMPT` > **plan-handoff resolver (bare invocation only)** > **current session transcript** > `HANDOFF_TRANSCRIPT` > `GO_PLAN_FILE` > `GO_TASKS_FILE`
 
 When using prompt/transcript/plan, the task is synthesized into the contract below. When using the task queue, `/go` selects the eligible task with the lowest numeric `priority` value (`P1` before `P2`); file order breaks ties.
 
@@ -291,6 +292,49 @@ PI dispatch is headless and artifact-first:
 - Conservative flags: `--no-context-files --no-extensions --no-skills --no-prompt-templates --no-themes`
 - Tool allowlist: `GO_PI_TOOLS`, defaulting to `read,grep,find,ls,edit,write,bash`
 - Timeout/binary/nonzero failures write `dispatch-result_$RUN_ID.json` and `.blocked_$RUN_ID`
+
+---
+
+## STEP 0.4: Bare-Invocation Plan-Handoff Resolver
+
+When `/go` is invoked with no `--prompt`, `--plan`, or `--tasks` (the bare
+`/go` handoff pattern — e.g. right after `/planning` says "say the word"),
+`scripts/resolve_plan_handoff.py` scans `~/.claude/plans/*.md` for a plan
+that is **ready to resume**:
+
+- frontmatter `status: implementation-ready`
+- frontmatter `unresolved_blockers: 0`
+- a `go_next_task` block declaring the explicit next task
+
+The `go_next_task` frontmatter contract (written by `/planning` or the plan
+author when the plan becomes implementation-ready):
+
+```yaml
+go_next_task:
+  task_id: TASK-001.1
+  title: short title
+  objective: one-sentence objective (full contract lives in the plan body)
+  verification_commands: pytest -q, python -m pytest tests/   # optional, comma-delimited
+  priority: P1                                              # optional, default P1
+```
+
+**Resolution rules:**
+
+| Candidates | Exit | Behavior |
+|------------|------|----------|
+| Exactly 1 | 0 | Bind: write `active-task_{RUN_ID}.json` (`source: "plan-handoff"`) with a `plan_binding` block pointing at the source plan. Freshest plan (by mtime) wins. |
+| >1 | 2 | Pause: write `.paused_{RUN_ID}` listing candidates; the run stops — disambiguate by passing `GO_PLAN_FILE`. |
+| 0 | 3 | Fall through to STEP 0.5 (transcript synthesis) → `GO_TASKS_FILE` queue. |
+
+The resolver carries only what is needed to **identify and start** the task
+(`task_id`, `title`, `objective`, `verification_commands`). The full task
+contract — acceptance criteria, scope, invariants — lives in the plan body;
+the worker reads it via `active-task.source_ref → plan_path`.
+
+The resolver is skipped when `GO_PLAN_FILE` is set (explicit plan pointer) or
+when `--tasks` is passed (explicit queue). It fires only on the fully-bare
+invocation that previously fell through to transcript synthesis, losing the
+plan's constraints.
 
 ---
 

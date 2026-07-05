@@ -725,6 +725,22 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
         write_json(state_dir / f"task-contract-{run_id}.json", task.raw)
         return task
     else:
+        # Bare-invocation plan-handoff resolver: when no --prompt/--plan/--tasks
+        # was given and no GO_PLAN_FILE is set, try to bind to the freshest
+        # implementation-ready plan that declares go_next_task. Falls through
+        # to the queue on no-candidate (exit 3); pauses on ambiguity (exit 2).
+        if not args.tasks and not os.environ.get("GO_PLAN_FILE"):
+            resolver = script_path("scripts", "resolve_plan_handoff.py")
+            rrc = run_script(resolver, [], state_dir, run_id)
+            if rrc == 0:
+                phase_marker(state_dir, "task-selected", run_id)
+                task_file = state_dir / f"active-task_{run_id}.json"
+                task_data = json.loads(task_file.read_text(encoding="utf-8"))
+                task = TaskContract.from_active_task(task_data)
+                write_json(state_dir / f"task-contract-{run_id}.json", task.raw)
+                return task
+            if rrc == 2:
+                return None  # ambiguous — .paused_{run_id} written by resolver
         select_script = script_path("scripts", "select-task.py")
         if args.tasks:
             os.environ["GO_TASKS_FILE"] = str(Path(args.tasks).expanduser().resolve())
