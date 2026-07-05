@@ -326,17 +326,22 @@ Usage: `/wiki index`
 
 Refresh stale wiki pages by detecting topics that need updating and offering web-based refresh.
 
-**Phase 1 — Discovery**: Identify candidates via two signals:
+**Phase 1 — Discovery**: Identify candidates via three signals:
 1. **Stale page list (deterministic, shared with /main):**
    ```bash
    python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --stale [--max-age 90] [--limit 20] [--json]
    ```
    Lists pages by mtime age (oldest first). Same engine `/main` and `/wiki lint` use — single source of truth for staleness.
-2. **QMD search frequency**: Run `qmd search --collection wiki <topic>` and track which topics are re-searched (implies active interest) — overlay this signal on the stale list to prioritize.
+2. **Source drift (deterministic, opt-in):** For pages with a `source_url` frontmatter field, fetch the upstream URL, hash it, and flag drift vs the stored `source_hash`. This is the provenance-based trigger — it fires when the *source* changed, regardless of page age.
+   ```bash
+   python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --source-drift [--source-timeout 5.0] [--json]
+   ```
+   Reports per-page reasons: `changed` (upstream content differs), `missing_hash` (page has `source_url` but no `source_hash` — needs initial population), `fetch_failed:<Error>` (network/HTTP). Pages without `source_url` are invisible to this scan.
+3. **QMD search frequency**: Run `qmd search --collection wiki <topic>` and track which topics are re-searched (implies active interest) — overlay this signal on the stale + drift lists to prioritize.
 
 **Phase 2 — Staleness scoring**: Rank candidates by:
 - Days since last update (page mtime vs current date)
-- External change signals: is the source URL (if any) returning different content?
+- Source drift: did `--source-drift` flag this page as `changed`? (strongest signal — upstream actually moved)
 - Search frequency: topics searched more often = higher priority
 
 **Phase 3 — Offer to user**: Present top candidates ranked by staleness score:
