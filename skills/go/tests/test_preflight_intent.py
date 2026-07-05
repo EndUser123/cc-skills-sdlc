@@ -416,3 +416,79 @@ def test_smoke_end_to_end_status_taxonomy_real_path():
             f"{prompt!r} -> {p['mixed_work_status']!r}, expected {expected_status!r}")
         assert "plain_english_report" in p
         assert len(p["plain_english_report"]["section_order"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# Goal req. 14 / 17 (last): enforcement-honesty — verified vs advisory paths
+# ---------------------------------------------------------------------------
+
+class TestEnforcementHonesty:
+    """delegation_policy.enforcement_status must distinguish declared policy
+    from verified runtime enforcement (req. 14). Tests exercise the real
+    generate_proposal path, not mocks (req. 17 last bullet)."""
+
+    def test_enforcement_status_has_three_lists(self):
+        p = generate_proposal("fix the typo in foo.py", "r-eh1", "t-eh1")
+        es = p["delegation_policy"]["enforcement_status"]
+        for key in ("verified", "advisory_or_unverified", "role_enforcement",
+                    "declared_vs_verified_note"):
+            assert key in es, f"missing {key}"
+
+    def test_verified_lists_all_five_points(self):
+        # req 14: writer + marker/state + reader/gate + active window + dispatch path
+        p = generate_proposal("fix the typo in foo.py", "r-eh2", "t-eh2")
+        verified = " ".join(p["delegation_policy"]["enforcement_status"]["verified"]).lower()
+        for needle in ("writer", "marker", "reader", "main-session", "dispatch"):
+            assert needle in verified, f"verified list missing {needle!r}"
+
+    def test_advisory_paths_named_explicitly(self):
+        # Task-subagent propagation unverified + agy outside tool-call boundary
+        p = generate_proposal("fix the typo in foo.py", "r-eh3", "t-eh3")
+        advisory = " ".join(
+            p["delegation_policy"]["enforcement_status"]["advisory_or_unverified"]
+        ).lower()
+        assert "subagent" in advisory or "unverified" in advisory
+        assert "agy" in advisory
+
+    def test_role_enforcement_distinguishes_verified_vs_advisory(self):
+        p = generate_proposal("fix the typo in foo.py", "r-eh4", "t-eh4")
+        role = p["delegation_policy"]["enforcement_status"]["role_enforcement"]
+        # claude_main + pi_ccr verified; claude_subagent/local_fast unverified; agy advisory
+        assert "verified" in role["claude_main"].lower()
+        assert "verified" in role["pi_ccr"].lower()
+        assert "unverified" in role["claude_subagent"].lower()
+        assert "unverified" in role["local_fast"].lower()
+        assert "advisory" in role["agy"].lower()
+
+    def test_declared_vs_verified_note_present(self):
+        p = generate_proposal("fix the typo in foo.py", "r-eh5", "t-eh5")
+        note = p["delegation_policy"]["enforcement_status"]["declared_vs_verified_note"]
+        assert "DECLARES" in note and "VERIFIED" in note
+
+    def test_skill_md_documents_enforcement_honesty(self):
+        # req 14 lives in SKILL too — grep for the honesty rule + 5 points.
+        skill = Path(__file__).resolve().parent.parent / "SKILL.md"
+        text = skill.read_text(encoding="utf-8")
+        assert "Enforcement honesty" in text
+        assert "verified" in text.lower() and "advisory_or_unverified" in text.lower()
+        # Must NOT claim all role authority is enforced.
+        assert "Do NOT claim" in text
+
+
+# ---------------------------------------------------------------------------
+# Goal req. 16: fixed mixed-work disclaimer sentence
+# ---------------------------------------------------------------------------
+
+class TestMixedDisclaimerWording:
+    """Mixed-intent reports must carry the req-16 disclaimer sentence."""
+
+    def test_mixed_report_includes_fixed_disclaimer(self):
+        p = generate_proposal(
+            "investigate why the hook fires then fix it in foo.py "
+            "and decide whether to keep the gate",
+            "r-mx", "t-mx")
+        assert p["task_intent"] == "mixed"
+        per = p["plain_english_report"]
+        joined = " ".join(per["what_i_did"])
+        assert "This is mixed work" in joined
+        assert "not claiming blocked or decision-dependent work is done" in joined

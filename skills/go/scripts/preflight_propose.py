@@ -1218,6 +1218,12 @@ def build_plain_english_report(proposal: dict) -> dict:
         what_i_did.append("Produced evidence/advisory only; no implementation-completion claim.")
     else:
         what_i_did.append("Ran preflight and derived the execution tier; no unauthorized mutation.")
+    if intent == "mixed":
+        what_i_did.append(
+            "This is mixed work. I completed safe read-only checks, found blockers, "
+            "and recommend the next low-risk step. I am not claiming blocked or "
+            "decision-dependent work is done."
+        )
 
     what_i_recommend: list[str] = [recommendation]
     if status == "blocked_prerequisite":
@@ -1389,6 +1395,32 @@ def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispa
                 "PreToolUse gate (Claude tool calls) + pi harness worktree assertion. "
                 "Advisory roles: mutating tools denied. Workers: edits path-bounded "
                 "when worker_scope resolvable, else tool-type only. pi_ccr: worktree only."
+            ),
+        },
+        "enforcement_status": {
+            "verified": [
+                "writer: derive_delegation_policy emits mutation_authority + worker_scope",
+                "marker/state: .delegation-{advisory,worker}_{run_id} written by orchestrate.py",
+                "reader/gate: go_delegation_enforce_PreToolUse.py wired via SKILL.md frontmatter",
+                "main-session PreToolUse: gate fires on Claude tool calls during /go",
+                "pi dispatch path: harness.py worktree-branch assertion + .blocked_{run_id}",
+            ],
+            "advisory_or_unverified": [
+                "Task-tool subagent propagation of PreToolUse: UNVERIFIED (research parked; "
+                "mitigated by capability-layer tools: restriction, which IS hard enforcement)",
+                "agy internal subprocess mutations: outside Claude's tool-call boundary "
+                "(advisory at /go layer; agy runs in its own worktree)",
+            ],
+            "role_enforcement": {
+                "claude_main": "verified (main-session PreToolUse)",
+                "claude_subagent": "PreToolUse propagation unverified; use tools: restriction for hard enforcement",
+                "local_fast": "PreToolUse propagation unverified; use tools: restriction for hard enforcement",
+                "pi_ccr": "verified (harness.py worktree-branch assertion)",
+                "agy": "advisory (own subprocess worktree, outside tool-call boundary)",
+            },
+            "declared_vs_verified_note": (
+                "mutation_authority DECLARES per-role scope; runtime enforcement is VERIFIED "
+                "only for paths in 'verified'. Do not claim all role mutation authority is enforced."
             ),
         },
         "final_authority": "/go evidence gates (not any worker)",

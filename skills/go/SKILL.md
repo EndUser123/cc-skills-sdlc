@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.4.0
+version: 2.5.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -497,6 +497,14 @@ A proposal authorizes dispatch or completion **only when its `runid` matches the
 - **pi subprocess boundary** — `scripts/adapters/pi/harness.py` refuses to spawn if the worktree branch is `main`/`master` (`pi_ccr` mutates only in an isolated feature worktree).
 - **Task-subagent spawn boundary** — the PreToolUse gate above does *not* propagate into spawned Task subagents (SKILL-frontmatter hooks are not inherited by subagent contexts unless listed in the agent's `skills:`). So when you spawn an advisory review subagent during a `.delegation-advisory` phase, pick a read-only agent type whose `tools:` omit `Bash`/`Edit`/`Write` (e.g. `tools: [Read, Grep, Glob]`). The capability layer then omits mutating tools from the subagent's function schema entirely — the call cannot be formed, which is stronger than a propagated hook would be. This is spawn-time discipline, not gate-enforced; a mutating-capable agent type spawned during advisory can mutate freely and the gate will not see it.
 - Markers are flipped by `orchestrate.set_delegation_mode()`: `worker` at the `dispatched` phase, `advisory` at `transcript-reviewed`. Outside a gated phase the gate is inert (silent allow).
+
+**Enforcement honesty** (req. 14 — `delegation_policy.enforcement_status`): distinguish *declared* policy from *verified runtime* enforcement. The proposal carries `enforcement_status` with three lists:
+
+- **`verified`** — the five points that must all hold to claim a role's mutation authority is enforced at runtime: (1) writer (`derive_delegation_policy` emits `mutation_authority` + `worker_scope`); (2) marker/state (`.delegation-{advisory,worker}_{run_id}` written by `orchestrate.py`); (3) reader/gate (`go_delegation_enforce_PreToolUse.py` wired via this skill's frontmatter); (4) active runtime window (gate fires on Claude's tool calls during `/go`); (5) dispatch path (`harness.py` worktree-branch assertion for `pi_ccr`).
+- **`advisory_or_unverified`** — paths NOT enforced at the `/go` layer: Task-tool subagent propagation of PreToolUse is **unverified** (research parked; mitigate with capability-layer `tools:` restriction, which IS hard enforcement); `agy` runs in its own subprocess worktree, outside Claude's tool-call boundary (advisory only here).
+- **`role_enforcement`** — per role: `claude_main` verified (main-session PreToolUse); `claude_subagent`/`local_fast` PreToolUse propagation unverified, use `tools:` for hard enforcement; `pi_ccr` verified (harness worktree assertion); `agy` advisory.
+
+**Do NOT claim `delegation_policy` enforces all role mutation authority** unless all five `verified` points hold for that role. **Do NOT recommend read-only advisory subagent profiles unless they exist in the current agent registry or this task creates them** — reference real agent types (e.g. `adversarial-critic`, `code-reviewer`, `explore`) rather than inventing profiles. The `declared_vs_verified_note` field restates this on every proposal.
 
 ---
 
