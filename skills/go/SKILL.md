@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.5.0
+version: 2.6.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -406,6 +406,7 @@ The proposal's `report_gate` field carries `allow_implementation_completion_clai
 
 - Do NOT emit `<promise>PR_READY</promise>` or "Fixed."/"Done."/"Verified." for that run.
 - Emit the evidence ledger / validation artifact / decision advisory instead, with an explicit note that no implementation-completion claim is being made.
+- **Scoped-test reporting (no greenwashing):** a targeted green suite MUST NOT obscure broader red state. When reporting verification, scope the claim to the exact suite run ("intent/mixed-report tests: 48/48 pass") and explicitly name any known unrelated failures in the broader suite ("full /go suite: 8 known unrelated failures tracked as #1115"). Never say "all verification green" globally when any suite covering the changed surface is red.
 - For `mixed`: name which children were executed and which were deferred. Use this sentence template when splitting:
 
 > This is mixed work. I executed the authorized low-risk item(s) now: `[A]`. I produced evidence for the investigation item(s): `[B]`. I am leaving the design/decision item(s) `[C]` unimplemented until you approve, because `[reason]`.
