@@ -20,6 +20,29 @@ from typing import Any
 
 DEFAULT_PI_TOOLS = "read,grep,find,ls,edit,write,bash"
 
+# SEC-1: pi carries its own auth (~/.pi/agent/models.json), so the parent
+# shell's secrets (anthropic keys, tokens, anything in os.environ) MUST NOT
+# leak into the pi subprocess. Only the keys pi actually needs are passed.
+_PI_ENV_ALLOWLIST = frozenset(
+    {
+        # OS-critical — drop these and pi's bash tool can't spawn children.
+        "PATH", "PATHEXT",
+        "SYSTEMROOT", "COMSPEC",  # Windows subprocess spawning
+        "TEMP", "TMP", "TMPDIR",
+        # pi config + auth location (~/.pi/agent/models.json).
+        "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
+        # /go session context pi's coding agent reads.
+        "RUN_ID", "GO_STATE_DIR", "WORKTREE", "PI_CODING_AGENT_SESSION_DIR",
+        # /go pi controls (read by parent; passed through for pi introspection).
+        "GO_PI_TOOLS", "GO_PI_TIMEOUT_SECONDS",
+    }
+)
+
+
+def _build_pi_env() -> dict[str, str]:
+    """Build pi's env from the allowlist, never os.environ.copy()."""
+    return {k: v for k, v in os.environ.items() if k in _PI_ENV_ALLOWLIST}
+
 
 @dataclass
 class PiHarnessResult:
@@ -252,7 +275,7 @@ def run_pi_harness(
     task_file = (state_dir / f"active-task_{run_id}.json").resolve()
     command = build_pi_command(pi_model, session_dir, task_file, prompt)
 
-    env = os.environ.copy()
+    env = _build_pi_env()
     env["RUN_ID"] = run_id
     env["GO_STATE_DIR"] = str(state_dir)
     env["WORKTREE"] = str(worktree)

@@ -145,6 +145,62 @@ def test_pi_harness_passes_required_child_env(tmp_path, monkeypatch):
     assert "--system-prompt" in captured["command"]
 
 
+def test_pi_harness_env_allowlist_excludes_parent_secrets(tmp_path, monkeypatch):
+    """SEC-1: pi subprocess must NOT inherit parent secrets (no os.environ.copy())."""
+    state_dir = tmp_path / "state"
+    worktree = tmp_path / "worktree"
+    state_dir.mkdir()
+    worktree.mkdir()
+    (state_dir / "active-task_run-sec.json").write_text("{}\n", encoding="utf-8")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["env"] = kwargs["env"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout='{"type":"session","id":"sess-sec"}\n',
+            stderr="",
+        )
+
+    monkeypatch.setattr(_PI_HARNESS.subprocess, "run", fake_run)
+    # Plant secret-looking keys in the parent env that MUST NOT cross over.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-PARENT-LEAK")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-parent-leak")
+    monkeypatch.setenv("PI_HARNESS_TEST_SECRET", "parent-only")
+
+    _PI_HARNESS.run_pi_harness(
+        worktree=worktree,
+        state_dir=state_dir,
+        run_id="run-sec",
+        pi_model="minimax/MiniMax-M3",
+        prompt="Task",
+    )
+
+    env = captured["env"]
+    # Allowlisted session vars are present (explicitly set by the harness).
+    assert env["RUN_ID"] == "run-sec"
+    assert env["GO_STATE_DIR"] == str(state_dir.resolve())
+    assert env["WORKTREE"] == str(worktree.resolve())
+    assert env["PI_CODING_AGENT_SESSION_DIR"] == str(
+        (state_dir / "pi-sessions" / "run-sec").resolve()
+    )
+    # Parent secrets are NOT leaked into pi's subprocess env.
+    assert "ANTHROPIC_API_KEY" not in env
+    assert "OPENAI_API_KEY" not in env
+    assert "PI_HARNESS_TEST_SECRET" not in env
+    # Allowlisted OS vars pass through.
+    for required in ("PATH",):
+        assert required in env, f"{required} must be allowlisted so pi can spawn children"
+
+
+def test_build_pi_env_helper_only_returns_allowlisted_keys():
+    """Unit-level check: _build_pi_env filters by _PI_ENV_ALLOWLIST."""
+    env = _PI_HARNESS._build_pi_env()
+    for key in env:
+        assert key in _PI_HARNESS._PI_ENV_ALLOWLIST, f"{key} is not in the allowlist"
+
+
 def test_pi_harness_nonzero_with_partial_json_blocks(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"
     worktree = tmp_path / "worktree"
