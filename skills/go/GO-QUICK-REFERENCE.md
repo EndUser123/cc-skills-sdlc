@@ -97,7 +97,7 @@ export MAX_ATTEMPTS=3
 Derived paths:
 
 ```bash
-ARTIFACT_DIR=".claude/.artifacts/$TERMINAL_ID/go"
+ARTIFACT_DIR="${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts/$TERMINAL_ID/go"
 PLAN_FILE="$ARTIFACT_DIR/active-plan.json"
 ACTIVE_TASK_FILE="$ARTIFACT_DIR/active-task_$RUN_ID.json"
 TASK_RESULT_FILE="$ARTIFACT_DIR/task-result_$RUN_ID.json"

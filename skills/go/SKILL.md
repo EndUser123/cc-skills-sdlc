@@ -656,7 +656,7 @@ touch "$GO_STATE_DIR/.verified_$RUN_ID"
 If docs-only diff, skip. Otherwise run `/simplify`.
 
 ```bash
-DOCS_ONLY="$(python -c 'import json; d=json.load(open(".claude/.artifacts/'${TERMINAL_ID}'/go/diff-summary_'${RUN_ID}'.json")); print("true" if d.get("docs_only") else "false")' 2>/dev/null || echo false)"
+DOCS_ONLY="$(python -c 'import json; d=json.load(open("'${CLAUDE_PROJECT_DIR:-P:/}'.claude/.artifacts/'${TERMINAL_ID}'/go/diff-summary_'${RUN_ID}'.json")); print("true" if d.get("docs_only") else "false")' 2>/dev/null || echo false)"
 if [ "$DOCS_ONLY" = "true" ]; then
   echo "Skipping simplify (docs-only)"
 else
