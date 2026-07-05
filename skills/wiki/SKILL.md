@@ -111,13 +111,14 @@ Report the failure status and stop.
 
 4. Distill file into a wiki page with enhanced metadata and structured extraction (see below).
 5. Write to <VAULT/concepts/slug>.md. For collision-safe slugs, use `make_collision_slug()` from `scripts/wiki_manifest.py` (slug = safe-slug + SHA256[:8]).
-6. Append to <LOG_FILE>: "## [YYYY-MM-DD] ingest | <title>\nSource: <original_filename>\nSHA256: <hash>\n"
+6. Run the shared auto-link step: `python skills/wiki/scripts/wiki_after_write.py <VAULT/concepts/slug.md>`. This queries QMD for top-K semantically similar existing concept pages and injects a `## Auto-related` section. Best-effort; no-op if QMD returns nothing. Never touches a hand-authored `## Related` section.
+7. Append to <LOG_FILE>: "## [YYYY-MM-DD] ingest | <title>\nSource: <original_filename>\nSHA256: <hash>\n"
 
  PHASE 3: COMPLETION REPORT (separate from generation) 
 
-7. Update manifest entry to status=done.
+8. Update manifest entry to status=done.
 
-NOTICE: Steps 4-5 are generation. Step 7 is completion reporting.
+NOTICE: Steps 4-6 are generation (write + auto-link). Step 8 is completion reporting.
 Do NOT mix "page written successfully" with "page meets quality bar."
 Quality assessment is a SEPARATE step handled by the coordinator.
 ```
@@ -208,7 +209,7 @@ The crawl skill handles all URL fetching, deduplication, wikilinks, and logging.
 
 **Hash-based deduplication**: The manifest pre-phase checks `log.md` for existing SHA256 hashes. Files already logged are marked `status: skipped`. Duplicate check is deterministic and requires no LLM involvement.
 
-**Auto-linking phase**: After writing the page, query QMD for semantically similar existing pages using the new page's title and summary. Inject `[[Page Name]]` links to top-K (default K=5) related pages into the new page's body under a `## Related` section.
+**Auto-linking phase**: After writing the page, run `python skills/wiki/scripts/wiki_after_write.py <page-path>`. The script reads the page's title+summary frontmatter, queries QMD for top-K (default 5) semantically similar existing concept pages, and injects `[[wikilinks]]` into a `## Auto-related` section. This is the **shared post-write step** called by every write path — Ingest subagent (Phase 2 step 6) and Query-section auto-save. Best-effort: QMD similarity quality determines candidates; pages with weak token overlap to their conceptual neighbors get no auto-links and should keep a hand-authored `## Related` section. Hand-authored `## Related` is never touched. Re-run the script anytime to regenerate `## Auto-related` from current QMD state.
 
 **Speculative linking**: When ingesting, if the content references pages that don't exist yet, create `[[wikilinks]]` to those pages anyway — they become "red links" in Obsidian. This is intentional: future ingest of those pages will resolve the links automatically. Never suppress a link because the target doesn't exist yet.
 
@@ -282,16 +283,37 @@ Usage: `/wiki ingest` (safe only), `/wiki ingest --all` (safe + large-warn), `/w
 | claude code, claude-code, settings, permissions | `P:/.claude/docs/claude-code-reference.md` |
 | detection, pattern, marker, matcher, applicability, epistemic, causal, diagnosis, output_patterns | `P:/.claude/hooks/__lib/` (112 .py files — grep for implementation details behind docs) |
 
-**Auto-save high-value results**: If the synthesized answer is substantive (non-trivial insight, new connection, resolved ambiguity, or decision-relevant synthesis), save it directly to the wiki without asking. Write to `wiki/concepts/<slug>.md` with YAML frontmatter. Only ask the user if the synthesis is uncertain or incomplete.
+**Auto-save high-value results**: If the synthesized answer is substantive (non-trivial insight, new connection, resolved ambiguity, or decision-relevant synthesis), save it directly to the wiki without asking. Write to `wiki/concepts/<slug>.md` with YAML frontmatter. Then run the shared auto-link step: `python skills/wiki/scripts/wiki_after_write.py <page-path>` — this is the same post-write call every Ingest subagent makes, so auto-saved pages get the same `## Auto-related` treatment as ingested ones. Only ask the user if the synthesis is uncertain or incomplete.
 
 Usage: `/wiki query <question>`
 
 ### Lint
-Health-check wiki: contradictions, orphan pages, missing cross-references, stale claims
+Two-layer health check: deterministic graph+staleness via script, then LLM judgment on top.
 
-**Automated periodic linting**: `/wiki lint` is included in the `/main` health check workflow. It runs on every `/main` invocation.
+**Phase 1 — Deterministic (script, no LLM):** Run the shared diagnostic engine that /main also uses:
 
-Usage: `/wiki lint`
+```bash
+python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py [--json]
+```
+
+Emits: broken wikilinks, orphan pages, duplicate slugs, missing frontmatter, stale page count (mtime > 90d). This is the same probe `/main` runs every invocation, so `/wiki lint` and `/main` never disagree on the graph.
+
+**Phase 2 — Judgment (LLM, on top of Phase 1 output):** For each broken link the script could NOT safely auto-fix and each orphan cluster, apply judgment:
+- Contradictions between pages that share a typed `@contradicts` link
+- Stale claims (assertions referencing deprecated/renamed tools or APIs)
+- Orphan triage: keep | merge into a related page | leave as intentional red-link seed
+
+Per wiki policy (`CLAUDE.md:22`): **never suppress a broken red-link just because the target doesn't exist** — speculative links are intentional. Only flag a red-link for action when Phase 1 reports it as broken AND a clear fuzzy-match target exists.
+
+**`/wiki lint --fix`** — runs Phase 1 in `--fix` mode (script applies ONLY safe deterministic repairs: unique fuzzy-match broken links at ≥0.9 confidence, single candidate), then surfaces the judgment-tail for Phase 2 review. The script's own `--fix` never deletes orphans or red-links.
+
+```bash
+python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --fix [--dry-run]
+```
+
+**Automated periodic linting**: Phase 1 of `/wiki lint` is included in the `/main` health check workflow on every `/main` invocation; `/main --fix` applies the safe-subset with a 7-day throttle (sentinel at `P:/.claude/.artifacts/_main/wiki_autofix_last_run.txt`).
+
+Usage: `/wiki lint [--fix] [--dry-run]`
 
 ### Index
 Rebuild `index.md` catalog from current wiki state
@@ -305,8 +327,12 @@ Usage: `/wiki index`
 Refresh stale wiki pages by detecting topics that need updating and offering web-based refresh.
 
 **Phase 1 — Discovery**: Identify candidates via two signals:
-1. **QMD search frequency**: Run `qmd search --collection wiki <topic>` and track which topics are re-searched (implies active interest)
-2. **Age check**: Pages with `created:` frontmatter older than 90 days are candidates (configurable threshold)
+1. **Stale page list (deterministic, shared with /main):**
+   ```bash
+   python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --stale [--max-age 90] [--limit 20] [--json]
+   ```
+   Lists pages by mtime age (oldest first). Same engine `/main` and `/wiki lint` use — single source of truth for staleness.
+2. **QMD search frequency**: Run `qmd search --collection wiki <topic>` and track which topics are re-searched (implies active interest) — overlay this signal on the stale list to prioritize.
 
 **Phase 2 — Staleness scoring**: Rank candidates by:
 - Days since last update (page mtime vs current date)
