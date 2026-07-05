@@ -150,6 +150,31 @@ _PATH_RE = re.compile(
     r"[\w-]+\.(?:py|md|json|sh|ts|tsx|js|toml|yaml|yml))"  # foo.py
 )
 
+# --- Mixed-work status + decision_kind classification (goal reqs 4-7) ---------
+# Distinguish WHY /go pauses. "blocked_*" = do NOT ask the user to approve
+# (state the blocker + the next evidence step); "pause_for_authorization" =
+# genuine user authority (do ask); "partial_readonly_done" / "recommendation_ready"
+# = safe to proceed / advisory ready. Collapsing all four into one pause is the
+# decision-fatigue the goal removes.
+# Gate-weakening intent = blocked by policy (never ask user to approve a guardrail
+# reduction); missing-evidence = blocked by prerequisite; shared-state surface =
+# genuine user authorization (req 16.g).
+_POLICY_WEAKEN_MARKERS: tuple[str, ...] = (
+    "weaken the gate", "weaken the hook", "demote to warn", "make advisory",
+    "disable the gate", "disable the hook", "skip the gate", "bypass the gate",
+    "fail-open", "fail open", "relax the gate", "loosen the gate",
+    "soft block", "soft-block", "exempt from the gate",
+)
+_MISSING_EVIDENCE_MARKERS: tuple[str, ...] = (
+    "missing corpus", "no corpus", "missing data", "no evidence",
+    "missing transcript", "unavailable corpus", "no benchmark", "no baseline",
+    "missing benchmark", "missing baseline", "no test corpus", "no held-out",
+)
+_SHARED_STATE_MARKERS: tuple[str, ...] = (
+    "settings.json", "hooks.json", "plugin.json", "router.py",
+    ".env", "provider-config", "marketplace.json",
+)
+
 # Phase 4: Verification Policy Matrix — maps prompt task-type keywords to the
 # verification modes that should be suggested. Each entry is (keyword, suggestions).
 # The suggestions override the generic keyword checks in verification_suggestions.
@@ -1086,6 +1111,160 @@ def derive_report_gate(task_intent, execution_tier) -> dict:
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim."
         ),
+    }
+
+
+def classify_mixed_work_status(
+    rewritten: str, task_intent: str, execution_tier: str, risk: dict, prompt_review_support: str
+) -> str:
+    """Why /go pauses (goal req. 4). Splits the old single pause_for_authorization
+    bucket into four:
+
+    - blocked_policy / blocked_prerequisite — /go must NOT ask the user to
+      approve (req. 7); state the blocker + the next evidence-gathering step.
+    - pause_for_authorization — genuine user authority (e.g. shared-state
+      mutation); /go MAY ask (req. 16.g).
+    - recommendation_ready — decide intent; advisory produced, awaiting director.
+    - partial_readonly_done — safe read-only narrowing already proceeded.
+
+    Derives from existing classifier signals + three conservative marker sets so
+    no new input surface is required. Defaults to partial_readonly_done when
+    nothing forces a pause (the gate is silent, not blocking).
+    """
+    low = rewritten.lower()
+    high_risk = bool(risk.get("high_risk"))
+    weakens_policy = any(m in low for m in _POLICY_WEAKEN_MARKERS)
+    missing_evidence = any(m in low for m in _MISSING_EVIDENCE_MARKERS)
+    is_shared_state = any(m in low for m in _SHARED_STATE_MARKERS)
+    if weakens_policy:
+        return "blocked_policy"
+    if missing_evidence:
+        return "blocked_prerequisite"
+    # High-risk surface that is NOT shared-state authorization + no review
+    # support => missing-prerequisite block (cannot review before dispatch).
+    if high_risk and not is_shared_state and prompt_review_support == "absent":
+        return "blocked_prerequisite"
+    # Shared-state mutation = genuine user authority (req. 16.g), even though
+    # the surface is also high-risk.
+    if is_shared_state and task_intent == "implement":
+        return "pause_for_authorization"
+    if task_intent == "decide" and execution_tier == "pause_for_authorization":
+        return "recommendation_ready"
+    if execution_tier == "pause_for_authorization":
+        return "pause_for_authorization"
+    return "partial_readonly_done"
+
+
+def classify_decision_kind(
+    rewritten: str, task_intent: str, execution_tier: str, risk: dict
+) -> str:
+    """Per-item authority classification for mixed work (goal req. 5).
+
+    safe_readonly_next_step — read-only, auto-executes without pause (req. 6).
+    agent_decidable — low-regret reversible implement at local tier.
+    user_preference — needs the director (decide intent).
+    shared_state_authorization — needs the director (shared config).
+    blocked_by_missing_evidence / blocked_by_policy — never asked of the user;
+    /go states the blocker and the next evidence step (req. 7).
+    """
+    low = rewritten.lower()
+    high_risk = bool(risk.get("high_risk"))
+    if any(m in low for m in _POLICY_WEAKEN_MARKERS):
+        return "blocked_by_policy"
+    if any(m in low for m in _MISSING_EVIDENCE_MARKERS):
+        return "blocked_by_missing_evidence"
+    if high_risk and any(m in low for m in _SHARED_STATE_MARKERS):
+        return "shared_state_authorization"
+    if task_intent == "decide":
+        return "user_preference"
+    if execution_tier == "direct_answer":
+        return "safe_readonly_next_step"
+    if task_intent in ("investigate", "validate"):
+        return "safe_readonly_next_step"
+    if execution_tier in ("local_surgical", "local_rigorous"):
+        return "agent_decidable"
+    return "user_preference"  # full_go / pause — defer to director
+
+
+def build_plain_english_report(proposal: dict) -> dict:
+    """Four-section plain-English report (goal reqs. 8, 10, 11).
+
+    Section order is fixed: What I did -> What I recommend -> What is blocked ->
+    What I need from you. Internal labels (pause_for_authorization,
+    blocked_prerequisite, prompt_review_required, prompt_review_support=absent)
+    may appear ONLY after these four sections. A "no mutation performed" claim
+    requires ``git status --short`` (or equivalent) evidence (req. 14 / 16.l),
+    surfaced via ``no_mutation_evidence_required``.
+    """
+    status = proposal.get("mixed_work_status", "partial_readonly_done")
+    advisory = proposal.get("decision_advisory") or {}
+    gate = proposal.get("report_gate") or {}
+    intent = proposal.get("task_intent", "")
+    recommendation = advisory.get(
+        "recommendation", "Proceed at the derived execution tier."
+    )
+
+    what_i_did: list[str] = []
+    if status == "partial_readonly_done" and intent in ("investigate", "validate", "mixed"):
+        what_i_did.append(
+            "Completed safe read-only narrowing — no code, docs, config, hooks, "
+            "cache, env, or shared-state mutation."
+        )
+    elif intent in ("investigate", "validate"):
+        what_i_did.append("Produced evidence/advisory only; no implementation-completion claim.")
+    else:
+        what_i_did.append("Ran preflight and derived the execution tier; no unauthorized mutation.")
+
+    what_i_recommend: list[str] = [recommendation]
+    if status == "blocked_prerequisite":
+        what_i_recommend.append(
+            "Next step is evidence-gathering, not approval: produce the missing "
+            "prerequisite (corpus/baseline/transcript), then re-run."
+        )
+    elif status == "blocked_policy":
+        what_i_recommend.append(
+            "Policy block: /go will not weaken the gate. Propose the change as a "
+            "separate, explicitly-authorized decision rather than asking to approve it inline."
+        )
+
+    what_is_blocked: list[str] = []
+    if status == "blocked_prerequisite":
+        what_is_blocked.append("Missing evidence/prerequisite — not asked of you (req. 7).")
+    if status == "blocked_policy":
+        what_is_blocked.append("Policy-blocked (gate weakening) — not asked of you (req. 7).")
+    if gate.get("must_defer_unauthorized_children"):
+        what_is_blocked.append(
+            "Unauthorized / deferred children of the mixed request — not bundled into completion."
+        )
+
+    if status == "pause_for_authorization":
+        need = advisory.get(
+            "exact_authorization_needed",
+            "Director authorization required to mutate shared state.",
+        )
+    elif status == "recommendation_ready":
+        need = advisory.get(
+            "exact_authorization_needed",
+            "Director decision required; advisory is ready.",
+        )
+    elif status in ("blocked_prerequisite", "blocked_policy"):
+        need = "Nothing right now — unblock the prerequisite above; no approval is requested."
+    else:
+        need = "Nothing right now — proceed at the recommended tier."
+
+    return {
+        "section_order": [
+            "what_i_did",
+            "what_i_recommend",
+            "what_is_blocked",
+            "what_i_need_from_you",
+        ],
+        "what_i_did": what_i_did,
+        "what_i_recommend": what_i_recommend,
+        "what_is_blocked": what_is_blocked,
+        "what_i_need_from_you": [need],
+        "labels_after_plain_english": True,
+        "no_mutation_evidence_required": True,
     }
 
 
