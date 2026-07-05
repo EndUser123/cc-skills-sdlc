@@ -14,7 +14,7 @@ print(m.canonical_terminal_id())
 ' 2>/dev/null || true)"
 TERMINAL_ID="${CLAUDE_TERMINAL_ID:-${TERMINAL_ID:-${_CANONICAL_TID_PY:-$(uuidgen | cut -d'-' -f1)}}}"
 GO_RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
-ARTIFACT_ROOT="${CLAIREC_CODE_ARTIFACTS_DIR:-.claude/.artifacts}"
+ARTIFACT_ROOT="${CLAUDE_CODE_ARTIFACTS_DIR:-${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts}"
 GO_ARTIFACT_DIR="${ARTIFACT_ROOT}/${TERMINAL_ID}/go"
 SCHEMA_DIR="${ROOT_DIR}/skills/go/schemas"
 VALIDATOR="${ROOT_DIR}/skills/go/scripts/validate_go_contracts.py"

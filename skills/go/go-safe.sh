@@ -5,7 +5,7 @@ export TERMINAL_ID="${TERMINAL_ID:-$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[
 export RUN_ID="${RUN_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 export MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 export GO_TASKS_FILE="${GO_TASKS_FILE:-.claude/tasks/tasks.json}"
-export GO_STATE_DIR=".claude/.artifacts/${TERMINAL_ID}/go"
+export GO_STATE_DIR="${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts/${TERMINAL_ID}/go"
 
 mkdir -p "$GO_STATE_DIR"
 

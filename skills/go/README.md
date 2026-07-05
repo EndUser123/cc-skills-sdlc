@@ -23,7 +23,7 @@ Worktree Check → Task Selection → Classify → Dispatch → Verify → Simpl
 ```bash
 export TERMINAL_ID="${TERMINAL_ID:-$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')}"
 export RUN_ID="${GO_RUN_ID:-$(uuidgen)}"
-export GO_STATE_DIR="$(pwd)/.claude/.artifacts/${TERMINAL_ID}/go"
+export GO_STATE_DIR="${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts/${TERMINAL_ID}/go"
 mkdir -p "$GO_STATE_DIR"
 ```
 

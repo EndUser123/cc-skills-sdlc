@@ -6,7 +6,7 @@
 set -euo pipefail
 
 TICKET="${1:-$(git branch --show-current 2>/dev/null | grep -oE '[a-zA-Z]+-[0-9]+' | head -1)}"
-STATE_FILE=".claude/.artifacts/${CLAUDE_TERMINAL_ID:-unknown}/go/progress.txt"
+STATE_FILE="${CLAUDE_PROJECT_DIR:-P:/}.claude/.artifacts/${CLAUDE_TERMINAL_ID:-unknown}/go/progress.txt"
 ITERATION=0
 
 echo "Ralph loop driver for: $TICKET"
