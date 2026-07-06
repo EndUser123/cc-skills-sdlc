@@ -211,6 +211,27 @@ def script_path(*parts: str) -> Path:
     return SKILL_DIR / Path(*parts)
 
 
+def _task_has_capability_audit(state_dir: Path, run_id: str) -> bool:
+    """Check if the active task has a capability_audit block."""
+    import glob as glob_mod
+    candidates = sorted(
+        state_dir.glob(f"active-task_{run_id}*"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    ) or sorted(
+        state_dir.glob("active-task_*"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        return False
+    try:
+        task_data = json.loads(candidates[0].read_text(encoding="utf-8"))
+        return bool(task_data.get("task", {}).get("capability_audit"))
+    except Exception:
+        return False
+
+
 def load_script_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -1276,6 +1297,14 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     if rc != 0:
         return False
     phase_marker(state_dir, "verified", run_id)
+
+    # Step 1.5: Run capability-claim audit (if task has capability_audit)
+    if _task_has_capability_audit(state_dir, run_id):
+        audit_script = script_path("scripts", "capability_claim_audit.py")
+        rc = run_script(audit_script, [str(state_dir), run_id], state_dir, run_id, cwd=worktree)
+        if rc != 0:
+            return False
+        phase_marker(state_dir, "capability-audit-passed", run_id)
 
     # Step 2: Get diff for simplify gate
     diff = subprocess.run(

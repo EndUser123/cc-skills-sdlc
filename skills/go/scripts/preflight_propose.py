@@ -2046,6 +2046,7 @@ def generate_proposal(
         task_intent, execution_tier, closure_check,
         operational_discovery=operational_discovery,
         discovery_evidence=None,  # scaffold — worker fills findings during the run
+        capability_claims=capability_claims_raw,
     )
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
@@ -2093,6 +2094,17 @@ def generate_proposal(
             "observed state before prescribing. Rank ≥2 verification paths by "
             "confidence-per-effort. Cleanup is report-only + approval-gated."
         )
+    if capability_claims_raw:
+        cap_claims = capability_claims_raw[0].get("claims", [])
+        cap_triggers = capability_claims_raw[0].get("trigger_terms", [])
+        notes.append(
+            f"CAPABILITY_CLAIM_AUDIT required (triggers={cap_triggers}): "
+            f"{len(cap_claims)} claim(s) detected. Visible-surface check alone is "
+            "insufficient — must verify backend runner/module/function paths exist "
+            "before claiming 'shipped'/'absorbed'/'production'. Reports must "
+            "distinguish: visible consolidation complete | routing complete | "
+            "backend implementation complete | pending capability intentionally deferred."
+        )
     proposal = {
         "runid": run_id,
         "run_id": run_id,
@@ -2117,6 +2129,7 @@ def generate_proposal(
         "closure_check": closure_check,
         "repro_policy": repro_policy,
         "operational_discovery": operational_discovery,
+        "capability_claims": capability_claims_raw[0] if capability_claims_raw else None,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
         "freshness": {
