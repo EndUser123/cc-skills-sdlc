@@ -1902,7 +1902,7 @@ def generate_proposal(
     prompt_review_required = bool(risk["prompt_review_required"])
     high_risk = bool(risk.get("high_risk"))
     model_affinity = classify_model_affinity(
-        task_intent, execution_tier, high_risk, len(prompt)
+        task_intent, execution_tier, high_risk, len(prompt), prompt
     )
     notes = [
         "Deterministic heuristic (no LLM). dispatch="
