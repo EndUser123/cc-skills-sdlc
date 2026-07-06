@@ -150,14 +150,28 @@ class TestRouteDecisionLocal:
 # ---------------------------------------------------------------------------
 
 class TestRouteDecisionClaude:
-    def test_claude_rejected_as_stub(self, tmp_path):
+    """TASK-003: claude is a real native-subagent dispatch mode, no longer a
+    stub. When chosen it is the implementer harness; when not chosen it is
+    rejected as not-selected (same shape as pi/local)."""
+
+    def test_claude_chosen_not_in_rejected(self, tmp_path):
         _make_active_task(tmp_path)
         inject_route_decision(tmp_path, "test-run", "claude")
         route = _read_route(tmp_path)
 
+        rejected_names = [r["harness"] for r in route["rejectedHarnesses"]]
+        assert "claude" not in rejected_names
+        assert route["chosenDispatch"] == "claude"
+        assert route["implementerHarness"] == "claude"
+
+    def test_claude_rejected_as_not_selected_when_pi_chosen(self, tmp_path):
+        _make_active_task(tmp_path)
+        pi_info = PiModelInfo("M3", "T2", "minimax/MiniMax-M3")
+        inject_route_decision(tmp_path, "test-run", "pi", pi_info)
+        route = _read_route(tmp_path)
+
         rejected = {r["harness"]: r["reason"] for r in route["rejectedHarnesses"]}
-        assert "claude" in rejected
-        assert "stub" in rejected["claude"].lower()
+        assert rejected["claude"] == "not-selected"
 
 
 # ---------------------------------------------------------------------------

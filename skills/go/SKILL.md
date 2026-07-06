@@ -73,7 +73,7 @@ Valid modes:
 |------|--------|
 | `pi` | External pi harness via `pi -p --mode json --model <resolved>` |
 | `local` | No worker; runs verification/review/artifact gates against the current checkout |
-| `claude` | Blocked with `unsupported-automated-dispatch` until a real non-interactive worker exists |
+| `claude` | Native Claude Code subagent. The orchestrator writes `claude-task-request_{RUN_ID}.json` and returns `<promise>SPAWN_CLAUDE_SUBAGENT</promise>`; the main-loop Claude spawns the in-session `Agent(...)` call, writes `claude-task-result_{RUN_ID}.json`, then resumes via `--claude-resume`. Worker mutation scope is enforced by the PreToolUse delegation gate (TASK-001.4). Opt out with `GO_DISABLE_CLAUDE_TASK_SUBAGENT=1`. |
 
 ---
 
@@ -82,7 +82,7 @@ Valid modes:
 1. Enforce worktree + branch preconditions (auto-create if on main)
 2. Acquire a task from one of three input sources
 3. Classify task complexity → select model via Bifrost
-4. Dispatch through `pi`, run local verification, or block unsupported `claude`
+4. Dispatch through `pi`, run local verification, or hand off to a native Claude subagent
 5. Run verification commands from the task contract
 6. Run `/simplify` if code changed
 7. Run 7-pass review at the appropriate depth

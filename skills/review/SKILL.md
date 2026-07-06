@@ -1,0 +1,85 @@
+---
+name: review
+description: "Unified code & PR review — modes: pr (default), diff, file, tests, errors, types, simplify, critical, multi (multi-LLM), full (14-agent inspection)"
+argument-hint: "[mode] [scope]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Task"]
+triggers:
+  - /review
+aliases:
+  - /review
+enforcement: advisory
+depends_on_skills: []
+workflow_steps: []
+suggest:
+  - /red-team
+  - /improve
+  - /skill-audit
+---
+
+# /review — Unified Code & PR Review
+
+Single entry point for every code-review flavor in the marketplace. Pick a mode or let the default `pr` mode run.
+
+## Modes
+
+| Mode | What it does | Engine |
+|------|--------------|--------|
+| `pr` *(default)* | Multi-agent PR review: comments, tests, errors, types, code, simplify | this skill (see workflow below) |
+| `diff` | Review only `git diff main...HEAD` (or staged/latest commit) | this skill, scope-narrowed |
+| `file` | Review one file or path prefix passed as scope | this skill, scope-narrowed |
+| `tests` | Behavioral test-coverage quality + critical gaps | `pr-test-analyzer` agent |
+| `errors` | Silent failures, catch blocks, error logging | `silent-failure-hunter` agent |
+| `types` | Type encapsulation, invariant expression, design quality | `type-design-analyzer` agent |
+| `simplify` | Clarity/maintainability pass after review passes | `code-simplifier` agent |
+| `critical` | High-precision bug + logic-defect review against CLAUDE.md | `code-reviewer` agent |
+| `multi` | Parallel multi-LLM adversarial dispatch (DeepSeek/Gemini/Claude/GPT) + synthesis | `skills/sqd/` (`python -m sqd dispatch`) |
+| `full` | Unified Code Inspection — auto-depth 3→14 agent registry + 3-tier verdict | `skills/uci/` (auto/`--lite`/`--full`) |
+
+**Mode resolution:** `/review tests errors` runs multiple aspect modes. `/review multi` and `/review full` delegate to their engines. Bare `/review` = `pr` mode over the auto-detected scope.
+
+## Workflow (default `pr` mode)
+
+1. **Determine scope** — user scope > feature branch (`git diff main...HEAD`) > staged > latest commit. Run `git diff --name-only`; check `gh pr view` if a PR exists.
+2. **Pick aspects** — from `$ARGUMENTS` or default to all applicable:
+   - Always: `code-reviewer` (general quality, CLAUDE.md compliance)
+   - Test files changed → `pr-test-analyzer`
+   - Comments/docs added → `comment-analyzer`
+   - Error handling changed → `silent-failure-hunter`
+   - Types added/modified → `type-design-analyzer`
+   - After passing → `code-simplifier`
+3. **Dispatch** — sequential by default (each report complete before the next); add `parallel` to run all at once.
+4. **Aggregate** — Critical (must fix) / Important (should fix) / Suggestions / Strengths, each with `file:line`.
+5. **Action plan** — fix critical → important → suggestions → re-run to verify.
+
+## Mode-specific contracts
+
+### `multi` (delegates to `skills/sqd/`)
+```bash
+cd "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc" && python -m sqd dispatch --target "<path>" --models deepseek gemini claude --parallel
+```
+Three phase gates (dispatch → collect → synthesize). Exit codes: 0 consensus, 1 divergence, 2 agent failure, 3 target not found. Synthesis + per-agent artifacts land in `skills/sqd/findings/`.
+
+### `full` (delegates to `skills/uci/`)
+Auto-selects depth from risk/file-count/line-count signals: `triage` (3 agents) → `standard` (4) → `deep` (8) → `comprehensive` (14). Force with `--lite` or `--full`. Per-agent additive triggers fire on code patterns regardless of mode. Three-tier verdict: **Ready to Merge** / **Needs Attention** / **Needs Work**. Pre-existing-issue detection separates MUST-FIX from background debt. Full registry + sequential-trigger + memory-integration docs live in `skills/uci/references/`.
+
+> **Historical note:** `/uci`'s claim that "`/review` and `/adversarial-review` were consolidated into this skill" is stale as of this consolidation — `/uci` now folds under `/review full`. The uci engine remains the execution backend.
+
+## Output
+
+Markdown by default (verdict → findings with impact/effort → cross-agent validation → action plan). `full` mode also supports `--format json|summary`.
+
+## When to escalate (suggest)
+
+- **Trust boundary / security / gate / hook changes** → `/red-team`
+- **Design-level improvement opportunity** → `/improve`
+- **Systemic skill-design issues across multiple skills** → `/skill-audit`
+
+## Evidence-First Principles
+
+- **E1**: claims of absence require confirmed Read/Grep/git failure.
+- **E4**: read source before reviewing; don't ask the user for what you can find.
+- **E5**: no "I assume / probably" without tool verification.
+
+## Deprecated aliases
+
+`/review-pr`, `/uci`, `/sqd` still resolve (5-line router stubs in their own SKILL.md) and forward here. They will be removed after one release cycle.

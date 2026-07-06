@@ -117,7 +117,6 @@ def inject_route_decision(
     # Rejected harnesses with reasons
     rejected: list[dict[str, str]] = []
     for harness, reason in [
-        ("claude", "unsupported-stub: no non-interactive worker implementation"),
         ("agy", "not-wired: agy is not integrated into /go dispatch"),
     ]:
         rejected.append({"harness": harness, "reason": reason})
@@ -126,6 +125,8 @@ def inject_route_decision(
         rejected.append({"harness": "local", "reason": "not-selected"})
     if dispatch != "pi":
         rejected.append({"harness": "pi", "reason": "not-selected"})
+    if dispatch != "claude":
+        rejected.append({"harness": "claude", "reason": "not-selected"})
 
     pi_transcript_review = dispatch == "pi"
 
@@ -310,6 +311,35 @@ def set_delegation_mode(state_dir: Path, mode: str, run_id: str) -> None:
         advisory_m.unlink(missing_ok=True)
 
 
+# Claude native-subagent tier map. /go cannot call the in-session Agent tool
+# itself (it runs as a Bash-invoked Python script), so dispatch_claude writes a
+# request artifact and returns a SPAWN_CLAUDE_SUBAGENT token; SKILL.md spawns the
+# Agent(...) call with these params, then resumes via --claude-resume.
+# Advisory only — the PreToolUse delegation gate (TASK-001.4) enforces worker
+# mutation scope regardless of the model chosen here.
+_CLAUDE_TIER_MODELS: dict[str, str] = {
+    "direct_answer": "haiku",
+    "local_surgical": "sonnet",
+    "local_rigorous": "sonnet",
+    "full_go": "sonnet",
+    "pause_for_authorization": "opus",
+}
+
+_CLAUDE_SUBAGENT_TYPE = "general-purpose"
+_CLAUDE_SUBAGENT_TOOLS: list[str] = ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]
+
+
+def claude_tier_model(execution_tier: str, task_type: str = "") -> str:
+    """Resolve the native-subagent model slug for a Claude-dispatch task.
+
+    design tasks always pin to opus (advisory weight); otherwise the map
+    follows the proposal's execution_tier. Unknown tiers default to sonnet.
+    """
+    if task_type == "design":
+        return "opus"
+    return _CLAUDE_TIER_MODELS.get(execution_tier, "sonnet")
+
+
 def write_current_run(state_dir: Path, run_id: str, status: str, dispatch: str) -> None:
     terminal_id = _canonical_terminal_id()
     payload = {
@@ -353,6 +383,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tasks", help="Path to tasks.json")
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
     parser.add_argument("--forbidden", nargs="*", default=[], help="Forbidden files")
+    parser.add_argument(
+        "--claude-resume",
+        metavar="RUN_ID",
+        default="",
+        help="Phase 2 of Claude native-subagent dispatch: re-enter the orchestrator "
+        "after SKILL.md has spawned the Agent and written claude-task-result_<run_id>.json. "
+        "Runs the common tail (verify/review/artifacts) on the current checkout.",
+    )
     parser.add_argument(
         "--validation",
         action="store_true",
@@ -1047,16 +1085,100 @@ def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelIn
 
 
 def dispatch_claude(state_dir: Path, run_id: str) -> bool:
-    write_json(
-        state_dir / f"dispatch-result_{run_id}.json",
-        {
-            "dispatch": "claude",
-            "status": "unsupported-automated-dispatch",
-            "reason": "Claude dispatch has no non-interactive worker implementation in this orchestrator.",
-        },
-    )
-    touch(state_dir / f".blocked_{run_id}")
-    return False
+    """Phase 1 of Claude native-subagent dispatch.
+
+    Writes claude-task-request_{run_id}.json (tier-resolved model, scrubbed
+    prompt, tools allowlist, scope), emits the dispatched + delegation-worker
+    markers, and returns True. The caller then emits SPAWN_CLAUDE_SUBAGENT so
+    SKILL.md can invoke the in-session Agent(...) tool — /go cannot call it
+    from Python. Phase 2 (--claude-resume) runs the common tail after the
+    subagent returns and SKILL.md writes claude-task-result_{run_id}.json.
+
+    FM-2: any failure (opt-out, marker write, missing active-task) writes
+    blocked_{run_id}.json BEFORE returning False.
+    """
+    if os.environ.get("GO_DISABLE_CLAUDE_TASK_SUBAGENT", "").strip():
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "reason_code": "claude_subagent_disabled",
+                "run_id": run_id,
+                "ts": now_utc_z(),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return False
+
+    task_file = state_dir / f"active-task_{run_id}.json"
+    if not task_file.exists():
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "reason_code": "missing_active_task",
+                "run_id": run_id,
+                "ts": now_utc_z(),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return False
+
+    task_data = json.loads(task_file.read_text(encoding="utf-8"))
+    task_inner = task_data.get("task", task_data)
+    task_type = task_inner.get("task_type", "")
+
+    execution_tier = ""
+    proposal_file = state_dir / f"task-proposal_{run_id}.json"
+    if proposal_file.exists():
+        try:
+            execution_tier = (
+                json.loads(proposal_file.read_text(encoding="utf-8"))
+                .get("execution_tier", "")
+            )
+        except (OSError, ValueError):
+            execution_tier = ""
+
+    model = claude_tier_model(execution_tier or "full_go", task_type)
+    scope_in = task_inner.get("scope_in", [])
+    forbidden = task_inner.get("forbidden_files", [])
+
+    request = {
+        "run_id": run_id,
+        "ts": now_utc_z(),
+        "model": model,
+        "subagent_type": _CLAUDE_SUBAGENT_TYPE,
+        "tools": list(_CLAUDE_SUBAGENT_TOOLS),
+        "prompt": task_prompt(task_file),
+        "scope_in": scope_in,
+        "forbidden_files": forbidden,
+        "execution_tier": execution_tier,
+        "task_type": task_type,
+    }
+    try:
+        write_json(state_dir / f"claude-task-request_{run_id}.json", request)
+        write_json(
+            state_dir / f"dispatch-result_{run_id}.json",
+            {
+                "dispatch": "claude",
+                "status": "spawn-pending",
+                "model": model,
+                "reason": "Request artifact written; awaiting native-subagent spawn by main-loop Claude.",
+            },
+        )
+        phase_marker(state_dir, "dispatched", run_id)
+        set_delegation_mode(state_dir, "worker", run_id)
+    except OSError as exc:
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "reason_code": "request_write_failed",
+                "run_id": run_id,
+                "error": str(exc),
+                "ts": now_utc_z(),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return False
+    return True
 
 
 def run_local_verification(state_dir: Path, run_id: str) -> bool:
@@ -1252,6 +1374,29 @@ def orchestrate(args: argparse.Namespace) -> str:
     if getattr(args, "preflight_only", False):
         return _orchestrate_preflight(args, state_dir, run_id)
 
+    # Claude phase 2: SKILL.md spawned the Agent and wrote the result. Run the
+    # common tail on the current checkout (no worktree — the subagent worked
+    # in-place under the PreToolUse delegation gate).
+    if getattr(args, "claude_resume", ""):
+        resume_run_id = args.claude_resume
+        result_file = state_dir / f"claude-task-result_{resume_run_id}.json"
+        if not result_file.exists():
+            write_json(
+                state_dir / f"blocked_{resume_run_id}.json",
+                {
+                    "reason_code": "missing_claude_task_result",
+                    "run_id": resume_run_id,
+                    "ts": now_utc_z(),
+                },
+            )
+            touch(state_dir / f".blocked_{resume_run_id}")
+            return finish("blocked")
+        phase_marker(state_dir, "coded", resume_run_id)
+        set_delegation_mode(state_dir, "advisory", resume_run_id)
+        if not run_common_tail(Path.cwd(), state_dir, resume_run_id):
+            return finish("blocked")
+        return finish("pr_ready")
+
     task = load_or_create_task(args, state_dir, run_id)
     if task is None:
         return finish("blocked")
@@ -1268,6 +1413,11 @@ def orchestrate(args: argparse.Namespace) -> str:
         inject_route_decision(state_dir, run_id, "claude")
         if not dispatch_claude(state_dir, run_id):
             return finish("blocked")
+        # Phase 1 complete: request artifact written. Hand off to SKILL.md,
+        # which reads claude-task-request_{run_id}.json, spawns the in-session
+        # Agent(...) call, writes claude-task-result_{run_id}.json, then
+        # re-invokes with --claude-resume <run_id> for phase 2.
+        return "<promise>SPAWN_CLAUDE_SUBAGENT</promise>"
 
     try:
         worktree = create_worktree(args.dispatch, state_dir, run_id)

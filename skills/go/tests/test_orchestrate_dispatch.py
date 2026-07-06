@@ -288,35 +288,132 @@ def test_orchestrate_returns_blocked_when_worktree_creation_fails(monkeypatch, t
     assert _ORCHESTRATE.orchestrate(args) == "<promise>BLOCKED</promise>"
 
 
-def test_orchestrate_claude_dispatch_blocks_without_worker(monkeypatch, tmp_path):
-    args = _ORCHESTRATE.parse_args(["--dispatch", "claude", "--prompt", "do work"])
+def _write_claude_active_task(tmp_path, run_id="run-claude", task_type="implementation"):
+    """Minimal active-task fixture for Claude-dispatch tests."""
+    path = tmp_path / f"active-task_{run_id}.json"
+    path.write_text(json.dumps({
+        "run_id": run_id,
+        "task": {
+            "id": f"prompt-{run_id}",
+            "title": "claude task",
+            "objective": "do claude work",
+            "task_type": task_type,
+            "scope_in": ["src/a.py"],
+            "forbidden_files": ["secrets.env"],
+            "acceptance_criteria": ["it works"],
+            "verification_commands": ["pytest -q"],
+        },
+    }), encoding="utf-8")
+    return path
 
+
+def test_dispatch_claude_writes_request_artifact_and_markers(monkeypatch, tmp_path):
+    monkeypatch.delenv("GO_DISABLE_CLAUDE_TASK_SUBAGENT", raising=False)
+    _write_claude_active_task(tmp_path)
+
+    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude") is True
+
+    req = json.loads((tmp_path / "claude-task-request_run-claude.json").read_text(encoding="utf-8"))
+    assert req["run_id"] == "run-claude"
+    assert req["model"] == "sonnet"  # default execution_tier (no proposal) -> full_go -> sonnet
+    assert req["subagent_type"] == "general-purpose"
+    assert "Edit" in req["tools"] and "Read" in req["tools"]
+    assert "claude task" in req["prompt"]
+    assert req["scope_in"] == ["src/a.py"]
+    assert req["forbidden_files"] == ["secrets.env"]
+
+    dr = json.loads((tmp_path / "dispatch-result_run-claude.json").read_text(encoding="utf-8"))
+    assert dr["status"] == "spawn-pending"
+    assert (tmp_path / ".dispatched_run-claude").exists()
+    assert (tmp_path / ".delegation-worker_run-claude").exists()
+    assert not (tmp_path / ".blocked_run-claude").exists()
+
+
+def test_dispatch_claude_design_task_pins_opus(monkeypatch, tmp_path):
+    monkeypatch.delenv("GO_DISABLE_CLAUDE_TASK_SUBAGENT", raising=False)
+    _write_claude_active_task(tmp_path, task_type="design")
+
+    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude") is True
+
+    req = json.loads((tmp_path / "claude-task-request_run-claude.json").read_text(encoding="utf-8"))
+    assert req["model"] == "opus"
+    assert req["task_type"] == "design"
+
+
+def test_dispatch_claude_opt_out_writes_blocked(monkeypatch, tmp_path):
+    monkeypatch.setenv("GO_DISABLE_CLAUDE_TASK_SUBAGENT", "1")
+    _write_claude_active_task(tmp_path)
+
+    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude") is False
+
+    blocked = json.loads((tmp_path / "blocked_run-claude.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "claude_subagent_disabled"
+    assert blocked["run_id"] == "run-claude"
+    assert (tmp_path / ".blocked_run-claude").exists()
+    assert not (tmp_path / "claude-task-request_run-claude.json").exists()
+
+
+def test_dispatch_claude_missing_active_task_writes_blocked(monkeypatch, tmp_path):
+    monkeypatch.delenv("GO_DISABLE_CLAUDE_TASK_SUBAGENT", raising=False)
+    # No active-task fixture written.
+    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude") is False
+
+    blocked = json.loads((tmp_path / "blocked_run-claude.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "missing_active_task"
+    assert (tmp_path / ".blocked_run-claude").exists()
+
+
+def test_claude_tier_map_pins():
+    # trivial -> haiku, surgical -> sonnet, design -> opus
+    assert _ORCHESTRATE.claude_tier_model("direct_answer") == "haiku"
+    assert _ORCHESTRATE.claude_tier_model("local_surgical") == "sonnet"
+    assert _ORCHESTRATE.claude_tier_model("local_rigorous") == "sonnet"
+    assert _ORCHESTRATE.claude_tier_model("full_go") == "sonnet"
+    assert _ORCHESTRATE.claude_tier_model("pause_for_authorization") == "opus"
+    assert _ORCHESTRATE.claude_tier_model("full_go", "design") == "opus"
+    assert _ORCHESTRATE.claude_tier_model("unknown_tier") == "sonnet"  # safe default
+
+
+def test_orchestrate_claude_dispatch_emits_spawn_token(monkeypatch, tmp_path):
+    """Full orchestlate() with --dispatch claude returns SPAWN_CLAUDE_SUBAGENT,
+    writes the request artifact, and does NOT create a worktree or run the tail."""
+    args = _ORCHESTRATE.parse_args(["--dispatch", "claude", "--prompt", "do work"])
     monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
     monkeypatch.setenv("RUN_ID", "run-claude")
+    monkeypatch.delenv("GO_DISABLE_CLAUDE_TASK_SUBAGENT", raising=False)
 
-    def fail_worktree(dispatch, state_dir, run_id):
-        raise AssertionError("unsupported claude dispatch must not create a worktree")
+    def forbid(*_a, **_k):
+        raise AssertionError("claude phase-1 must not create a worktree or run the tail")
+    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", forbid)
+    monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", forbid)
 
-    monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)
+    token = _ORCHESTRATE.orchestrate(args)
+    assert token == "<promise>SPAWN_CLAUDE_SUBAGENT</promise>"
+    assert (tmp_path / "claude-task-request_run-claude.json").exists()
+    assert (tmp_path / ".dispatched_run-claude").exists()
 
+
+def test_claude_resume_runs_common_tail_on_cwd(monkeypatch, tmp_path):
+    """--claude-resume phase 2: requires claude-task-result, runs common tail."""
+    monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
+    monkeypatch.setenv("TERMINAL_ID", "tid-resume")
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", "tid-resume")
+
+    # Missing result -> blocked.
+    args = _ORCHESTRATE.parse_args(["--claude-resume", "run-claude"])
     assert _ORCHESTRATE.orchestrate(args) == "<promise>BLOCKED</promise>"
+    blocked = json.loads((tmp_path / "blocked_run-claude.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "missing_claude_task_result"
 
-    result = json.loads((tmp_path / "dispatch-result_run-claude.json").read_text(encoding="utf-8"))
-    assert result["dispatch"] == "claude"
-    assert result["status"] == "unsupported-automated-dispatch"
-    assert not (tmp_path / ".dispatched_run-claude").exists()
-
-
-def test_dispatch_claude_writes_blocked_contract(tmp_path):
-    assert _ORCHESTRATE.dispatch_claude(tmp_path, "run-claude-helper") is False
-
-    result = json.loads((tmp_path / "dispatch-result_run-claude-helper.json").read_text(encoding="utf-8"))
-    assert result == {
-        "dispatch": "claude",
-        "status": "unsupported-automated-dispatch",
-        "reason": "Claude dispatch has no non-interactive worker implementation in this orchestrator.",
-    }
-    assert (tmp_path / ".blocked_run-claude-helper").exists()
+    # Write the result -> tail runs -> pr_ready.
+    (tmp_path / "claude-task-result_run-claude.json").write_text(
+        json.dumps({"run_id": "run-claude", "status": "ok", "summary": "done"}), encoding="utf-8"
+    )
+    monkeypatch.setattr(_ORCHESTRATE, "run_common_tail", lambda cwd, sd, rid: True)
+    args2 = _ORCHESTRATE.parse_args(["--claude-resume", "run-claude"])
+    assert _ORCHESTRATE.orchestrate(args2) == "<promise>PR_READY</promise>"
+    assert (tmp_path / ".coded_run-claude").exists()
+    assert (tmp_path / ".delegation-advisory_run-claude").exists()
 
 
 def test_orchestrate_local_dispatch_skips_worktree_and_worker(monkeypatch, tmp_path):
