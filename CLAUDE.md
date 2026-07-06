@@ -2,7 +2,7 @@
 
 SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (38)
+## Skills (39)
 
 | Skill | Purpose |
 |-------|---------|
@@ -30,7 +30,10 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | prd | PRD — Product Requirements Document |
 | pre-mortem | Critique — Adaptive Adversarial Review |
 | profile | /profile - Performance Baseline & Comparison |
-| review-pr | PR Review — Multi-agent PR review (absorbed from pr-review-toolkit) |
+| review | /review — Unified code & PR review (modes: pr/diff/file/tests/errors/types/simplify/critical/multi/full) |
+| review-pr | *DEPRECATED stub → /review* (pr mode) |
+| sqd | *DEPRECATED stub → /review multi* (multi-LLM adversarial dispatch) |
+| uci | *DEPRECATED stub → /review full* (Unified Code Inspection engine) |
 | qmd-wiki | qmd-wiki |
 | rca | Debug RCA Skill — Root cause analysis with Iron Law |
 | review_bundle | Review Bundle Creation |
