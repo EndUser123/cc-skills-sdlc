@@ -6,7 +6,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 
 | Skill | Purpose |
 |-------|---------|
-| av | Skill Improvement Tool |
+| av | *DEPRECATED stub → /skill-audit generate-hooks* (skill-type classification + hook-template library; engine retained at `references/`) |
 | cfg | /cfg - Control Flow Graph Visualization |
 | chat-to-decisions | God-Tier Chat-to-Decisions v12 |
 | code | /code -- Adaptive Feature Development (Task Engine under /go + Mission Control standalone) |
