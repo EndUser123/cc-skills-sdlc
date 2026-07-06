@@ -289,6 +289,89 @@
         },
         "pr_ready": {
           "type": "string"
+        },
+        "capability_audit": {
+          "type": "string"
+        }
+      }
+    },
+    "capability_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional capability-claim audit block. Present when the task involved command consolidation, deprecation, absorption, routing, or cleanup.",
+      "properties": {
+        "audit_passed": {
+          "type": "boolean",
+          "description": "True only when every non-deferred claim is verified against real implementation paths."
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command", "classification", "status"],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "classification": {
+                "type": "string",
+                "enum": [
+                  "true_stub",
+                  "deprecation_header_on_retained_engine",
+                  "retained_engine",
+                  "routed_to_parent",
+                  "pending_backend",
+                  "deleted",
+                  "unknown"
+                ]
+              },
+              "source_path": {
+                "type": "string"
+              },
+              "parent_path": {
+                "type": "string"
+              },
+              "routing_mechanism": {
+                "type": "string"
+              },
+              "backend_path": {
+                "type": "string"
+              },
+              "backend_exists": {
+                "type": "boolean",
+                "description": "Whether the backend runner/module/function path resolves to a real file."
+              },
+              "status": {
+                "type": "string",
+                "enum": ["verified", "overclaim", "deferred", "not_checked"]
+              },
+              "evidence": {
+                "type": "string",
+                "description": "Human-readable evidence for the classification."
+              }
+            }
+          },
+          "default": []
+        },
+        "visible_surface_complete": {
+          "type": "boolean",
+          "description": "Whether the visible command surface reduction is verified."
+        },
+        "routing_complete": {
+          "type": "boolean",
+          "description": "Whether routing to parent/backend is verified."
+        },
+        "backend_implemented": {
+          "type": "boolean",
+          "description": "Whether the backend runner/module/function exists and is live."
+        },
+        "deferred_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Capabilities intentionally deferred — allowed only when explicitly marked pending."
         }
       }
     }

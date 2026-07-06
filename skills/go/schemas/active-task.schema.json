@@ -170,6 +170,59 @@
         "output": {
           "type": "string",
           "description": "What to surface when done — summary of changes, test results, or specific artifacts to report."
+        },
+        "capability_audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Present when the task involves command consolidation, deprecation, absorption, routing, or cleanup. Triggers the capability-claim audit during verification.",
+          "properties": {
+            "required": {
+              "type": "boolean",
+              "default": true
+            },
+            "trigger_terms": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Which trigger terms matched in the task prompt."
+            },
+            "claims": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["command", "claimed_status"],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Name or path of the command/mode being claimed about."
+                  },
+                  "claimed_status": {
+                    "type": "string",
+                    "enum": ["absorbed", "shipped", "production", "stub", "deleted", "routed", "pending", "unknown"],
+                    "description": "What the task prompt claims about this command."
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "description": "Path to the source command file."
+                  },
+                  "parent_path": {
+                    "type": "string",
+                    "description": "Path to the parent command/mode that absorbed this one."
+                  },
+                  "routing_mechanism": {
+                    "type": "string",
+                    "description": "How routing works (e.g. router.py, settings.json, hook dispatch)."
+                  },
+                  "backend_path": {
+                    "type": "string",
+                    "description": "Path to the backend runner/module/function that implements the capability."
+                  }
+                }
+              },
+              "default": []
+            }
+          }
         }
       }
     }
