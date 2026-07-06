@@ -2,7 +2,7 @@
 
 SDLC skills for Claude Code — architecture, planning, code quality, testing, review, and documentation.
 
-## Skills (43)
+## Skills (38)
 
 | Skill | Purpose |
 |-------|---------|
@@ -11,9 +11,6 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | chat-to-decisions | God-Tier Chat-to-Decisions v12 |
 | code | /code -- Adaptive Feature Development (Task Engine under /go + Mission Control standalone) |
 | code-flow-visualizer | Code Flow Visualizer |
-| code-review | Code Review — Automated Multi-Agent Review |
-| code-reviewer-business-logic | Business Logic Reviewer (Correctness) |
-| critical-code-reviewer | Mindset |
 | deliberate-changes | Deliberate Changes Management |
 | deps | /deps - Dependency Management |
 | design | Architecture Advisor with ADR Phase Gates |
@@ -33,9 +30,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | prd | PRD — Product Requirements Document |
 | pre-mortem | Critique — Adaptive Adversarial Review |
 | profile | /profile - Performance Baseline & Comparison |
-| prrp | Production-Ready Review Prompt (PRRP) |
 | review-pr | PR Review — Multi-agent PR review (absorbed from pr-review-toolkit) |
-| python-backend-reviewer | Python Backend Code Reviewer |
 | qmd-wiki | qmd-wiki |
 | rca | Debug RCA Skill — Root cause analysis with Iron Law |
 | review_bundle | Review Bundle Creation |
