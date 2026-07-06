@@ -1268,20 +1268,21 @@ def classify_capability(command_claim: dict) -> str:
     content_lower = content.lower()
 
     stub_signals = ("pass through", "pass-through", "no-op", "noop",
-                    "raise deprecation", "warnings.warn", "deprecated")
+                    "raise deprecation")
     has_stub_header = any(s in content_lower for s in stub_signals)
 
     has_deprecation = ("deprecat" in content_lower or "deprecated" in content_lower)
     has_real_logic = (
-        len(content) > 500
+        len(content) > 100
         and ("def " in content or "class " in content or "async def" in content)
         and not has_stub_header
     )
 
-    if has_stub_header and not has_real_logic:
-        return "true_stub"
+    # Deprecation on retained engine: has deprecation warning AND real logic
     if has_deprecation and has_real_logic:
         return "deprecation_header_on_retained_engine"
+    if has_stub_header and not has_real_logic:
+        return "true_stub"
     if has_real_logic:
         return "retained_engine"
 
