@@ -124,11 +124,8 @@ class TestClassificationSchema:
         stub_file = tmp_path / "stub_cmd.py"
         stub_file.write_text(
             '#!/usr/bin/env python3\n'
-            '"""Deprecated command."""\n'
-            'import warnings\n'
-            'warnings.warn("Use /new instead", DeprecationWarning)\n'
-            'def main():\n'
-            '    pass\n'
+            '"""Deprecated command - pass through only."""\n'
+            'print("Use /new instead")\n'
         )
         result = classify_capability({
             "source_path": str(stub_file),
