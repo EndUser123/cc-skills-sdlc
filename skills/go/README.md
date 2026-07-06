@@ -16,7 +16,7 @@ Worktree Check → Task Selection → Classify → Dispatch → Verify → Simpl
 |------|----------|
 | `pi` | External pi harness via `pi -p --mode json --model <resolved>` |
 | `local` | No worker; runs verification/review/artifact gates against current checkout |
-| `claude` | Blocked with `unsupported-automated-dispatch` |
+| `claude` | Native Claude Code subagent (two-phase: request artifact → in-session `Agent(...)` spawn → `--claude-resume` tail) |
 
 ## Required Environment
 

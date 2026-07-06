@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.10.0
+version: 2.11.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -118,6 +118,7 @@ When dispatch is `pi`, the classifier output is resolved through `scripts/adapte
 - `<promise>MORE_TASKS_IN_PLAN</promise>` — current task done, more remain
 - `<promise>ALL_TASKS_COMPLETE</promise>` — no eligible tasks remain
 - `<promise>PAUSED_FOR_APPROVAL</promise>` — run paused at a plan-declared gate: the only remaining tasks are `requires_approval: true` and not yet `approved`. Resume by flipping a gated task's `status` to `approved` and re-running `/go`.
+- `<promise>SPAWN_CLAUDE_SUBAGENT</promise>` — `--dispatch claude` phase 1 complete: `claude-task-request_{RUN_ID}.json` written. The main-loop Claude must spawn the in-session `Agent(...)` call with the request's `model`/`tools`/`prompt`/`subagent_type`, write `claude-task-result_{RUN_ID}.json`, then re-invoke the orchestrator with `--claude-resume <RUN_ID>` for phase 2 (verify/review/artifact tail).
 
 ---
 
@@ -278,9 +279,51 @@ git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 |----------|----------|
 | `pi` | Create `P:/worktrees/pi-task-*`, resolve model, run `pi -p --mode json --model <resolved>` |
 | `local` | Use current checkout as the worktree for verification/review/artifact gates |
-| `claude` | Write `dispatch-result_{RUN_ID}.json` with `unsupported-automated-dispatch`, then block |
+| `claude` | Phase 1: write `claude-task-request_{RUN_ID}.json` (tier-resolved model, scrubbed prompt, tools, scope) and return `<promise>SPAWN_CLAUDE_SUBAGENT</promise>`. Phase 2 (below): main-loop Claude spawns `Agent(...)`, then `--claude-resume` runs the tail. |
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
+
+### Claude native-subagent dispatch (two-phase)
+
+`/go` runs as a Bash-invoked Python script and cannot call the in-session
+`Agent(...)` tool itself, so Claude dispatch is split into two phases around
+the spawn:
+
+**Phase 1 — request write (orchestrator):** `dispatch_claude()` reads
+`active-task` + `task-proposal`, resolves the tier model
+(`direct_answer`→haiku, `local_surgical`/`local_rigorous`/`full_go`→sonnet,
+`pause_for_authorization` or `task_type=design`→opus; advisory), scrubs the
+assembled prompt, and writes `claude-task-request_{RUN_ID}.json`:
+
+```json
+{"run_id":"...", "model":"sonnet", "subagent_type":"general-purpose",
+ "tools":["Read","Grep","Glob","Edit","Write","Bash"], "prompt":"...",
+ "scope_in":[...], "forbidden_files":[...], "execution_tier":"...", "task_type":"..."}
+```
+
+It emits `.dispatched_{RUN_ID}` + `.delegation-worker_{RUN_ID}` (the PreToolUse
+gate activates worker-scope enforcement), then returns
+`<promise>SPAWN_CLAUDE_SUBAGENT</promise>`. Opt out with
+`GO_DISABLE_CLAUDE_TASK_SUBAGENT=1` (writes `blocked_{RUN_ID}.json`).
+
+**Phase 2 — spawn + resume (main-loop Claude):** when the orchestrator emits
+`SPAWN_CLAUDE_SUBAGENT`, the main-loop Claude:
+
+1. Reads `$GO_STATE_DIR/claude-task-request_$RUN_ID.json`.
+2. Invokes the in-session `Agent(...)` tool with `subagent_type`, `model`,
+   `tools`, and `prompt` from the request. Worker mutation scope is enforced
+   by the `go_delegation_enforce_PreToolUse` gate (TASK-001.4) and the
+   `tools:` allowlist (hard enforcement — memory #1120).
+3. Writes `claude-task-result_$RUN_ID.json` (`{run_id, status, summary, ts}`).
+4. Re-invokes the orchestrator:
+   ```bash
+   GO_RUN_ID="$RUN_ID" python ".claude/skills/go/scripts/orchestrate.py" --claude-resume "$RUN_ID"
+   ```
+   This runs the common tail (verify → simplify → 7-pass → QA → artifacts) on
+   the current checkout — no worktree, the subagent worked in-place.
+
+The tier map is advisory; the PreToolUse gate is the load-bearing mutation
+control regardless of which model the subagent runs on.
 
 PI dispatch is headless and artifact-first:
 
