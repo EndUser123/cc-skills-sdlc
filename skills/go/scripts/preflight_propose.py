@@ -1171,6 +1171,131 @@ def detect_risk_signals(rewritten: str) -> dict:
     }
 
 
+# --- Capability-claim audit (consolidation/deprecation/routing tasks) ----------
+
+def detect_capability_claims(rewritten: str) -> list[dict]:
+    """Detect capability claims in the prompt for consolidation/deprecation tasks.
+
+    Returns a list of claim dicts, each with 'command' and 'claimed_status'.
+    Empty list means no capability-claim audit is needed.
+    """
+    low = rewritten.lower()
+    matched_triggers = [t for t in _CAPABILITY_AUDIT_TRIGGER_TERMS if t in low]
+    if not matched_triggers:
+        return []
+
+    # Extract command-like names from the prompt (quoted, slash-prefixed, or named)
+    claims = []
+    quoted = re.findall(r'[`"\']([/]?[\w-]+(?:\s[\w-]+)?)[`"\']', rewritten)
+    slash_cmds = re.findall(r'/[\w-]+', rewritten)
+    named = re.findall(r'\b(\w+(?:\s+\w+)?)\s+(?:command|skill|plugin|mode)\b', rewritten)
+
+    seen = set()
+    for name in quoted + slash_cmds + named:
+        name_clean = name.strip().lower()
+        if name_clean and name_clean not in seen and len(name_clean) > 1:
+            seen.add(name_clean)
+            claimed_status = _infer_claimed_status(rewritten, name)
+            claims.append({
+                "command": name,
+                "claimed_status": claimed_status,
+            })
+
+    if not claims:
+        claims.append({
+            "command": "(task-level consolidation)",
+            "claimed_status": "unknown",
+        })
+
+    return [{"trigger_terms": matched_triggers, "claims": claims}]
+
+
+def _infer_claimed_status(rewritten: str, command_name: str) -> str:
+    """Infer the claimed status of a command from surrounding context."""
+    low = rewritten.lower()
+    name_low = command_name.lower()
+
+    sentences = re.split(r'[.!?\n]', low)
+    context = ""
+    for s in sentences:
+        if name_low in s:
+            context = s
+            break
+
+    if not context:
+        return "unknown"
+
+    if any(w in context for w in ("absorb", "absorbed", "merge into", "moved to")):
+        return "absorbed"
+    if any(w in context for w in ("shipped", "production", "live", "deployed")):
+        return "shipped"
+    if any(w in context for w in ("stub", "stubs", "no-op", "pass-through")):
+        return "stub"
+    if any(w in context for w in ("delet", "remov", "gone")):
+        return "deleted"
+    if any(w in context for w in ("rout", "delegat", "forward")):
+        return "routed"
+    if any(w in context for w in ("pending", "not yet", "unbuilt", "todo")):
+        return "pending"
+
+    return "unknown"
+
+
+def classify_capability(command_claim: dict) -> str:
+    """Classify a capability claim based on source inspection.
+
+    Returns one of: true_stub, deprecation_header_on_retained_engine,
+    retained_engine, routed_to_parent, pending_backend, deleted, unknown.
+    """
+    source_path = command_claim.get("source_path")
+    backend_path = command_claim.get("backend_path")
+    claimed = command_claim.get("claimed_status", "unknown")
+
+    if not source_path:
+        return "unknown"
+
+    source = Path(source_path)
+    if not source.exists():
+        if claimed in ("absorbed", "routed"):
+            return "routed_to_parent"
+        return "deleted"
+
+    try:
+        content = source.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return "unknown"
+
+    content_lower = content.lower()
+
+    stub_signals = ("pass through", "pass-through", "no-op", "noop",
+                    "raise deprecation", "warnings.warn", "deprecated")
+    has_stub_header = any(s in content_lower for s in stub_signals)
+
+    has_deprecation = ("deprecat" in content_lower or "deprecated" in content_lower)
+    has_real_logic = (
+        len(content) > 500
+        and ("def " in content or "class " in content or "async def" in content)
+        and not has_stub_header
+    )
+
+    if has_stub_header and not has_real_logic:
+        return "true_stub"
+    if has_deprecation and has_real_logic:
+        return "deprecation_header_on_retained_engine"
+    if has_real_logic:
+        return "retained_engine"
+
+    if any(r in content_lower for r in ("parent", "forward to", "delegate to", "route to")):
+        return "routed_to_parent"
+
+    if backend_path:
+        bp = Path(backend_path)
+        if not bp.exists():
+            return "pending_backend"
+
+    return "unknown"
+
+
 def derive_execution_tier(task_intent, dispatch, local_eligible, requires_approval, risk) -> str:
     """Pick the minimum sufficient ceremony.
 
@@ -1258,7 +1383,8 @@ def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
 
 
 def derive_report_gate(task_intent, execution_tier, closure_check=None,
-                       operational_discovery=None, discovery_evidence=None) -> dict:
+                       operational_discovery=None, discovery_evidence=None,
+                       capability_claims=None) -> dict:
     """Completion-claim eligibility (goal reqs. 4, 8, 9).
 
     investigate/validate/decide never enable implementation-completion claims.
@@ -1293,6 +1419,12 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
     de_passes = _discovery_evidence_passes(discovery_evidence)
     discovery_incomplete = od_required and not de_passes
     allow_recommendation_as_verified = not discovery_incomplete
+
+    # Capability-claim audit: blocks "shipped"/"absorbed"/"production" wording
+    # when audit is required but not passed.
+    cap_claims = capability_claims or []
+    cap_audit_required = bool(cap_claims)
+
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,
@@ -1305,6 +1437,8 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
         "discovery_evidence_passes": de_passes if od_required else True,
         "discovery_incomplete": discovery_incomplete,
         "allow_recommendation_as_verified": allow_recommendation_as_verified,
+        "capability_claim_audit_required": cap_audit_required,
+        "capability_claim_audit_passed": False,  # worker fills after audit
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim. "
@@ -1315,6 +1449,12 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
                "with provenance (verified|inference|assumption); until then discovery_incomplete "
                "and the recommendation is advisory, NOT verified. "
                if od_required else "")
+            + ("capability_claim_audit_required: visible-surface check alone is insufficient. "
+               "Must verify backend runner/module/function paths exist before claiming "
+               "'shipped'/'absorbed'/'production'. Reports must distinguish: visible "
+               "consolidation complete | routing complete | backend implementation complete | "
+               "pending capability intentionally deferred. "
+               if cap_audit_required else "")
         ),
     }
 
@@ -1895,6 +2035,7 @@ def generate_proposal(
     dispatch, local_eligible, requires_approval = classify_dispatch(rewritten)
     task_intent = classify_intent(rewritten)
     risk = detect_risk_signals(rewritten)
+    capability_claims_raw = detect_capability_claims(rewritten)
     execution_tier = derive_execution_tier(
         task_intent, dispatch, local_eligible, requires_approval, risk
     )
