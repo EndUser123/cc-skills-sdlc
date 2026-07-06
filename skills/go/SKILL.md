@@ -367,7 +367,7 @@ go_next_task:
 |------------|------|----------|
 | Exactly 1 | 0 | Bind: write `active-task_{RUN_ID}.json` (`source: "plan-handoff"`) with a `plan_binding` block pointing at the source plan. Freshest plan (by mtime) wins. |
 | >1 | 2 | Pause: write `.paused_{RUN_ID}` listing candidates; the run stops — disambiguate by passing `GO_PLAN_FILE`. |
-| 0 | 3 | Fall through to STEP 0.5 (transcript synthesis) → `GO_TASKS_FILE` queue. |
+| 0 | 3 | Fall through to `select-task.py` (`GO_TASKS_FILE` queue). STEP 0.5 transcript synthesis does not run on the bare-invocation path — it is reached only when `GO_PROMPT`/transcript input is present. |
 
 The resolver carries only what is needed to **identify and start** the task
 (`task_id`, `title`, `objective`, `verification_commands`). The full task
