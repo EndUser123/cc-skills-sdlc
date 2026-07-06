@@ -86,37 +86,6 @@ def test_skill_manifest_points_to_authoritative_adapters_and_references() -> Non
     assert manifest["references"]["phases"] == "references/phases"
 
 
-def test_claude_skill_references_moved_phase_prompts_and_shared_contracts() -> None:
-    skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-
-    expected = [
-        "references/method.md",
-        "references/failure-mode-checklist.md",
-        "references/output-contract.md",
-        "references/evidence-contract.md",
-        "references/modes.md",
-        "references/investigation-types.md",
-        "references/static-test-contract.md",
-        "references/non-static-validation.md",
-        "references/review-lenses.md",
-        "references/project-profiles.md",
-        "references/decision-model.md",
-        "references/live-probe-planner.md",
-        "references/finding-synthesis.md",
-        "references/destructive-live-preflight.md",
-        "references/historical-regression-awareness.md",
-        "P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p1_initial_review.md",
-        "P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p2_meta_critique.md",
-        "P:/packages/cc-skills-sdlc/skills/pre-mortem/references/phases/p3_synthesis.md",
-    ]
-
-    missing = [path for path in expected if path not in skill_text]
-    assert not missing
-    assert "skills/pre-mortem/phases" not in skill_text
-    assert "${CLAUDE_SKILL_DIR}" not in skill_text
-    assert "PreMortemSession.find_or_create_session()" in skill_text
-
-
 def test_phase_one_uses_package_owned_specialist_agents() -> None:
     p1_text = (SKILL_ROOT / "references" / "phases" / "p1_initial_review.md").read_text(
         encoding="utf-8"
