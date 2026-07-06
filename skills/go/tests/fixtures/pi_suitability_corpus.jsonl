@@ -1,0 +1,29 @@
+{"prompt": "/go implement the priorities", "label": "neutral", "source": "transcript", "rationale": "vague; depends on unstated plan context — neither pi-bound nor claude-bound until bound to a plan"}
+{"prompt": "/go is optimal", "label": "claude", "source": "transcript", "rationale": "meta-question about /go itself; judgment, not code-editing"}
+{"prompt": "/go investigate X", "label": "claude", "source": "transcript", "rationale": "investigate intent — read-only reasoning, pi is a coding worker"}
+{"prompt": "/go do recommended next steps", "label": "neutral", "source": "transcript", "rationale": "plan-handoff; underlying task unknown"}
+{"prompt": "/go execute phase 1", "label": "neutral", "source": "transcript", "rationale": "plan-handoff pointer; task shape depends on the plan body"}
+{"prompt": "/go the plan", "label": "neutral", "source": "transcript", "rationale": "bare plan-handoff; no task shape until bound"}
+{"prompt": "/go to the plan", "label": "neutral", "source": "transcript", "rationale": "bare plan-handoff"}
+{"prompt": "/go proceed", "label": "neutral", "source": "transcript", "rationale": "bare plan-handoff"}
+{"prompt": "/go STEP 0+1: acquire TASK-002 via queue pointer", "label": "neutral", "source": "transcript", "rationale": "plan-handoff pointer to a queue; task shape unknown"}
+{"prompt": "/go Start implementation — TASK-001 (Stage-0 baseline snapshot)", "label": "pi", "source": "transcript", "rationale": "concrete implementation task with bounded scope (snapshot) and deterministic verification"}
+{"prompt": "/go dispatch routing + per-model task shaping redesign", "label": "claude", "source": "transcript", "rationale": "design/redesign of dispatch logic — architecture decision work, not a bounded code edit"}
+{"prompt": "/go run-continuity across session compaction — resume-binding contract", "label": "claude", "source": "transcript", "rationale": "contract/state design; decide intent, not code-editing"}
+{"prompt": "/go mixed-work status + decision_kind + plain-English report (goal reqs 4-15)", "label": "claude", "source": "transcript", "rationale": "mixed feature work touching classification + report + gate surfaces; needs Claude's orchestration judgment"}
+{"prompt": "/go discovery-first + verification ranking + lifecycle hygiene", "label": "claude", "source": "transcript", "rationale": "orchestration/design work across multiple subsystems"}
+{"prompt": "/go reliability arc Phases 1-5.5 shipped; Phase 6 calibration + #1037 RCA-gap", "label": "neutral", "source": "transcript", "rationale": "status report + multi-task pointer; not a single bounded code edit"}
+{"prompt": "/go is supposed to follow the plan to completion — how can we make /go act the way I want?", "label": "claude", "source": "transcript", "rationale": "decide about /go behavior; strategy question"}
+{"prompt": "/go orchestrator change → CLI smoke + artifact contract test", "label": "pi", "source": "transcript", "rationale": "concrete: add a CLI smoke + contract test; bounded code edit with deterministic verification"}
+{"prompt": "/go C:\\Users\\brsth\\.claude\\plans\\plan-crud-operations-redesign.md", "label": "neutral", "source": "transcript", "rationale": "explicit plan-handoff pointer; task shape lives in the plan body"}
+{"prompt": "/go Task: Implement Phase 0 of the Ponytail Claim Integration. Source of truth: pony_tail_claim_pha", "label": "pi", "source": "transcript", "rationale": "explicit implementation phase with a source-of-truth pointer; bounded code edit"}
+{"prompt": "/go SKILL.md: Step 8 auto-loop + pause rule + PAUSED token", "label": "claude", "source": "transcript", "rationale": "skill/contract design work; decide intent on pause semantics"}
+{"prompt": "fix the pytest collection error in test_orchestrate_dispatch.py", "label": "pi", "source": "canonical", "rationale": "concrete bug fix in a specific test file; deterministic verification (pytest collects clean)"}
+{"prompt": "investigate why the daemon heartbeat is missing", "label": "claude", "source": "canonical", "rationale": "investigate intent — diagnosis, not code-editing"}
+{"prompt": "refactor derive_delegation_policy to emit a worker_scope field", "label": "pi", "source": "canonical", "rationale": "concrete refactor of one function with an additive field; deterministic test"}
+{"prompt": "decide whether to pin Python 3.13 or 3.14 for plugin venvs on Windows", "label": "claude", "source": "canonical", "rationale": "decide intent — technology choice with tradeoffs"}
+{"prompt": "add a regression test for the FMM keyword-gap (keyword: refactor)", "label": "pi", "source": "canonical", "rationale": "concrete test addition; deterministic verification (new test passes)"}
+{"prompt": "audit the hook test suite for failures and classify each", "label": "claude", "source": "canonical", "rationale": "validation/audit — read-only classification, not code-editing"}
+{"prompt": "delete the stale __csf tree and its .nip subdirectories", "label": "claude", "source": "canonical", "rationale": "high-risk shared-state deletion; needs careful handling, not blind pi dispatch"}
+{"prompt": "validate the migration on a snapshot db and report row counts", "label": "claude", "source": "canonical", "rationale": "validate intent — verification/reporting, not code-editing"}
+{"prompt": "wire the new go_delegation_enforce_PreToolUse gate into SKILL.md frontmatter", "label": "claude", "source": "canonical", "rationale": "high-risk: hooks/gates/settings surface; needs careful handling"}
