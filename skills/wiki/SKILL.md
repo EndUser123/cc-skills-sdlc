@@ -269,19 +269,12 @@ Usage: `/wiki ingest` (safe only), `/wiki ingest --all` (safe + large-warn), `/w
   more. Escalate only when the session answer is insufficient AND external
   knowledge is clearly wanted.
 
-**Step 2 — Parallel search (external scope only).**
-1. `search-research --mode quick "<question>"` (QMD_WIKI backend)
-2. `Grep` against known local doc files matching the question domain (see Known Local Docs below)
+**Step 2 — Search (external scope only).**
+1. `search-research --mode quick "<question>"` (QMD_WIKI backend) — primary path
+2. If QMD returns nothing relevant and the question is about hook/skill/agent implementation detail, `Grep` directly under `P:/.claude/hooks/__lib/` or the relevant plugin tree
 → First quality result wins → LLM synthesizes answer
 
-**Known Local Docs**: Grep these in parallel with QMD when the question matches:
-| Pattern | File |
-|||
-| hook, stop, pretool, posttool, userprompt | `P:/.claude/docs/claude-hooks-v3.1.md` |
-| skill, slash command, SKILL.md | `P:/.claude/docs/claude-skills-v3.0.md` |
-| agent, subagent | `P:/.claude/docs/claude-agents-v1.0.md` |
-| claude code, claude-code, settings, permissions | `P:/.claude/docs/claude-code-reference.md` |
-| detection, pattern, marker, matcher, applicability, epistemic, causal, diagnosis, output_patterns | `P:/.claude/hooks/__lib/` (112 .py files — grep for implementation details behind docs) |
+(An earlier "Known Local Docs" table pointing at `P:/.claude/docs/*.md` was removed 2026-07-06 — those files were deleted in a docs/ → staging+wiki migration but the table was never reconciled. QMD indexes the live wiki; do not reintroduce hand-maintained doc-path pointers.)
 
 **Auto-save high-value results**: If the synthesized answer is substantive (non-trivial insight, new connection, resolved ambiguity, or decision-relevant synthesis), save it directly to the wiki without asking. Write to `wiki/concepts/<slug>.md` with YAML frontmatter. Then run the shared auto-link step: `python skills/wiki/scripts/wiki_after_write.py <page-path>` — this is the same post-write call every Ingest subagent makes, so auto-saved pages get the same `## Auto-related` treatment as ingested ones. Only ask the user if the synthesis is uncertain or incomplete.
 
