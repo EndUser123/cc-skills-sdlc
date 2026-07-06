@@ -1,5 +1,6 @@
 ---
 name: uci
+disable-model-invocation: true
 description: "DEPRECATED — use /review full. Unified Code Inspection (14-agent registry, 3-tier verdict)."
 enforcement: advisory
 workflow_steps: []

@@ -1,5 +1,6 @@
 ---
 name: av
+disable-model-invocation: true
 description: "DEPRECATED entry — use /skill-audit generate-hooks. Classifies skill type (EXECUTION/KNOWLEDGE/PROCEDURE) + scores hook need + generates a complete hook package (templates: PostToolUse validator, state manager, PreToolUse gate, PostToolUse transition, + 3 SKILL.md scaffolds)."
 version: "2.0.0"
 status: "stable"

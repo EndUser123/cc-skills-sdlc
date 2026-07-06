@@ -1,5 +1,6 @@
 ---
 name: sqd
+disable-model-invocation: true
 description: "DEPRECATED — use /review multi. Parallel multi-LLM adversarial review dispatcher."
 enforcement: advisory
 workflow_steps: []

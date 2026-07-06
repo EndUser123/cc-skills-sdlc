@@ -1,5 +1,6 @@
 ---
 name: pre-mortem
+disable-model-invocation: true
 description: "DEPRECATED entry — use /red-team pre-mortem. 3-phase adaptive adversarial critique (triage+specialist → meta-critique → synthesis) with Health Score + RNS + blinded consumer-contract review."
 version: "2.1.1"
 status: "stable"

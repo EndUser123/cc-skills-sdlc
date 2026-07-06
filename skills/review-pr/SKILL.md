@@ -1,5 +1,6 @@
 ---
 name: review-pr
+disable-model-invocation: true
 description: "DEPRECATED — use /review (pr mode is the default). Multi-agent PR review."
 enforcement: advisory
 workflow_steps: []
