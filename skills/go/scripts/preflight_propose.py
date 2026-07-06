@@ -107,6 +107,21 @@ _HIGH_RISK_MARKERS: tuple[str, ...] = (
 
 _PROMPT_REVIEW_SUPPORT = "absent"  # no prompt-review artifact gate exists in go/ yet
 
+# --- Capability-claim audit (consolidation/deprecation/routing tasks) ----------
+# Trigger terms that activate the capability-claim audit. When any match,
+# the proposal emits capability_claims and the report gate requires backend
+# verification before "shipped"/"absorbed"/"production" wording.
+_CAPABILITY_AUDIT_TRIGGER_TERMS: tuple[str, ...] = (
+    "consolidat", "deprecat", "absorb", "rout", "stub", "cleanup",
+    "command cleanup", "skill cleanup", "plugin cleanup", "mode migration",
+    "visible surface", "command migration", "merge command", "replace command",
+    "decommission", "sunset", "retire",
+)
+# Claimed statuses that require backend verification (not just visible-surface).
+_CAPABILITY_AUDIT_VERIFIED_CLAIMS: frozenset[str] = frozenset({
+    "absorbed", "shipped", "production",
+})
+
 # --- Delegation policy (lightweight role/authority/freshness) ----------------
 # /go can delegate to claude_main, claude_subagent, local_fast, agy, pi_ccr.
 # This policy assigns bounded roles without a new multi-agent orchestrator.
