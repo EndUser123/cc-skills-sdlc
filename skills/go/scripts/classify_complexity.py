@@ -45,6 +45,54 @@ TASK_TYPE_WEIGHT: dict[str, int] = {
     "planning": 3,
 }
 
+# TASK-004: pi-default-flip gate. When "advisory", the dispatcher logs the
+# model_affinity recommendation but routes per existing rules. Flipping to
+# "default_pi" is gated on test_pi_suitability_corpus.py passing
+# precision >= 0.7 AND recall >= 0.6 over the >= 20-prompt corpus. Do NOT
+# flip without re-running the corpus test.
+PI_DEFAULT_FLIP = "advisory"
+
+# pi has prompt-size transport limits (#914); above this the pi path is a
+# poor fit regardless of intent. Conservative ceiling; adjust with evidence.
+_PI_PROMPT_MAX_CHARS = 8000
+
+
+def classify_model_affinity(
+    task_intent: str,
+    execution_tier: str,
+    high_risk: bool,
+    prompt_length: int,
+) -> str:
+    """Rule-based pi-suitability recommendation. Advisory-only.
+
+    Returns ``"pi" | "claude" | "neutral"``. ``"neutral"`` is the documented
+    absent-value default — consumers MUST treat a missing field as neutral
+    and route per existing rules.
+
+    Rooted in /go's own intent/risk semantics (independent of execution_tier,
+    which is downstream of dispatch and would couple the recommendation to the
+    very routing it advises on):
+      - direct_answer / pause_for_authorization -> claude (no worker, or
+        director-judgment boundary; pi cannot mediate authorization).
+      - decide / investigate / validate intents -> claude (need Claude's
+        judgment or are read-only; pi is a coding worker, not a strategist).
+      - high_risk surface (hooks/gates/settings/state) -> claude.
+      - prompt longer than _PI_PROMPT_MAX_CHARS -> claude (#914 transport).
+      - implement intent (concrete code-editing work) -> pi.
+      - everything else (planning, ambiguous plan-handoff) -> neutral.
+    """
+    if execution_tier in ("direct_answer", "pause_for_authorization"):
+        return "claude"
+    if task_intent in ("decide", "investigate", "validate"):
+        return "claude"
+    if high_risk:
+        return "claude"
+    if prompt_length > _PI_PROMPT_MAX_CHARS:
+        return "claude"
+    if task_intent == "implement":
+        return "pi"
+    return "neutral"
+
 
 def _bucket(value: int, thresholds: list[int]) -> int:
     """Map value to 1/2/3 using [low_max, mid_max] thresholds."""

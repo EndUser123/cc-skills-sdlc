@@ -27,6 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from classify_complexity import classify_model_affinity
+
 # Heuristic markers — conservative. False-positives acceptable (telemetry-style
 # probe per the agentic-reliability rollout discipline; never blocks dispatch).
 _BROAD_MARKERS = (
@@ -1898,12 +1900,18 @@ def generate_proposal(
     )
     decision_kind = classify_decision_kind(rewritten, task_intent, execution_tier, risk)
     prompt_review_required = bool(risk["prompt_review_required"])
+    high_risk = bool(risk.get("high_risk"))
+    model_affinity = classify_model_affinity(
+        task_intent, execution_tier, high_risk, len(prompt)
+    )
     notes = [
         "Deterministic heuristic (no LLM). dispatch="
         f"{dispatch} localEligible={local_eligible}",
         f"task_intent={task_intent} execution_tier={execution_tier} "
         f"prompt_review_required={prompt_review_required}",
         f"mixed_work_status={mixed_work_status} decision_kind={decision_kind}",
+        f"model_affinity={model_affinity} (advisory; PI_DEFAULT_FLIP=advisory — "
+        "route per existing rules, do not auto-flip dispatch)",
     ]
     if execution_tier == "pause_for_authorization":
         notes.append(
@@ -1942,6 +1950,7 @@ def generate_proposal(
         "task_intent": task_intent,
         "execution_tier": execution_tier,
         "risk_signals": risk,
+        "model_affinity": model_affinity,
         "prompt_review_required": prompt_review_required,
         "prompt_review_support": _PROMPT_REVIEW_SUPPORT,
         "report_gate": report_gate,
