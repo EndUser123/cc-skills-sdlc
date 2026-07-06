@@ -815,6 +815,51 @@ Script logic:
 
 ---
 
+## STEP 6.6: Capability-Claim Audit (Consolidation/Deprecation/Routing Tasks)
+
+For tasks involving command consolidation, deprecation, absorption, routing, or cleanup, verify capability claims against real implementation paths before allowing "shipped"/"absorbed"/"production" wording.
+
+**Trigger:** `task.capability_audit` present in the active task (auto-detected by preflight from trigger terms: consolidation, deprecation, absorption, routing, stubs, cleanup, migration, visible surface, decommission, sunset, retire).
+
+```bash
+python ".claude/skills/go/scripts/capability_claim_audit.py" "$GO_STATE_DIR" "$RUN_ID"
+STATUS=$?
+if [ "$STATUS" -ne 0 ]; then
+  echo "CAPABILITY AUDIT FAILED: overclaim(s) detected"
+  touch "$GO_STATE_DIR/.blocked_$RUN_ID"
+  echo "<promise>BLOCKED</promise>"
+  exit 1
+fi
+touch "$GO_STATE_DIR/.capability-audit-passed_$RUN_ID"
+```
+
+**Classification schema** (per command/mode):
+
+| Classification | Meaning |
+|----------------|---------|
+| `true_stub` | Command body replaced with pass-through/no-op |
+| `deprecation_header_on_retained_engine` | Has deprecation warning but still runs real logic |
+| `retained_engine` | Full implementation still present, not stubbed |
+| `routed_to_parent` | Delegates to parent command/mode |
+| `pending_backend` | Routing exists but backend runner/module missing |
+| `deleted` | Command removed entirely |
+| `unknown` | Cannot determine from source inspection |
+
+**Report-gate behavior:**
+- Visible-surface verification alone is insufficient when capability migration is claimed
+- Reports must distinguish: visible consolidation complete | routing complete | backend implementation complete | pending capability intentionally deferred
+- "shipped"/"absorbed"/"production" wording blocked when `capability_audit.audit_passed: false`
+
+**Confirm-closed for consolidation** must include:
+- Visible command surface check
+- Model auto-invocation surface check (where relevant)
+- Routed capability backend check
+- Stale docs/language check
+
+**Artifacts:** `capability-audit-{RUN_ID}.json` with per-claim evidence, classification, and overall audit verdict. Ingested into `verification-result.capability_audit`.
+
+---
+
 ## STEP 7: Local PR Artifacts
 
 Generate commit message, PR title, PR body, PR-ready report.
