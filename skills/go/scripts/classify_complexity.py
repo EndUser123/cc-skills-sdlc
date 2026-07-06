@@ -93,6 +93,7 @@ def classify_model_affinity(
     execution_tier: str,
     high_risk: bool,
     prompt_length: int,
+    prompt: str = "",
 ) -> str:
     """Rule-based pi-suitability recommendation. Advisory-only.
 
