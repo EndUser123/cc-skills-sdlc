@@ -1,6 +1,6 @@
 ---
 name: go
-version: 2.11.0
+version: 2.12.0
 description: Use when a user asks to run /go, execute the next planned task, process a tasks.json queue, or drive a bounded SDLC task through enforced evidence gates.
 category: execution
 enforcement: strict
@@ -135,9 +135,13 @@ failures.
 
 - **Do not pair native `/goal` with state-expressible `/go` task-completion
   work.** If the success condition is expressible in `/go` state (phase
-  markers, `.pr_ready`, `.blocked`), let the deterministic gate drive
-  continuation. Setting `/goal` on top re-enables the brittle native evaluator
-  for no benefit.
+  markers, `.pr_ready`, `.blocked`, or `task.done_when`), let the
+  deterministic gate drive continuation. Setting `/goal` on top re-enables
+  the brittle native evaluator for no benefit.
+- **When `done_when` is set, the orchestrator runs it as the primary
+  completion check** — before the phase-marker gate. Exit code 0 = done,
+  non-zero = not done. This is the binary proof the 9-section template
+  requires.
 - **Use deterministic `/go` state continuation for task-completion goals.**
 - **Use tier-2 review/critic (e.g. `/av`, `/pre-mortem`, pi/GLM reviewers) for
   fuzzy quality goals** the gate cannot express (subjective correctness,
@@ -217,6 +221,9 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
   "forbidden_files": [],
   "acceptance_criteria": ["Criterion 1"],
   "verification_commands": [],
+  "done_when": "pytest tests/test_target.py exits 0",
+  "stop_rules": { "max_turns": 10, "max_attempts": 3 },
+  "output": "Summary of changes + test results",
   "task_type": "implementation",
   "routing": { "skill": "/code", "route": "code" }
 }
@@ -236,12 +243,29 @@ When using prompt/transcript/plan, the task is synthesized into the contract bel
   "forbidden_files": ["secrets.env"],
   "acceptance_criteria": ["Criterion 1"],
   "verification_commands": ["pytest -q"],
+  "done_when": "pytest -q exits 0",
+  "stop_rules": { "max_turns": 10, "max_attempts": 3 },
+  "output": "Files changed, test output, any caveats",
   "task_type": "implementation",
   "requires_approval": false
 }
 ```
 
 **Allowed `task_type` values:** `implementation`, `refactor`, `design`, `planning`, `testing`
+
+**New fields (from 9-section `/goal` template alignment):**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `done_when` | string | **Single binary observable condition** — a command whose exit code 0 = done. This is the authoritative completion signal. `acceptance_criteria` are supplementary. |
+| `stop_rules.max_turns` | integer | Hard cap on LLM turns before force-stop. Prevents infinite loops. Default: 10. |
+| `stop_rules.max_attempts` | integer | Max retry attempts on verification failure. Default: 3. Overrides global `MAX_ATTEMPTS`. |
+| `output` | string | What to surface when done — summary, test results, artifacts. |
+
+**Why `done_when` exists alongside `acceptance_criteria`:**
+- `acceptance_criteria` is a list of conditions ("tests pass", "no regressions", "docs updated") — useful for human review
+- `done_when` is a **single executable command** that the orchestrator can run to prove completion — useful for deterministic gating
+- Example: `done_when: "pytest tests/test_auth.py"` is a concrete, runnable proof. `acceptance_criteria: ["auth tests pass"]` is the human-readable version of the same thing.
 
 (`testing` routes to `/t` — use for mutation audits, coverage strategy, or test architecture work. `/tdd --phase mutation --module <dotted>` is the **execution-side** route used during a TDD run as a side-channel quality gate; it writes a signed `MutationReceipt` that `validate_tdd.py` and `verification_result.mutation` both consume.)
 

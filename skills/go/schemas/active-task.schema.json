@@ -142,6 +142,34 @@
         },
         "notes": {
           "type": "string"
+        },
+        "done_when": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Single binary observable condition that proves completion. Must be a command whose exit code 0 = done, non-zero = not done. Example: 'pytest tests/test_auth.py'. This is the authoritative completion signal — acceptance_criteria are supplementary."
+        },
+        "stop_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_turns": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10,
+              "description": "Hard cap on LLM turns (tool-call round-trips) before the task is force-stopped. Prevents infinite loops."
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 3,
+              "description": "Max retry attempts on verification failure before BLOCKED."
+            }
+          },
+          "description": "Per-task caps to prevent infinite looping. Overrides global MAX_ATTEMPTS when set."
+        },
+        "output": {
+          "type": "string",
+          "description": "What to surface when done — summary of changes, test results, or specific artifacts to report."
         }
       }
     }
