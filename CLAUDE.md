@@ -28,7 +28,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | performance-profiler | Performance Profiler |
 | planning | Plan Workflow v2 |
 | prd | PRD — Product Requirements Document |
-| pre-mortem | Critique — Adaptive Adversarial Review |
+| pre-mortem | *DEPRECATED stub → /red-team pre-mortem* (3-phase adaptive critique + Health Score + RNS + blinded consumer-contract review; engine retained) |
 | profile | /profile - Performance Baseline & Comparison |
 | review | /review — Unified code & PR review (modes: pr/diff/file/tests/errors/types/simplify/critical/multi/full) |
 | review-pr | *DEPRECATED stub → /review* (pr mode) |
