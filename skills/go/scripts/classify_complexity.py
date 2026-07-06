@@ -72,16 +72,18 @@ def classify_model_affinity(
     Rooted in /go's own intent/risk semantics (independent of execution_tier,
     which is downstream of dispatch and would couple the recommendation to the
     very routing it advises on):
-      - direct_answer / pause_for_authorization -> claude (no worker, or
-        director-judgment boundary; pi cannot mediate authorization).
+      - direct_answer -> claude (no worker; conversational).
       - decide / investigate / validate intents -> claude (need Claude's
         judgment or are read-only; pi is a coding worker, not a strategist).
       - high_risk surface (hooks/gates/settings/state) -> claude.
       - prompt longer than _PI_PROMPT_MAX_CHARS -> claude (#914 transport).
       - implement intent (concrete code-editing work) -> pi.
-      - everything else (planning, ambiguous plan-handoff) -> neutral.
+      - everything else (mixed, planning, ambiguous plan-handoff) -> neutral.
+
+    Note: pause_for_authorization is NOT a claude trigger — a paused task
+    still has a worker fit; authorization gates WHEN, not WHO.
     """
-    if execution_tier in ("direct_answer", "pause_for_authorization"):
+    if execution_tier == "direct_answer":
         return "claude"
     if task_intent in ("decide", "investigate", "validate"):
         return "claude"
