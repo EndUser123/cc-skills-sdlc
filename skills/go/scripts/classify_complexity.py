@@ -57,6 +57,36 @@ PI_DEFAULT_FLIP = "advisory"
 # poor fit regardless of intent. Conservative ceiling; adjust with evidence.
 _PI_PROMPT_MAX_CHARS = 8000
 
+# Concreteness signals that distinguish a bounded code edit (pi-suitable)
+# from a plan-handoff pointer or a design/orchestration ask. The intent
+# classifier marks plan-handoffs as `implement` upstream; without a
+# concrete-target check the advisor would over-recommend pi on bare
+# "/go the plan" / "/go execute phase 1" prompts. .md is intentionally
+# excluded — plan files and SKILL.md are contract/spec surfaces, not code.
+_PI_CODE_EXT = re.compile(r"\.(?:py|ts|tsx|js|jsx|go|rs|java|rb|php|sh|toml|yaml|yml|json)\b", re.I)
+_PI_SNAKE = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+_PI_IMPL_VERB = re.compile(r"\b(?:implement|refactor|fix|add|write|update|extend|extract|introduce)", re.I)
+_PI_TASK_TAG = re.compile(r"\bTASK-\d+\b", re.I)
+_PI_CODE_UNIT = re.compile(r"\b(?:regression test|test|function|method|class|module|phase)\b", re.I)
+
+
+def _has_concrete_code_target(prompt: str) -> bool:
+    """True when the prompt names a specific code artifact or unit of work.
+
+    Plan-handoff pointers ("the plan", "execute phase 1", "TASK-NNNN via queue")
+    and design/orchestration asks lack this signal — they are not pi-bound from
+    the prompt alone, so the advisor returns neutral (route per existing rules).
+    """
+    if _PI_CODE_EXT.search(prompt):
+        return True
+    if _PI_SNAKE.search(prompt):
+        return True
+    if _PI_TASK_TAG.search(prompt) and _PI_IMPL_VERB.search(prompt):
+        return True
+    if _PI_IMPL_VERB.search(prompt) and _PI_CODE_UNIT.search(prompt):
+        return True
+    return False
+
 
 def classify_model_affinity(
     task_intent: str,
@@ -78,7 +108,10 @@ def classify_model_affinity(
         judgment or are read-only; pi is a coding worker, not a strategist).
       - high_risk surface (hooks/gates/settings/state) -> claude.
       - prompt longer than _PI_PROMPT_MAX_CHARS -> claude (#914 transport).
-      - implement intent (concrete code-editing work) -> pi.
+      - implement intent AND a concrete code target (file path, identifier,
+        TASK-NNNN+verb, or verb+code-unit) -> pi. The concreteness gate
+        excludes plan-handoff pointers and design asks that the upstream
+        intent classifier mislabels as `implement`.
       - everything else (mixed, planning, ambiguous plan-handoff) -> neutral.
 
     Note: pause_for_authorization is NOT a claude trigger — a paused task
@@ -92,7 +125,7 @@ def classify_model_affinity(
         return "claude"
     if prompt_length > _PI_PROMPT_MAX_CHARS:
         return "claude"
-    if task_intent == "implement":
+    if task_intent == "implement" and _has_concrete_code_target(prompt):
         return "pi"
     return "neutral"
 
