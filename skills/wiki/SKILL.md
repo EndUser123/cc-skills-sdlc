@@ -88,13 +88,25 @@ Emits one `<source-stem>.json` per source file + a `_manifest.json`. Chunks are
 2–8KB each — small enough for any consumer.
 
 **Stage 4 (dispatch distillation — choose one):**
-- **Claude subagents** (highest fidelity): read `_manifest.json`, spawn one
-  Task-tool subagent per chunk. Each subagent verifies the candidate against
-  its context_snippet, generalizes the claim, and writes a real concept page
-  to `P:/.data/wiki/concepts/<slug>.md`.
-- **Local/cheap LLM** (volume): pipe each chunk JSON to a parallel `/ai-cli`
-  call. The chunk is self-contained (sentence + context + source path) so no
-  shared state is needed between calls.
+
+```bash
+# Emits a markdown dispatch plan with one pre-filled Task-tool block per chunk.
+python skills/wiki/scripts/wiki_signal_dispatch.py \
+  --manifest P:/.data/wiki/_incoming/distill_chunks/_manifest.json \
+  --chunks-dir P:/.data/wiki/_incoming/distill_chunks \
+  --out P:/.data/wiki/_incoming/dispatch_plan.md \
+  --vault P:/.data/wiki/concepts \
+  --max-chunks 30
+```
+
+Then execute the plan:
+- **Claude subagents** (highest fidelity): for each chunk block in `dispatch_plan.md`,
+  spawn one Task-tool subagent with the block as its prompt. Each subagent verifies
+  candidates against their `context_snippet`, generalizes durable claims, and writes
+  real concept pages to `P:/.data/wiki/concepts/<slug>.md`.
+- **Local/cheap LLM** (volume): re-run with `--mode ai-cli` to emit one shell
+  command per chunk piping to `/ai-cli`. Run them in parallel. Each chunk is
+  self-contained (sentence + context + source path) so no shared state is needed.
 - **Manual triage** (highest precision): read `durable_report.md`, hand-pick
   the strongest 10–20 candidates, dispatch targeted subagents for just those.
 
