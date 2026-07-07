@@ -2003,18 +2003,47 @@ _REFACTOR_SCOPE_MAP = {
 
 
 def classify_refactor_escalation(
-    rewritten: str, task_intent: str, execution_tier: str
+    rewritten: str, task_intent: str, execution_tier: str,
+    discovery_evidence: dict | None = None,
 ) -> dict:
     """Detect when discovery finds structural issues that warrant /refactor.
 
     Does NOT expand the current task. Produces a recommendation:
     continue_narrow_fix (safe to finish), pause_for_refactor (unsafe without),
     or finish_then_refactor (complete with risks noted).
+
+    Merges two signal sources (req. 4):
+    1. Prompt-based: substring markers in the rewritten goal text.
+    2. Discovery-evidence-based: structural_issues in discovery_evidence
+       findings, each carrying provenance (verified > inference > assumption).
+    Discovery evidence may raise severity but never erases prompt evidence.
     """
     lower = rewritten.lower()
-    hits = [m for m in _REFACTOR_ESCALATION_MARKERS if m in lower]
+    prompt_hits = [m for m in _REFACTOR_ESCALATION_MARKERS if m in lower]
 
-    if not hits:
+    # --- Discovery-evidence structural issues (reqs. 2, 3) ---
+    discovery_issues: list[dict] = []
+    de = discovery_evidence or {}
+    for f in (de.get("findings") or []):
+        si = (f or {}).get("structural_issues") or []
+        prov = (f or {}).get("provenance", "inference")
+        for issue in si:
+            discovery_issues.append({
+                "issue": issue,
+                "provenance": prov if prov in _PROVENANCE_TIERS else "inference",
+                "source": (f or {}).get("source", "runtime discovery"),
+            })
+
+    all_hits = list(prompt_hits)
+    discovery_trigger_labels = []
+    for di in discovery_issues:
+        # Map structural_issue enum to prompt-marker equivalent for scope
+        label = di["issue"].replace("_", " ")
+        discovery_trigger_labels.append(label)
+        if label not in all_hits:
+            all_hits.append(label)
+
+    if not all_hits:
         return {
             "required": False,
             "trigger_evidence": [],
@@ -2024,46 +2053,69 @@ def classify_refactor_escalation(
             "suggested_command": None,
             "reason": "no structural-issue markers detected",
             "risk_if_ignored": None,
+            "discovery_issues": [],
+            "prompt_evidence": [],
         }
 
-    scope_hits = [_REFACTOR_SCOPE_MAP.get(h, "module") for h in hits]
+    scope_hits = [_REFACTOR_SCOPE_MAP.get(h, "module") for h in all_hits]
     refactor_scope = "architecture" if "architecture" in scope_hits else (
         "plugin" if "plugin" in scope_hits else (
             "workflow" if "workflow" in scope_hits else "module"
         )
     )
 
-    # If the task itself is already a broad refactor/design, don't escalate —
-    # the worker handles it directly.
-    if task_intent in ("decide", "mixed") and execution_tier in (
-        "pause_for_authorization",
-    ):
-        recommendation = "finish_then_refactor"
-    elif refactor_scope == "architecture":
-        recommendation = "pause_for_refactor"
-    elif refactor_scope in ("plugin", "workflow"):
-        recommendation = "finish_then_refactor"
-    else:
-        recommendation = "continue_narrow_fix"
+    # --- Provenance-weighted confidence (req. 3) ---
+    has_verified = any(di["provenance"] == "verified" for di in discovery_issues)
+    has_inference = any(di["provenance"] == "inference" for di in discovery_issues)
+    # Assumption-only does not hard-pause by itself (req. 10 test case).
+    assumption_only = bool(discovery_issues) and not has_verified and not has_inference
 
-    # Determine current task scope from execution tier
+    # --- Unsafe-fix indicators (req. 7) ---
+    unsafe_indicators = {
+        "wrong_layer_ownership", "dead_producer_consumer",
+        "broad_cross_file_change_needed", "excessive_test_setup_due_to_design_complexity",
+    }
+    found_unsafe = any(di["issue"] in unsafe_indicators for di in discovery_issues)
+
+    # --- Recommendation logic ---
     task_scope = "narrow"
     if execution_tier in ("full_go",):
         task_scope = "medium"
     if execution_tier in ("pause_for_authorization",):
         task_scope = "broad"
 
+    if task_intent in ("decide", "mixed") and execution_tier == "pause_for_authorization":
+        recommendation = "finish_then_refactor"
+    elif found_unsafe and (has_verified or has_inference):
+        # Verified/inference unsafe indicator -> pause (req. 5)
+        recommendation = "pause_for_refactor"
+    elif refactor_scope == "architecture" and not assumption_only:
+        recommendation = "pause_for_refactor"
+    elif refactor_scope in ("plugin", "workflow"):
+        recommendation = "finish_then_refactor"
+    elif assumption_only:
+        # Assumption-only does not hard-pause (req. 10)
+        recommendation = "finish_then_refactor"
+    else:
+        recommendation = "continue_narrow_fix"
+
+    # Merge evidence: prompt evidence is never erased (req. 4)
+    trigger_evidence = prompt_hits + discovery_trigger_labels
+
     return {
         "required": True,
-        "trigger_evidence": hits,
+        "trigger_evidence": trigger_evidence,
+        "prompt_evidence": prompt_hits,
+        "discovery_issues": discovery_issues,
         "current_task_scope": task_scope,
         "refactor_scope": refactor_scope,
         "recommendation": recommendation,
         "suggested_command": f"/refactor <{refactor_scope}>",
         "reason": (
-            f"Discovery found {len(hits)} structural marker(s): "
-            f"{', '.join(hits[:3])}. The current task scope is {task_scope}; "
-            f"the refactor scope is {refactor_scope}. "
+            f"Found {len(trigger_evidence)} structural signal(s): "
+            f"{', '.join(trigger_evidence[:3])}. "
+            f"Prompt-based: {len(prompt_hits)}, discovery-based: {len(discovery_issues)}. "
+            f"Scope: {task_scope} -> {refactor_scope}. "
             f"Recommendation: {recommendation}."
         ),
         "risk_if_ignored": (
