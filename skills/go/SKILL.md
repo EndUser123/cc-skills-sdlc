@@ -458,6 +458,32 @@ touch "$GO_STATE_DIR/.task-selected_$RUN_ID"
 
 ---
 
+## Discoverability rule — before declaring blocked (missing_input)
+
+`/go` is the **primary owner** of the discoverability classification. Before
+declaring a task blocked on missing input, emit:
+
+```
+missing_input: <what's missing>
+discoverability: DISCOVERABLE | USER_ONLY | UNKNOWN
+discovery_attempted: <tool run + result, or "none">
+evidence: <file:line / command output / "not found">
+remaining_need: <what's still missing after discovery>
+```
+
+**Rule:** if `discoverability` is `DISCOVERABLE`, run the discovery BEFORE
+emitting blocked. A read-only command, grep, file read, filesystem search,
+repo search, or web/search tool can answer it. Asking the user for a
+DISCOVERABLE fact is a contract violation equal to inventing it — both
+offload work the agent should do.
+
+Only emit `USER_ONLY` (and ask the user with a precise `NEED: <question>`)
+when the fact is a preference, approval, credential, intent, private fact,
+destructive permission, budget decision, or inaccessible system.
+
+Full rule + worked examples at
+`cc-skills-analysis/skills/debrief/references/discoverability-classification.md`.
+
 ## STEP 1.5: Classify Complexity
 
 Read `active-task_{RUN_ID}.json` and classify complexity. Select model for Bifrost routing.
