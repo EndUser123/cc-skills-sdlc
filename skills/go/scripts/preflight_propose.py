@@ -2137,31 +2137,23 @@ _KNOWN_FAILURE_SHAPES_PREFLIGHT: dict[str, dict] = {
     "unit_test_only": {"missed_evidence": "real_entrypoint_smoked", "fix_type": "add entry-point smoke"},
 }
 _PATTERN_HIGH_RISK_SHAPES = frozenset({"cache_not_verified", "missing_backend"})
-# Per-session state for recurrence counting. Uses existing /go state artifacts.
-# Writer: this function. Storage: P:/.claude/.artifacts/{terminal_id}/go/pattern-candidates.jsonl
-# Reader: future /go runs in the same terminal. Authority: this function.
-# Freshness: append-only, no TTL (patterns accumulate). Failure direction: OSError -> silent skip.
-_PATTERN_DB_FALLBACK = Path("P:/.claude/state/go-patterns-preflight.jsonl")
 
 
 def classify_pattern_candidates(
-    proposal: dict, state_dir: Path | None = None,
+    proposal: dict,
 ) -> list[dict]:
     """Detect pattern candidates from the proposal's evidence levels.
 
-    Uses the completion-authority evidence levels (already in the proposal via
-    Stop_enforce_gate's evaluate_completion_authority at runtime, or scaffolded
-    by preflight for prompt-based detection). Does NOT create cross-session
-    Stop-hook state — writes to /go state artifacts only.
+    Report-local only — no cross-session state, no persistence, no append-only
+    files. Pattern candidates are emitted in the report and consumed by the
+    receiving LLM or human. Recurrence counting is not done in this function.
 
     Returns a list of pattern_candidate dicts with promotion recommendations.
     """
-    # Read evidence levels from the proposal
     re_fields = proposal.get("refactor_escalation") or {}
     trigger_evidence = re_fields.get("trigger_evidence") or []
     candidates = []
     for shape, meta in _KNOWN_FAILURE_SHAPES_PREFLIGHT.items():
-        # Check if this failure shape's trigger markers are in the evidence
         marker = shape.replace("_", " ")
         if marker in " ".join(trigger_evidence).lower() or shape in str(trigger_evidence).lower():
             candidates.append({
@@ -2170,7 +2162,7 @@ def classify_pattern_candidates(
                 "missed_evidence": meta["missed_evidence"],
                 "detected_by": "preflight_propose.classify_pattern_candidates",
                 "fix_type": meta["fix_type"],
-                "recurrence_count": 1,  # first occurrence in this proposal
+                "recurrence_count": 1,
                 "promotion_recommendation": (
                     "hook" if shape in _PATTERN_HIGH_RISK_SHAPES else "note"
                 ),
