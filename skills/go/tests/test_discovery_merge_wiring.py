@@ -417,3 +417,86 @@ class TestWorkerPromptDiscoveryContract:
         assert "GO_STATE_DIR" in content
 
 
+# ---------------------------------------------------------------------------
+# PI review_transcript discovery-findings extraction (loaded from source).
+# ---------------------------------------------------------------------------
+_PI_PATH = SCRIPTS / "adapters" / "pi" / "review_transcript.py"
+_pi_spec = importlib.util.spec_from_file_location("pi_review_transcript", _PI_PATH)
+pi_rev = importlib.util.module_from_spec(_pi_spec)  # type: ignore[assignment]
+_pi_spec.loader.exec_module(pi_rev)  # type: ignore[union-attr]
+
+
+class TestPiDiscoveryFindingsExtraction:
+    """Tests for the PI review transcript -> discovery_evidence mapping."""
+
+    def test_blind_write_maps_to_wrong_layer(self):
+        """BLIND_WRITE warning with files_written maps to inference finding."""
+        result = {
+            "warnings": ["BLIND_WRITE: files written without any reads first"],
+            "files_written": ["bar.py"],
+            "files_read": [],
+        }
+        findings = pi_rev.extract_discovery_findings(result, {})
+        assert len(findings) == 1
+        assert findings[0]["provenance"] == "inference"
+        assert findings[0]["structural_issues"] == ["wrong_layer_ownership"]
+        assert "bar.py" in findings[0]["evidence"]
+
+    def test_forbidden_file_maps_to_wrong_layer(self):
+        """FORBIDDEN_FILE warning with matching path maps to inference finding."""
+        result = {
+            "warnings": ["FORBIDDEN_FILE: pi modified forbidden file 'src/auth.py'"],
+            "files_written": ["src/auth.py"],
+            "files_read": ["src/auth.py"],
+        }
+        task = {"forbidden_files": ["src/auth.py"]}
+        findings = pi_rev.extract_discovery_findings(result, task)
+        assert len(findings) == 1
+        assert findings[0]["provenance"] == "inference"
+        assert findings[0]["structural_issues"] == ["wrong_layer_ownership"]
+        assert "src/auth.py" in findings[0]["evidence"]
+
+    def test_no_warnings_maps_to_empty_findings(self):
+        """No actionable warnings -> empty findings list."""
+        result = {"warnings": [], "files_written": [], "files_read": []}
+        findings = pi_rev.extract_discovery_findings(result, {})
+        assert findings == []
+
+    def test_excessive_calls_not_mapped(self):
+        """Non-file warnings like EXCESSIVE_CALLS produce no findings (no file evidence)."""
+        result = {
+            "warnings": ["EXCESSIVE_CALLS: 60 tool calls (possible loop)"],
+            "files_written": ["x.py"],
+            "files_read": [],
+        }
+        findings = pi_rev.extract_discovery_findings(result, {})
+        assert findings == []
+
+    def test_pi_writer_then_reader(self, tmp_path: Path):
+        """PI findings -> write_discovery_evidence -> apply_discovery_evidence_merge."""
+        rid = "pi-wire-001"
+        _make_proposal(tmp_path, rid)
+        result = {
+            "warnings": ["BLIND_WRITE: files written without any reads first"],
+            "files_written": ["src/auth.py"],
+            "files_read": [],
+        }
+        findings = pi_rev.extract_discovery_findings(result, {})
+        pf.write_discovery_evidence(tmp_path, rid, findings)
+        assert pf.apply_discovery_evidence_merge(tmp_path, rid) is True
+        updated = json.loads(
+            (tmp_path / f"task-proposal_{rid}.json").read_text(encoding="utf-8")
+        )
+        re = updated["refactor_escalation"]
+        assert re["required"] is True
+        assert re["recommendation"] == "pause_for_refactor"
+
+    def test_pi_no_findings_preserves_preflight(self, tmp_path: Path):
+        """PI review with no actionable warnings -> no discovery file -> preflight preserved."""
+        rid = "pi-wire-002"
+        _make_proposal(tmp_path, rid)
+        assert pf.apply_discovery_evidence_merge(tmp_path, rid) is True
+        updated = json.loads(
+            (tmp_path / f"task-proposal_{rid}.json").read_text(encoding="utf-8")
+        )
+        assert updated["refactor_escalation"]["required"] is False

@@ -13,7 +13,7 @@ Read these package-owned files before producing findings. Use the absolute paths
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/method.md`
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/failure-mode-checklist.md`
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/output-contract.md`
-- `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/evidence-contract.md`
+- `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/pre-mortem-evidence-tiers.md`
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/modes.md`
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/investigation-types.md`
 - `P:/packages/cc-skills-sdlc/skills/pre-mortem/references/static-test-contract.md`

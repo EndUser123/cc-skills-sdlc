@@ -17,7 +17,7 @@ The harness or agent must load:
 - `../references/method.md`
 - `../references/failure-mode-checklist.md`
 - `../references/output-contract.md`
-- `../references/evidence-contract.md`
+- `../references/pre-mortem-evidence-tiers.md`
 - `../references/modes.md`
 - `../references/investigation-types.md`
 - `../references/static-test-contract.md`

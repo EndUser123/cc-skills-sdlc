@@ -173,6 +173,57 @@ def review(
     }
 
 
+
+
+def extract_discovery_findings(review_result: dict[str, Any], task: dict[str, Any]) -> list[dict[str, Any]]:
+    """Map evidence-backed pi-review warnings into discovery_evidence findings.
+
+    Only warnings with concrete file-path evidence are mapped, and only to
+    ``wrong_layer_ownership`` with provenance ``inference`` -- we infer possible
+    wrong-layer write behavior from the worker's file I/O, not from verified
+    code-inspection. This never fabricates structural issues: a process warning
+    with no file evidence is dropped, and provenance is always ``inference``
+    (never ``verified``, which would require code-level proof).
+
+    Returns a findings list ready for write_discovery_evidence().
+    """
+    warnings: list[str] = review_result.get("warnings", [])
+    files_written: list[str] = review_result.get("files_written", [])
+    warning_text = " ".join(warnings)
+    findings: list[dict[str, Any]] = []
+
+    # BLIND_WRITE: wrote without reading first -> infers wrong layer (no read
+    # of the owner module before mutating). Evidence: the written paths.
+    if "BLIND_WRITE" in warning_text and files_written:
+        findings.append({
+            "source": "pi transcript review (blind write)",
+            "provenance": "inference",
+            "summary": (
+                "pi worker wrote files without reading them first -- possible "
+                "wrong-layer mutation (no read of the owner module before edit)"
+            ),
+            "evidence": "files written without prior read: " + ", ".join(files_written[:5]),
+            "structural_issues": ["wrong_layer_ownership"],
+        })
+
+    # FORBIDDEN_FILE: modified a file outside the declared scope -> infers
+    # wrong layer (touched a layer the task is not authorized to mutate).
+    forbidden = task.get("forbidden_files", []) or []
+    violated = [f for f in files_written if any(ff in f for ff in forbidden)]
+    if violated:
+        findings.append({
+            "source": "pi transcript review (forbidden-file write)",
+            "provenance": "inference",
+            "summary": (
+                "pi worker modified files outside the declared scope -- possible "
+                "wrong-layer mutation (touched a forbidden layer)"
+            ),
+            "evidence": "forbidden files modified: " + ", ".join(violated[:5]),
+            "structural_issues": ["wrong_layer_ownership"],
+        })
+
+    return findings
+
 def _extract_text(content: list[dict[str, Any]]) -> str:
     """Extract text from a content array."""
     parts: list[str] = []
@@ -213,6 +264,24 @@ def main() -> None:
     tmp = out.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     tmp.replace(out)
+
+    # Map evidence-backed warnings into discovery_evidence so the existing
+    # apply_discovery_evidence_merge reader (called in orchestrate.py after
+    # dispatch_pi) can escalate. Soft-fail: if no findings or the writer is
+    # unavailable, nothing is written and the reader preserves preflight.
+    try:
+        _scripts_dir = str(pathlib.Path(__file__).resolve().parents[3])
+        if _scripts_dir not in sys.path:
+            sys.path.insert(0, _scripts_dir)
+        import importlib
+        _pf = importlib.import_module("preflight_propose")
+        findings = extract_discovery_findings(result, task)
+        if findings:
+            written = _pf.write_discovery_evidence(state_dir, run_id, findings)
+            if written is not None:
+                print(f"  discovery-evidence: {written} ({len(findings)} finding(s))")
+    except Exception:
+        pass  # discovery emission is best-effort; never block the review
 
     print(f"SUMMARY: {out}")
     if result["warnings"]:

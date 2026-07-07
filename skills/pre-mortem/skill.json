@@ -11,7 +11,7 @@
     "method": "references/method.md",
     "failure_mode_checklist": "references/failure-mode-checklist.md",
     "output_contract": "references/output-contract.md",
-    "evidence_contract": "references/evidence-contract.md",
+    "evidence_contract": "references/pre-mortem-evidence-tiers.md",
     "modes": "references/modes.md",
     "investigation_types": "references/investigation-types.md",
     "static_test_contract": "references/static-test-contract.md",
