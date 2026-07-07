@@ -71,8 +71,8 @@ def test_durable_signature_required():
     assert r.returncode == 0
     kept = {k["sentence"] for k in json.loads(out_path.read_text(encoding="utf-8"))}
     # Both anchor + verb — survive
-    assert any("caused by a stale require() cache after the lmstudio" in k for k in kept)
-    assert any("Fix 3 — Dead code removal" in k and "line 1945-1946" in k for k in kept)
+    assert any("cli.py:1122 imports non-existent" in k for k in kept)
+    assert any("Fix 3 — Dead code removal" in k and "apply_epistemic_policy" in k for k in kept)
     # Without anchor or verb — drop
     assert not any("The file contains 200 lines of code." in k for k in kept)
     assert not any("The fix is to do something different." == k for k in kept)
