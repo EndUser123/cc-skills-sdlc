@@ -108,6 +108,27 @@ patterns → `classification: applies_to_related_skills` with owner
 the file:line output. Canonical template at
 `debrief/references/cross-skill-transfer-check.md`.
 
+## Completion Evidence Contract — required for code/diff/test claims
+
+When reviewing code/test/diff completion claims, the Completion Evidence
+Contract governs the acceptance bar. The contract lives at
+`debrief/references/completion-evidence-contract.md`. Required mappings:
+
+- `file_changed` rows require the Edit/Write receipt + a Read of the
+  modified lines confirming the change persisted. Mtime-only verification
+  is NOT sufficient.
+- `test_passed` rows require the actual pytest output line (`N passed`)
+  for the relevant test file. Reporting "tests pass" without the line is
+  `NOT_PROVEN`.
+- A test that checks text exists is `static_invariant_tested`, NOT
+  `behavior_eval_tested`. If the report claims the latter, flag the
+  overclaim.
+- Runtime behavior changes require a live smoke proof or recorded
+  behavior change, not just a code diff.
+
+If a `/review` report's claims can't be backed by Edit receipts + pytest
+output + Read receipts, the verdict is REVISE.
+
 ## Deprecated aliases
 
 `/review-pr`, `/uci`, `/sqd` still resolve (5-line router stubs in their own SKILL.md) and forward here. They will be removed after one release cycle.
