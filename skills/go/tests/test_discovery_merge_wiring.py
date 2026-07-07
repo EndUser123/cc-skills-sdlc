@@ -236,3 +236,105 @@ class TestStopBoundary:
         ]
         for sym in forbidden:
             assert sym not in content, f"Stop_enforce_gate.py contains {sym}"
+
+
+class TestWriteDiscoveryEvidence:
+    """Tests for the write_discovery_evidence writer helper."""
+
+    def test_writer_creates_valid_file(self, tmp_path: Path):
+        """Writer produces a discovery-evidence file the reader consumes."""
+        run_id = "writer-001"
+        findings = [{
+            "source": "code inspection",
+            "provenance": "verified",
+            "summary": "X writes to Y's state without going through Y's API",
+            "evidence": "grep -n 'Y\\.state' foo.py:42",
+            "structural_issues": ["wrong_layer_ownership"],
+        }]
+        out = pf.write_discovery_evidence(tmp_path, run_id, findings)
+        assert out is not None
+        assert out.exists()
+        data = json.loads(out.read_text(encoding="utf-8"))
+        assert data["run_id"] == run_id
+        assert len(data["findings"]) == 1
+        assert data["findings"][0]["structural_issues"] == ["wrong_layer_ownership"]
+
+    def test_writer_then_reader_pauses(self, tmp_path: Path):
+        """Writer output flows through the reader to cause pause_for_refactor."""
+        run_id = "writer-002"
+        _make_proposal(tmp_path, run_id)
+        findings = [{
+            "source": "grep",
+            "provenance": "verified",
+            "summary": "caller bypasses the owner module",
+            "evidence": "foo.py:42 calls bar._state directly",
+            "structural_issues": ["wrong_layer_ownership"],
+        }]
+        pf.write_discovery_evidence(tmp_path, run_id, findings)
+        # Reader (the real runtime path) consumes the writer's file.
+        assert pf.apply_discovery_evidence_merge(tmp_path, run_id) is True
+        updated = json.loads(
+            (tmp_path / f"task-proposal_{run_id}.json").read_text(encoding="utf-8")
+        )
+        re = updated["refactor_escalation"]
+        assert re["required"] is True
+        assert re["recommendation"] == "pause_for_refactor"
+
+    def test_writer_drops_verified_without_evidence(self, tmp_path: Path):
+        """Verified finding with no evidence citation is dropped (not faked)."""
+        run_id = "writer-003"
+        findings = [{
+            "source": "hunch",
+            "provenance": "verified",  # claims verified
+            "summary": "something feels off",
+            # NO evidence field — must be dropped
+            "structural_issues": ["inert_code"],
+        }]
+        out = pf.write_discovery_evidence(tmp_path, run_id, findings)
+        assert out is None  # no valid findings → soft-fail, no file written
+        assert not (tmp_path / f"discovery-evidence_{run_id}.json").exists()
+
+    def test_writer_drops_malformed_provenance(self, tmp_path: Path):
+        """Invalid provenance / missing source → finding dropped."""
+        run_id = "writer-004"
+        findings = [
+            {"source": "x", "provenance": "guess", "summary": "bad prov"},  # invalid prov
+            {"provenance": "inference", "summary": "no source"},  # missing source
+            {"source": "x", "provenance": "assumption"},  # missing summary
+        ]
+        out = pf.write_discovery_evidence(tmp_path, run_id, findings)
+        assert out is None
+
+    def test_writer_filters_noncanonical_structural_issues(self, tmp_path: Path):
+        """Unknown structural_issues values are dropped, canonical kept."""
+        run_id = "writer-005"
+        findings = [{
+            "source": "inspection",
+            "provenance": "inference",
+            "summary": "overlap",
+            "structural_issues": ["duplicated_responsibility", "made_up_issue", "also_fake"],
+        }]
+        out = pf.write_discovery_evidence(tmp_path, run_id, findings)
+        data = json.loads(out.read_text(encoding="utf-8"))
+        assert data["findings"][0]["structural_issues"] == ["duplicated_responsibility"]
+
+    def test_writer_empty_findings_is_noop(self, tmp_path: Path):
+        """Empty findings list → None, no file."""
+        out = pf.write_discovery_evidence(tmp_path, "writer-006", [])
+        assert out is None
+
+    def test_assumption_only_writer_no_hard_pause(self, tmp_path: Path):
+        """Writer + reader: assumption-only issue does not hard-pause."""
+        run_id = "writer-007"
+        _make_proposal(tmp_path, run_id)
+        pf.write_discovery_evidence(tmp_path, run_id, [{
+            "source": "guess", "provenance": "assumption",
+            "summary": "might be duplicated",
+            "structural_issues": ["duplicated_responsibility"],
+        }])
+        pf.apply_discovery_evidence_merge(tmp_path, run_id)
+        updated = json.loads(
+            (tmp_path / f"task-proposal_{run_id}.json").read_text(encoding="utf-8")
+        )
+        assert updated["refactor_escalation"]["recommendation"] == "finish_then_refactor"
+

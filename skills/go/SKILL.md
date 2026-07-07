@@ -341,6 +341,17 @@ gate activates worker-scope enforcement), then returns
    by the `go_delegation_enforce_PreToolUse` gate (TASK-001.4) and the
    `tools:` allowlist (hard enforcement — memory #1120).
 3. Writes `claude-task-result_$RUN_ID.json` (`{run_id, status, summary, ts}`).
+   If the worker observed code-level structural issues while doing the task, it
+   MUST also populate a `discovery_evidence` field (or write a sibling
+   `discovery-evidence_$RUN_ID.json`) so the merge reader can escalate to
+   `/refactor`. Each finding needs `source` (what produced it), `provenance`
+   (`verified` | `inference` | `assumption`), `summary`, optional
+   `structural_issues` from the canonical set
+   (`dead_producer_consumer`, `inert_code`, `duplicated_responsibility`,
+   `wrong_layer_ownership`, `repeated_patching`, `state_identity_lifecycle_ambiguity`,
+   `broad_cross_file_change_needed`, `excessive_test_setup_due_to_design_complexity`),
+   and `evidence` (file/path/grep/test citation — REQUIRED when `provenance="verified"`).
+   Report only what was actually observed; never fabricate findings.
 4. Re-invokes the orchestrator:
    ```bash
    GO_RUN_ID="$RUN_ID" python ".claude/skills/go/scripts/orchestrate.py" --claude-resume "$RUN_ID"

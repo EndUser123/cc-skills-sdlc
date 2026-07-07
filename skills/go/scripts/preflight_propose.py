@@ -2588,6 +2588,57 @@ def apply_discovery_evidence_merge(state_dir: Path, run_id: str) -> bool:
         return True
     except Exception:
         return False  # rebuild failed -- keep preflight-only result
+
+
+# Canonical structural-issue enum. The writer filters worker-reported issues to
+# this set so the merge reader never sees an unknown shape. Keep in sync with
+# unsafe_indicators at L2074 and _KNOWN_FAILURE_SHAPES_PREFLIGHT.
+_STRUCTURAL_ISSUES_CANONICAL = frozenset({
+    "dead_producer_consumer", "inert_code", "duplicated_responsibility",
+    "wrong_layer_ownership", "repeated_patching", "state_identity_lifecycle_ambiguity",
+    "broad_cross_file_change_needed", "excessive_test_setup_due_to_design_complexity",
+})
+
+
+def write_discovery_evidence(state_dir: Path, run_id: str, findings: list) -> object:
+    """Write worker-discovered structural findings to the standard discovery file.
+
+    Called by the worker path (claude subagent via SKILL.md, or pi harness) after
+    the worker observes code-level structural issues. Validates schema and drops
+    malformed entries rather than failing. Verified findings must carry concrete
+    evidence (file/path/grep/test citation); inference/assumption may omit it.
+
+    Returns the written Path on success, None if no valid findings (soft-fail).
+    Does NOT raise on bad input -- the reader is fail-soft, so the writer is too.
+    """
+    if not findings:
+        return None
+    valid = []
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        provenance = f.get("provenance")
+        source = f.get("source")
+        summary = f.get("summary") or f.get("evidence")
+        if provenance not in _PROVENANCE_TIERS or not source or not summary:
+            continue
+        if provenance == "verified" and not f.get("evidence"):
+            continue
+        si = [s for s in (f.get("structural_issues") or [])
+               if s in _STRUCTURAL_ISSUES_CANONICAL]
+        valid.append({
+            "source": source,
+            "provenance": provenance,
+            "summary": summary,
+            "evidence": f.get("evidence", ""),
+            "structural_issues": si,
+        })
+    if not valid:
+        return None
+    out = state_dir / f"discovery-evidence_{run_id}.json"
+    _atomic_write_json(out, {"findings": valid, "run_id": run_id})
+    return out
+
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 
