@@ -204,7 +204,150 @@ def evaluate_completion_authority(state_dir: Path, run_id: str) -> dict:
     downgrade["overclaim_terms"] = overclaim
     downgrade["levels"] = levels["levels"]
     downgrade["target"] = "active_task"
+
+    # Pattern detection: classify failure shape and promote on recurrence.
+    pattern = _classify_failure_shape(downgrade)
+    if pattern:
+        pattern = _record_and_promote_pattern(state_dir, run_id, pattern)
+        downgrade["pattern_candidate"] = pattern
+
+    # Dry-run refactor analysis: trigger on routing/hook/gate/plugin tasks.
+    if _should_trigger_dry_run(active):
+        dry_run = _dry_run_analysis(active, state_dir)
+        downgrade["dry_run_analysis"] = dry_run
+        # BLOCK finding prevents implementation-ready claim.
+        if dry_run.get("has_block") and downgrade.get("downgrade") != "BLOCK":
+            downgrade["downgrade"] = "BLOCK"
+            downgrade["reason"] = (
+                f"dry-run BLOCK: {dry_run['findings'][0]['detail']} "
+                f"(category: {dry_run['findings'][0]['category']})"
+            )
+
     return downgrade
+
+
+# ---------------------------------------------------------------------------
+# Pattern detection: track recurring failure shapes and promote them
+# ---------------------------------------------------------------------------
+
+_PATTERN_DB = Path("P:/.claude/state/go-patterns.jsonl")
+
+_KNOWN_FAILURE_SHAPES = {
+    "cache_not_verified": {"missed_evidence": "cache_or_runtime_verified", "fix_type": "add cache rebuild step"},
+    "advisory_not_enforced": {"missed_evidence": "real_entrypoint_smoked", "fix_type": "add enforcement gate"},
+    "completion_without_packet": {"missed_evidence": "field_confirmed_against_original_symptom", "fix_type": "add verification packet"},
+    "missing_backend": {"missed_evidence": "source_inspected", "fix_type": "add backend existence check"},
+    "unit_test_only": {"missed_evidence": "real_entrypoint_smoked", "fix_type": "add entry-point smoke"},
+}
+
+
+def _classify_failure_shape(verdict: dict) -> dict | None:
+    """Extract a pattern_candidate from the completion-authority verdict."""
+    if verdict.get("downgrade") == "ADVISORY":
+        return None  # no failure shape — the claim was honest
+    levels = verdict.get("levels") or []
+    for shape, meta in _KNOWN_FAILURE_SHAPES.items():
+        if meta["missed_evidence"] not in levels:
+            return {
+                "failure_shape": shape,
+                "boundary": "completion_authority",
+                "missed_evidence": meta["missed_evidence"],
+                "detected_by": "completion_authority_gate",
+                "fix_type": meta["fix_type"],
+            }
+    return None
+
+
+def _record_and_promote_pattern(state_dir: Path, run_id: str, pattern: dict) -> dict:
+    """Record a pattern occurrence and return promotion_recommendation."""
+    shape = pattern.get("failure_shape", "unknown")
+    try:
+        _PATTERN_DB.parent.mkdir(parents=True, exist_ok=True)
+        # Count prior occurrences of this shape.
+        count = 0
+        if _PATTERN_DB.is_file():
+            for line in _PATTERN_DB.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                    if rec.get("failure_shape") == shape:
+                        count += 1
+                except json.JSONDecodeError:
+                    pass
+        count += 1  # include this occurrence
+        pattern["recurrence_count"] = count
+        # Promotion rules: 1=>note, 2=>pattern_candidate, 3=>report-gate,
+        # high-risk deterministic miss => hook/test directly.
+        high_risk_shapes = {"cache_not_verified", "missing_backend"}
+        if shape in high_risk_shapes and count == 1:
+            pattern["promotion_recommendation"] = "hook"
+        elif count >= 3:
+            pattern["promotion_recommendation"] = "report_gate"
+        elif count >= 2:
+            pattern["promotion_recommendation"] = "pattern_candidate"
+        else:
+            pattern["promotion_recommendation"] = "note"
+        # Append this occurrence.
+        with _PATTERN_DB.open("a", encoding="utf-8") as fh:
+            entry = {"ts": time.time(), "run_id": run_id, **pattern}
+            fh.write(json.dumps(entry) + "\n")
+    except OSError:
+        pattern["promotion_recommendation"] = "note"
+    return pattern
+
+
+# ---------------------------------------------------------------------------
+# Dry-run refactor analysis: no-mutation analysis before broad changes
+# ---------------------------------------------------------------------------
+
+_DRY_RUN_TRIGGERS = frozenset({
+    "routing", "dispatch", "hook", "gate", "plugin", "cache", "state",
+    "session", "identity", "artifact", "lifecycle", "consolidation",
+    "migration", "model_routing", "refactor", "router", "settings.json",
+})
+
+
+def _should_trigger_dry_run(active: dict) -> bool:
+    """True if the task touches a surface that warrants dry-run analysis."""
+    text = " ".join(str(v) for v in [
+        active.get("summary") or "",
+        active.get("task_type") or "",
+        active.get("scope_in") or "",
+        active.get("title") or "",
+    ]).lower()
+    return any(trigger in text for trigger in _DRY_RUN_TRIGGERS)
+
+
+def _dry_run_analysis(active: dict, state_dir: Path) -> dict:
+    """No-mutation refactor analysis. Returns findings + report mode."""
+    findings = []
+    # Architecture map: list verified_source_paths that exist.
+    paths = [p for p in (active.get("verified_source_paths") or []) if Path(p).exists()]
+    # Dead-code check: any path in scope_in that doesn't exist.
+    for p in (active.get("scope_in") or []):
+        if not Path(p).exists():
+            findings.append({"severity": "REVISE", "category": "dead_path",
+                             "detail": f"scope_in path does not exist: {p}"})
+    # Inert-code check: marker files for gates/hooks that have no test coverage.
+    # Real-entrypoint test gap: no .smoke marker.
+    if not _has_evidence_file(state_dir, active.get("_run_id", ""), "smoke"):
+        findings.append({"severity": "BLOCK", "category": "entrypoint_gap",
+                         "detail": "no real-entrypoint smoke evidence found"})
+    # Simplification options (informational, not blocking).
+    simplification = []
+    if not paths:
+        simplification.append("document: no verified source paths — add source inspection")
+    has_block = any(f["severity"] == "BLOCK" for f in findings)
+    return {
+        "mode": "dry_run_only",
+        "has_block": has_block,
+        "findings": findings,
+        "architecture_map": {"verified_paths": paths},
+        "simplification_options": simplification,
+    }
+
+
 _STALE_TTL_SECONDS = 6 * 3600  # 6h — same as G4
 
 _ROOT = Path(__file__).resolve().parents[3]
