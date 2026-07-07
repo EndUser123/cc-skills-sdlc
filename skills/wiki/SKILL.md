@@ -468,6 +468,21 @@ Seed the project `CLAUDE.md` with a Wiki Index pointer so every coding agent in 
 
 Usage: `/wiki init`
 
+## Verification (cold-start)
+
+```bash
+# 1) The since-intersect test suite (3 tests: git-log, intersection, no false positive):
+python -m pytest plugins/cc-skills-sdlc/skills/wiki/tests/test_since_intersect.py -q
+# expect: 3 passed
+
+# 2) The shared wiki_health_check.py (the same engine /wiki lint + /main use):
+python plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --stale --max-age 90 --json
+# expect: a JSON list of pages with their mtime + the stale-by count.
+
+# 3) Quick semantic check (no ffmpeg, no network): the Phase-1 Discovery with --since
+# intersects a known git diff against `Sources:` frontmatter. See test_since_intersect.py.
+```
+
 Usage: `/wiki update [--auto] [--max-age <days>] [--limit <n>] [<topic>]
 
 ## Evidence-First Principles
