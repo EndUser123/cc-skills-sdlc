@@ -108,6 +108,11 @@ patterns → `classification: applies_to_related_skills` with owner
 the file:line output. Canonical template at
 `debrief/references/cross-skill-transfer-check.md`.
 
+**Advisory status:** XSTC discipline is currently prompt-advisory only.
+Runtime enforcement is a future enhancement, not a current guarantee. The
+sibling Completion Evidence Contract (CEC) is enforced via `/red-team`'s
+Pre-check 0 BLOCK authority; XSTC has no runtime enforcement equivalent.
+
 ## Completion Evidence Contract — required for code/diff/test claims
 
 When reviewing code/test/diff completion claims, the Completion Evidence

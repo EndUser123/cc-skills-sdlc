@@ -108,25 +108,26 @@ def test_missing_verification_packet_blocks_high_risk_complete_claim(tmp_path, g
 
 def test_evidence_present_case_allows_complete(tmp_path, gate):
     """All evidence levels present: no downgrade despite 'complete' word."""
-    state = tmp_path / "go" / "active-task_runOK.json"
-    state.parent.mkdir(parents=True)
-    (state.parent / ".test-pass-runOK").touch()
-    (state.parent / ".smoke-runOK").touch()
-    (state.parent / ".cache-rebuild-runOK").touch()
+    state_dir = tmp_path / "go"
+    state_dir.mkdir(parents=True)
+    (state_dir / ".test-pass-runOK").touch()
+    (state_dir / ".smoke-runOK").touch()
+    (state_dir / ".cache-rebuild-runOK").touch()
+    # Create a real source file so verified_source_paths can resolve
+    (state_dir / "x.py").write_text("# stub\n", encoding="utf-8")
+    import json as _json
     active = {
         "task": {
             "summary": "Implementation complete",
             "tests_pass": True,
-            "verified_source_paths": [str(state / "x.py")],
+            "verified_source_paths": [str(state_dir / "x.py")],
             "smoke_ok": True,
             "cache_ok": True,
             "closure_check_passed": True,
         }
     }
-    (state.parent / "active-task_runOK.json").write_text(
-        str(active).replace("'", '"'), encoding="utf-8"
-    )
-    verdict = gate.evaluate_completion_authority(state.parent, "runOK")
+    (state_dir / "active-task_runOK.json").write_text(_json.dumps(active), encoding="utf-8")
+    verdict = gate.evaluate_completion_authority(state_dir, "runOK")
     # All evidence levels present -> no BLOCK, no INCOMPLETE
     assert verdict["downgrade"] in ("ADVISORY", "PASS_WITH_BLOCKING_FOLLOWUP")
     assert "field_confirmed_against_original_symptom" in verdict["levels"]
