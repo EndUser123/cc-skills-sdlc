@@ -129,8 +129,8 @@ def main() -> int:
     for p in Path(args.wiki_dir).glob("*.md"):
         try:
             t = p.read_text(encoding="utf-8", errors="replace")
-            for line in re.findall(r"\b[a-z0-9]{4,}\b", t.lower()):
-                wiki_shingles.add(line)
+            tokens = {w for w in re.findall(r"[A-Za-z0-9]+", t.lower()) if len(w) >= 4}
+            wiki_shingles.update(tokens)
         except Exception:
             pass
 
@@ -151,7 +151,10 @@ def main() -> int:
             claim_dropped += 1
             continue
         # Already-covered check (cheap word-shard overlap; extractor used shingle Jaccard)
-        words = set(re.findall(r"\b[a-z0-9]{4,}\b", sent.lower()))
+        # Word shards: split on word-boundary OR underscore/dot (so that
+        # identifiers like "skill_first_gate_v3" tokenize as separate words).
+        words = set(re.findall(r"[A-Za-z0-9]+", sent.lower()))
+        words = {w for w in words if len(w) >= 4}
         if len(words) < 5:
             continue
         overlap = len(words & wiki_shingles) / len(words)

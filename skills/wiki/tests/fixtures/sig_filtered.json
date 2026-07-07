@@ -4,13 +4,13 @@
     "sentence": "Root cause: cli.py:1122 imports non-existent research_flash.sources.github_source.",
     "novelty": 0.95,
     "tool_output_hits": 0,
-    "novelty_words": 0.167
+    "novelty_words": 1.0
   },
   {
     "file": "x.txt",
     "sentence": "Fix 3 — Dead code removal: removed unreachable return in apply_epistemic_policy at line 1945.",
     "novelty": 0.95,
     "tool_output_hits": 0,
-    "novelty_words": 0.25
+    "novelty_words": 1.0
   }
 ]
