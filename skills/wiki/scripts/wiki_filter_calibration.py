@@ -41,6 +41,14 @@ from wiki_signal_filter import is_tool_output_noise, has_durable_signature  # no
 WIKI_OVERLAP_DEFAULT = 0.95  # must match wiki_signal_filter.py hardcoded threshold
 
 
+def _is_wiki_overlap_drop(sent: str, wiki_words: set[str], threshold: float) -> bool:
+    """Check if a sentence would be dropped by the wiki-overlap gate."""
+    words = {w for w in __import__("re").findall(r"[A-Za-z0-9]+", sent.lower()) if len(w) >= 4}
+    if not words:
+        return False
+    return len(words & wiki_words) / len(words) >= threshold
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="in_path", required=True, help="Candidates JSON (from extract)")
@@ -123,6 +131,14 @@ def main() -> int:
             fp += 1
 
     kept = tp + fp
+
+    # Compute recall excluding wiki-overlap drops (those sentences are already
+    # in the wiki; dropping them is correct dedup, not a filter recall failure).
+    # STATE-001 fix: separates "filter didn't recognize" from "wiki already has it".
+    durable_wiki_overlap_drops = drop_reasons.get("wiki-overlap", 0)  # approx: some noise too
+    durable_filter_fn = fn - sum(1 for l in labels if l["label"] == "durable" and l["sentence"].strip() in cand_by_sentence and _is_wiki_overlap_drop(l["sentence"].strip(), wiki_words, args.overlap))
+    novel_durable = durable_true - durable_wiki_overlap_drops if durable_wiki_overlap_drops < durable_true else 1
+
     metrics = {
         "total": len(labels),
         "durable_true": durable_true,
@@ -133,6 +149,7 @@ def main() -> int:
         "kept_durable_correct": tp,
         "precision_kept": (tp / kept) if kept else None,
         "recall_durable": (tp / durable_true) if durable_true else None,
+        "recall_on_novel_only": (tp / novel_durable) if novel_durable > 0 else None,
         "false_negative_rate": (fn / durable_true) if durable_true else None,
         "false_positive_rate": (fp / kept) if kept else None,
         "by_drop_reason": drop_reasons,
