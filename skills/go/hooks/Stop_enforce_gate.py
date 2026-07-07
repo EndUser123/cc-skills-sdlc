@@ -109,15 +109,17 @@ def _evaluate_completion_evidence(active: dict, state_dir: Path, run_id: str) ->
     return {"levels": levels, "highest": levels[-1] if levels else "asserted_by_worker"}
 
 
-def _downgrade_from_overclaim(levels: list[str], overclaim_terms: list[str]) -> dict:
+def _downgrade_from_overclaim(levels: list[str], overclaim_terms: list[str], active: dict | None = None) -> dict:
     """Map overclaim terms + highest evidence level to a downgrade verdict.
 
     Downgrade rules (per goal req 4):
       - all overclaim terms + no source_inspected      -> INCOMPLETE
       - shipped/available/absorbed/production/live terms  -> PENDING/UNVERIFIED
+      - absorbed claim + missing backend_path or backend doesn't exist -> BLOCK
       - fixed/complete term without field_confirmed     -> INCOMPLETE
       - else                                            -> ADVISORY
     """
+    active = active or {}
     high = levels[-1] if levels else "asserted_by_worker"
     shipping = {"shipped", "available", "absorbed", "production", "runtime-delivered", "live"}
     fix_or_complete = {"complete", "completed", "fix", "fixed", "tests passed", "zero drift", "cache rebuilt", "verified", "enforced"}
@@ -127,6 +129,13 @@ def _downgrade_from_overclaim(levels: list[str], overclaim_terms: list[str]) -> 
 
     is_shipping = bool(shipping & set(overclaim_terms))
     is_fix = bool(fix_or_complete & set(overclaim_terms))
+    is_absorbed = "absorbed" in overclaim_terms
+
+    # Capability migration: absorbed claim needs a real backend_path that exists.
+    if is_absorbed:
+        backend = active.get("backend_path") or ""
+        if not backend or not Path(backend).exists():
+            return {"downgrade": "BLOCK", "reason": f"absorbed claim without existing backend_path (backend: {backend!r})", "highest": high}
 
     if is_shipping and "source_inspected" not in levels:
         return {"downgrade": "BLOCK", "reason": f"shipping claim without source_inspected (terms: {sorted(shipping & set(overclaim_terms))})", "highest": high}
@@ -191,7 +200,7 @@ def evaluate_completion_authority(state_dir: Path, run_id: str) -> dict:
     ]).strip()
     overclaim = _detect_overclaim(claim_text)
     levels = _evaluate_completion_evidence(active, state_dir, run_id)
-    downgrade = _downgrade_from_overclaim(levels["levels"], overclaim)
+    downgrade = _downgrade_from_overclaim(levels["levels"], overclaim, active)
     downgrade["overclaim_terms"] = overclaim
     downgrade["levels"] = levels["levels"]
     downgrade["target"] = "active_task"
@@ -326,7 +335,12 @@ def main() -> None:
     if not run_id:
         sys.exit(0)
 
+    # Validation mode: if the validation contract is satisfied, allow.
+    if _is_validation_complete(state_dir, run_id):
+        sys.exit(0)
+
     # Completion-authority gate: downgrade overclaim before /go declares done.
+    # Runs AFTER validation-mode check so validation tasks don't get blocked.
     # Fail-soft: advisory downgrade is logged only; block only on
     # "BLOCK" downgrade (incomplete or missing required packet for high-risk).
     try:
@@ -340,10 +354,6 @@ def main() -> None:
         # cc-skills-sdlc CLAUDE.md stop-output contract: emit {"decision":"block",...}
         # and exit 0. Reason must lead with "continue: " so CC continues the loop.
         print(json.dumps({"decision": "block", "reason": f"continue: {reason}"}))
-        sys.exit(0)
-
-    # Validation mode: if the validation contract is satisfied, allow.
-    if _is_validation_complete(state_dir, run_id):
         sys.exit(0)
 
     # Load enforce config.
