@@ -1977,6 +1977,105 @@ def classify_layer_placement(rewritten: str) -> dict:
     }
 
 
+# --- Refactor-escalation detection ---------------------------------------------
+_REFACTOR_ESCALATION_MARKERS: tuple[str, ...] = (
+    "dead path", "dead code", "dead producer", "dead consumer",
+    "inert code", "inert gate", "inert hook",
+    "duplicated responsibility", "duplicate responsibility",
+    "wrong layer", "wrong-layer",
+    "repeated patching", "patching around",
+    "state ownership", "identity ambiguity", "lifecycle ambiguity",
+    "cross-file change", "broad refactor",
+    "excessive setup", "design complexity",
+    "structural issue", "fragile fix",
+)
+_REFACTOR_SCOPE_MAP = {
+    "dead path": "module", "dead code": "module",
+    "dead producer": "workflow", "dead consumer": "workflow",
+    "inert code": "module", "inert gate": "plugin",
+    "duplicated responsibility": "module",
+    "wrong layer": "architecture",
+    "repeated patching": "module",
+    "state ownership": "architecture",
+    "cross-file change": "plugin",
+    "broad refactor": "architecture",
+}
+
+
+def classify_refactor_escalation(
+    rewritten: str, task_intent: str, execution_tier: str
+) -> dict:
+    """Detect when discovery finds structural issues that warrant /refactor.
+
+    Does NOT expand the current task. Produces a recommendation:
+    continue_narrow_fix (safe to finish), pause_for_refactor (unsafe without),
+    or finish_then_refactor (complete with risks noted).
+    """
+    lower = rewritten.lower()
+    hits = [m for m in _REFACTOR_ESCALATION_MARKERS if m in lower]
+
+    if not hits:
+        return {
+            "required": False,
+            "trigger_evidence": [],
+            "current_task_scope": "narrow",
+            "refactor_scope": "none",
+            "recommendation": "continue_narrow_fix",
+            "suggested_command": None,
+            "reason": "no structural-issue markers detected",
+            "risk_if_ignored": None,
+        }
+
+    scope_hits = [_REFACTOR_SCOPE_MAP.get(h, "module") for h in hits]
+    refactor_scope = "architecture" if "architecture" in scope_hits else (
+        "plugin" if "plugin" in scope_hits else (
+            "workflow" if "workflow" in scope_hits else "module"
+        )
+    )
+
+    # If the task itself is already a broad refactor/design, don't escalate —
+    # the worker handles it directly.
+    if task_intent in ("decide", "mixed") and execution_tier in (
+        "pause_for_authorization",
+    ):
+        recommendation = "finish_then_refactor"
+    elif refactor_scope == "architecture":
+        recommendation = "pause_for_refactor"
+    elif refactor_scope in ("plugin", "workflow"):
+        recommendation = "finish_then_refactor"
+    else:
+        recommendation = "continue_narrow_fix"
+
+    # Determine current task scope from execution tier
+    task_scope = "narrow"
+    if execution_tier in ("full_go",):
+        task_scope = "medium"
+    if execution_tier in ("pause_for_authorization",):
+        task_scope = "broad"
+
+    return {
+        "required": True,
+        "trigger_evidence": hits,
+        "current_task_scope": task_scope,
+        "refactor_scope": refactor_scope,
+        "recommendation": recommendation,
+        "suggested_command": f"/refactor <{refactor_scope}>",
+        "reason": (
+            f"Discovery found {len(hits)} structural marker(s): "
+            f"{', '.join(hits[:3])}. The current task scope is {task_scope}; "
+            f"the refactor scope is {refactor_scope}. "
+            f"Recommendation: {recommendation}."
+        ),
+        "risk_if_ignored": (
+            "The narrow fix may be fragile or incomplete without addressing "
+            "the structural issue. Future changes to the same area will "
+            "encounter the same difficulty. Tests may require excessive setup."
+            if recommendation != "continue_narrow_fix" else
+            "Low risk — the structural marker is localized."
+        ),
+    }
+
+
 def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispatch) -> dict:
     """Lightweight role/authority/freshness policy for /go delegation.
 
@@ -2153,6 +2252,9 @@ def generate_proposal(
         rewritten, task_intent, execution_tier, risk, dispatch
     )
     layer_placement = classify_layer_placement(rewritten)
+    refactor_escalation = classify_refactor_escalation(
+        rewritten, task_intent, execution_tier
+    )
     # Wrong-layer escalation: if pattern detection/dry-run is proposed for a
     # Stop hook, force pause_for_authorization before any implementation.
     _layer_note = None
@@ -2248,6 +2350,7 @@ def generate_proposal(
         "repro_policy": repro_policy,
         "operational_discovery": operational_discovery,
         "layer_placement": layer_placement,
+        "refactor_escalation": refactor_escalation,
         "capability_claims": capability_claims_raw[0] if capability_claims_raw else None,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
