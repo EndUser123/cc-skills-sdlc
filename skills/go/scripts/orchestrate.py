@@ -52,6 +52,7 @@ def resolve_session_id() -> str:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
 from preflight_propose import run_preflight as _run_preflight  # noqa: E402
+from preflight_propose import apply_discovery_evidence_merge as _apply_discovery_merge  # noqa: E402
 
 
 @dataclass
@@ -1484,6 +1485,7 @@ def orchestrate(args: argparse.Namespace) -> str:
             return finish("blocked")
         phase_marker(state_dir, "coded", resume_run_id)
         set_delegation_mode(state_dir, "advisory", resume_run_id)
+        _apply_discovery_merge(state_dir, resume_run_id)
         if not run_common_tail(Path.cwd(), state_dir, resume_run_id):
             return finish("blocked")
         return finish("pr_ready")
@@ -1539,6 +1541,7 @@ def orchestrate(args: argparse.Namespace) -> str:
         inject_route_decision(state_dir, run_id, "pi", pi_info)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
             return finish("blocked")
+        _apply_discovery_merge(state_dir, run_id)
 
     if not run_common_tail(worktree, state_dir, run_id):
         return finish("blocked")

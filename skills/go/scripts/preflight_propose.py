@@ -2539,6 +2539,55 @@ def rebuild_with_discovery_evidence(proposal: dict, discovery_evidence: dict) ->
     return proposal
 
 
+
+def apply_discovery_evidence_merge(state_dir: Path, run_id: str) -> bool:
+    """Merge worker-filled discovery_evidence into the proposal.
+
+    Reads task-proposal_{run_id}.json, looks for discovery_evidence in
+    discovery-evidence_{run_id}.json (standard) or claude-task-result_{run_id}.json
+    (worker result), calls rebuild_with_discovery_evidence if valid, rebuilds the
+    plain_english_report, and writes the updated proposal back.
+
+    Returns True on success or soft-skip (no discovery found).
+    Returns False on hard failure (proposal unreadable, write failed).
+    Does NOT block the pipeline -- callers should continue even on False.
+    """
+    proposal_file = state_dir / f"task-proposal_{run_id}.json"
+    if not proposal_file.exists():
+        return True  # no proposal to merge; preflight-only mode
+    try:
+        proposal = json.loads(proposal_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False  # proposal unreadable -- don't mask the error
+
+    # Try standard discovery file first, then worker result file as fallback.
+    discovery_evidence = None
+    for candidate in (
+        state_dir / f"discovery-evidence_{run_id}.json",
+        state_dir / f"claude-task-result_{run_id}.json",
+    ):
+        if not candidate.exists():
+            continue
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+            # Standard discovery file: {findings: [...]}. Worker result may wrap: {discovery_evidence: {findings: [...]}}.
+            findings = data.get("findings") or (data.get("discovery_evidence") or data.get("discoveryEvidence", {})).get("findings")
+            if findings:
+                discovery_evidence = {"findings": findings}
+                break
+        except (OSError, ValueError):
+            continue
+
+    if not discovery_evidence:
+        return True  # no discovery findings; preflight-only result is correct
+
+    try:
+        proposal = rebuild_with_discovery_evidence(proposal, discovery_evidence)
+        proposal["plain_english_report"] = build_plain_english_report(proposal)
+        _atomic_write_json(proposal_file, proposal)
+        return True
+    except Exception:
+        return False  # rebuild failed -- keep preflight-only result
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 
