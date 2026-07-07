@@ -21,7 +21,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-_plugin_dir = SCRIPTS.parent.parent
+_plugin_dir = SCRIPTS.parent
 
 # Stub classify_complexity so preflight_propose can import.
 if "classify_complexity" not in sys.modules:
