@@ -2155,10 +2155,11 @@ def generate_proposal(
     layer_placement = classify_layer_placement(rewritten)
     # Wrong-layer escalation: if pattern detection/dry-run is proposed for a
     # Stop hook, force pause_for_authorization before any implementation.
+    _layer_note = None
     if layer_placement.get("verdict") == "wrong_layer":
         execution_tier = "pause_for_authorization"
         mixed_work_status_override = "blocked_policy"
-        notes.append(
+        _layer_note = (
             f"LAYER_PLACEMENT wrong_layer: {layer_placement['reason']} "
             "Broad behaviors must move to preflight/report-gate. "
             "Do NOT implement in the Stop hook."
@@ -2185,6 +2186,8 @@ def generate_proposal(
         f"model_affinity={model_affinity} (advisory; PI_DEFAULT_FLIP=advisory — "
         "route per existing rules, do not auto-flip dispatch)",
     ]
+    if _layer_note:
+        notes.append(_layer_note)
     if execution_tier == "pause_for_authorization":
         notes.append(
             "PAUSE: emit decision_advisory before any dispatch; do not proceed "
