@@ -28,16 +28,35 @@ from pathlib import Path
 
 
 def find_line_no(lines: list[str], sentence: str) -> int:
-    """Return 1-based line number of the first source line containing a stable
-    prefix of the sentence, or 0 if not found."""
-    # Normalize the sentence to a 40-char probe that's likely to survive inline
-    probe = re.sub(r"\s+", " ", sentence).strip()[:40]
-    if not probe:
+    """Return 1-based line number of the source line most likely to anchor this
+    candidate. Candidates are often newline-collapsed by the upstream extractor,
+    so a start-anchored probe won't work — instead search for distinctive tokens.
+
+    Strategy (first hit wins):
+      1. file.py:line refs  (e.g. 'xyz_router.py:42')
+      2. long alnum runs    (>= 8 chars, e.g. 'xyz_pipeline', 'EpistemicPolicyResult')
+      3. numbers+units      (e.g. '15ms', '400 tokens', 'v3.0')
+      4. short start-probe  (fallback: first 30 chars of the sentence)
+    Returns 0 if nothing matches.
+    """
+    if not sentence:
         return 0
-    probe_lower = probe.lower()
-    for i, line in enumerate(lines):
-        if probe_lower in line.lower():
-            return i + 1
+    # Build a list of (regex, source) probes in priority order
+    probes: list[str] = []
+    probes += re.findall(r"\b[\w_]+\.py:\d+", sentence)            # file.py:line
+    probes += re.findall(r"\b[A-Za-z_][A-Za-z0-9_]{7,}\b", sentence)  # long alnum
+    probes += re.findall(r"\b\d+\s*(?:ms|tokens?|KB|MB|GB|%|×)\b", sentence, re.I)  # num+unit
+    probes += re.findall(r"\bv\d+\.\d+\b", sentence, re.I)         # version
+    # Fallback: distinctive short phrase (skip generic leading words)
+    fallback = re.sub(r"\s+", " ", sentence).strip()
+    if len(fallback) >= 30:
+        probes.append(fallback[:30])
+
+    for probe in probes:
+        probe_lower = probe.lower()
+        for i, line in enumerate(lines):
+            if probe_lower in line.lower():
+                return i + 1
     return 0
 
 

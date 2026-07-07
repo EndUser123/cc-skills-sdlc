@@ -73,16 +73,39 @@ python skills/wiki/scripts/wiki_signal_filter.py \
   --report P:/.data/wiki/_incoming/durable_report.md
 ```
 
-**Stage 3 (LLM triage, in main session)**: read `durable_report.md`, group
-surviving candidates by theme, dispatch one subagent per cluster to distill them
-into real concept pages (verifying each against its source file first). Do NOT
-ingest the raw candidate sentences as pages — they are unverified classifier
-output. The triage subagent's job is: confirm the claim is real, generalize it,
-write the wiki page.
+**Stage 3 (chunk for LLM distillation)** — group survivors into self-contained
+verification chunks. Each chunk carries the candidate sentence + ±N lines of
+source context, so the reviewer never needs to load a full 500KB source file:
+
+```bash
+python skills/wiki/scripts/wiki_signal_distill.py \
+  --in P:/.data/wiki/_incoming/durable_candidates.json \
+  --source C:/Users/brsth/Downloads \
+  --out-dir P:/.data/wiki/_incoming/distill_chunks \
+  --context-lines 15
+```
+Emits one `<source-stem>.json` per source file + a `_manifest.json`. Chunks are
+2–8KB each — small enough for any consumer.
+
+**Stage 4 (dispatch distillation — choose one):**
+- **Claude subagents** (highest fidelity): read `_manifest.json`, spawn one
+  Task-tool subagent per chunk. Each subagent verifies the candidate against
+  its context_snippet, generalizes the claim, and writes a real concept page
+  to `P:/.data/wiki/concepts/<slug>.md`.
+- **Local/cheap LLM** (volume): pipe each chunk JSON to a parallel `/ai-cli`
+  call. The chunk is self-contained (sentence + context + source path) so no
+  shared state is needed between calls.
+- **Manual triage** (highest precision): read `durable_report.md`, hand-pick
+  the strongest 10–20 candidates, dispatch targeted subagents for just those.
+
+Do NOT ingest raw candidate sentences as pages — they are unverified classifier
+output. Every survivor must be verified against its source before promotion.
 
 **Tunables**:
 - `--wiki-overlap 0.5` (extractor): raise to keep more wiki-adjacent sentences, lower for stricter novelty.
 - `--noise-threshold 2` (filter): tool-output pattern hits to skip (2 = strict, 3 = loose).
+- `--context-lines 15` (distill): lines of source context per candidate.
+- `--max-per-chunk 20` (distill): split a file's candidates into multiple chunks above this count.
 
 Usage: `/wiki signal-extract <source-dir>`
 
