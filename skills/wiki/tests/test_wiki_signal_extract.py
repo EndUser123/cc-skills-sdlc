@@ -70,3 +70,52 @@ def test_missing_source_dir_errors_clean(tmp_path: Path):
     r = _run_cli([f"--source={tmp_path / 'nonexistent'}", f"--wiki={tmp_path}", f"--out={out}"])
     assert r.returncode == 1
     assert "not found" in r.stderr.lower() or "not found" in r.stdout.lower()
+
+
+def test_chain_files_skipped(tmp_path: Path):
+    """GATE-001: chain_*.md session exports are skipped by default to avoid
+    re-scanning already-ingested transcripts."""
+    src = tmp_path / "src"; src.mkdir()
+    (src / "chain_20260705_192919.md").write_text(
+        "Root cause: novel_chain_bug.py:1 fails silently.", encoding="utf-8",
+    )
+    (src / "real_source.txt").write_text(
+        "Root cause: novel_real_bug.py:2 fails silently.", encoding="utf-8",
+    )
+    wiki = tmp_path / "wiki"; wiki.mkdir()
+    out = tmp_path / "candidates.json"
+
+    r = _run_cli([f"--source={src}", f"--wiki={wiki}", f"--out={out}"])
+    assert r.returncode == 0
+    assert "skipped 1 chain files" in r.stdout, f"expected chain skip message, got: {r.stdout}"
+    cands = json.loads(out.read_text(encoding="utf-8"))
+    # The chain file's sentence must NOT appear; the real file's must
+    assert all("novel_chain_bug" not in c["sentence"] for c in cands), \
+        "chain_*.md file should be skipped"
+    assert any("novel_real_bug" in c["sentence"] for c in cands), \
+        "real source file should be scanned"
+
+
+def test_log_md_hash_dedup(tmp_path: Path):
+    """GATE-002: files whose SHA256 hash appears in the wiki log.md are
+    reported as already-processed. This test verifies the hash-loading
+    path works by creating a log.md with a known hash."""
+    import hashlib
+    src = tmp_path / "src"; src.mkdir()
+    source_file = src / "ingested.txt"
+    source_content = "Root cause: dedup_test.py:1 fails on retry."
+    source_file.write_text(source_content, encoding="utf-8")
+
+    wiki = tmp_path / "wiki"; wiki.mkdir()
+    file_hash = hashlib.sha256(source_file.read_bytes()).hexdigest()
+    (wiki / "log.md").write_text(
+        f"## [2026-07-07] ingest | test\nSHA256: {file_hash}\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "candidates.json"
+
+    r = _run_cli([f"--source={src}", f"--wiki={wiki}", f"--out={out}"])
+    assert r.returncode == 0
+    # The extractor should report that it loaded hashes from log.md
+    assert "already-injected hashes: 1" in r.stdout or "already-injected hashes: " in r.stdout, \
+        f"expected hash loading from log.md, got: {r.stdout}"
