@@ -1,7 +1,15 @@
 import sys, json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from complexity_scanner import scan_complexity
+from complexity_scanner import scan_complexity, rank_hotspots
+
+if "--churn" in sys.argv[1:]:
+    _files = [ln.strip() for ln in Path(__file__).parent.parent.joinpath('scan_targets.txt').read_text().splitlines() if ln.strip()]
+    _rows = rank_hotspots(_files, since_days=90, min_cc=5, top_n=10)
+    print("Top %d churn x complexity hotspots (last 90d):" % len(_rows))
+    for _r in _rows:
+        print("  score=%(hotspot_score)d  CC=%(max_cc)d  churn=%(churn)d  %(file_path)s" % _r)
+    sys.exit(0)
 
 files = Path(__file__).parent.parent.joinpath('scan_targets.txt').read_text().splitlines()
 findings = scan_complexity(files, min_cc=5)
