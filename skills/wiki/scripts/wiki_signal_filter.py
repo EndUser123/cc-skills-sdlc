@@ -74,7 +74,27 @@ DECISION_VERBS = re.compile(
     r"\b(?:fix (?:is|was) to)\b|"
     r"\b(?:Fabrication|Hallucination)\b.{0,30}:|"
     r"\b(?:provid|provid|provided|provides) (?:no|full|partial)\b.{0,20}\bcontrol|"
-    r"\b(?:imports? from|imports? non-?existent)\b)",
+    r"\b(?:imports? from|imports? non-?existent)\b"
+    # --- natural-language phrasings from LLM-verified test set (recall fix) ---
+    r"|\b(?:is (?:process-global|session-local|terminal-scoped|cross-terminal|stateless)\b"
+    r"|caches? (?:imported|module|in memory|the old|buggy)\b"
+    r"|skips? (?:close_turn|dispatch|enforcement|registration)\b"
+    r"|doesn'?t exist\b"
+    r"|returns? the most recent(?:ly modified)?\b"
+    r"|keyed (?:by|on)\b.{0,30}(?:terminal|session|mtime)\b"
+    r"|must (?:pass|be derived|use)\b"
+    r"|cannot (?:rewrite|intercept|distinguish|mutate)\b"
+    r"|inverts? (?:causality|the)\b"
+    r"|process-global\b"
+    r"|double-fire(?:s|d)?\b"
+    r"|blocks? (?:before|after|until|repeatedly|infinite)\b"
+    r"|returns? immediately\b.{0,30}(?:before|and the)\b"
+    r"|the n_1 pointer is\b"
+    r"|overwritten (?:on|each|every)\b"
+    r"|single-hop\b"
+    r"|doesn'?t (?:fire|run|reach|execute|register)\b"
+    r"|inert\b"
+    r"|unreachable\b))",
     re.I,
 )
 
@@ -87,7 +107,7 @@ ANCHOR_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(?:exit code|HTTP)\s*\d+"),
     re.compile(r"\b\d+\s*(?:ms|seconds?|tokens?|KB|MB|GB|%|×)\b"),
     re.compile(r"\b(?:env_?var|environment variable|ANTHROPIC_\w+|GO_RUN_ID|CLAUDE_GO_)\w*"),
-    re.compile(r"\b(?:Stop_router|skill_first_gate|cdp_start|Stop\.py|main_health|Stop_aggregator|Stop_artifact_enforcement|Stop_semantic_critic|claim_patterns|cross_validator|unified_evidence_enforcer|hook_runner|preflight_propose|orchestrate\.py)\w*"),
+    re.compile(r"\b(?:Stop[-_]?router|skill[-_]?first[-_]?gate|cdp[-_]?start|Stop\.py|main[-_]?health|Stop[-_]?aggregator|Stop[-_]?artifact[-_]?enforcement|Stop[-_]?semantic[-_]?critic|claim[-_]?patterns|cross[-_]?validator|unified[-_]?evidence[-_]?enforcer|hook[-_]?runner|preflight[-_]?propose|orchestrate\.py|close[-_]?turn|pycache|sys\.modules|ANTHROPIC_BASE_URL)\w*"),
     re.compile(r"\bline\s+\d{1,4}\b"),
     # Architectural anchors: hook lifecycle events with concrete names
     re.compile(r"\b(?:HandoffValidationError|EpistemicPolicyResult|HookEventName|additionalContext|permissionDecision|systemMessage)\b"),
