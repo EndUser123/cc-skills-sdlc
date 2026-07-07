@@ -175,8 +175,9 @@ def test_create_worktree_names_include_run_id_suffix(monkeypatch, tmp_path):
     worktree = _ORCHESTRATE.create_worktree("pi", tmp_path, "run-abcdef123456")
 
     assert "abcdef12" in str(worktree)
-    assert "abcdef12" in captured["command"][4]
-    assert "abcdef12" in captured["command"][5]
+    # Argv shape varies by dispatch (submodule-aware #916 prepends `-C <repo>`);
+    # assert the run-id suffix appears in some argv element (branch and/or path).
+    assert any("abcdef12" in arg for arg in captured["command"])
 
 
 def test_ensure_runtime_env_generates_nonconstant_run_id(monkeypatch):
@@ -280,7 +281,7 @@ def test_orchestrate_returns_blocked_when_worktree_creation_fails(monkeypatch, t
     monkeypatch.setenv("GO_STATE_DIR", str(tmp_path))
     monkeypatch.setenv("RUN_ID", "run1")
 
-    def fail_worktree(dispatch, state_dir, run_id):
+    def fail_worktree(dispatch, state_dir, run_id, target_repo=None):
         raise RuntimeError("git worktree add failed")
 
     monkeypatch.setattr(_ORCHESTRATE, "create_worktree", fail_worktree)

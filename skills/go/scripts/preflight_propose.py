@@ -122,6 +122,26 @@ _CAPABILITY_AUDIT_VERIFIED_CLAIMS: frozenset[str] = frozenset({
     "absorbed", "shipped", "production",
 })
 
+# --- Layer-placement guard (hook/gate boundary) --------------------------------
+# Stop hooks verify narrow session-bound evidence; preflight/report-gate owns
+# broad analysis, pattern detection, promotion policy, dry-run refactor.
+# This guard catches the misimplementation pattern that put pattern detection
+# into Stop_enforce_gate.py (recovered 2026-07-07).
+_LAYER_HOOK_FILE_MARKERS: tuple[str, ...] = (
+    "stop_enforce_gate", "stop hook", "stop.py", "pretooluse", "pre tool use",
+    "posttooluse", "post tool use", "sessionstart",
+)
+_LAYER_BROAD_BEHAVIOR_MARKERS: tuple[str, ...] = (
+    "pattern detection", "pattern_candidate", "dry run", "dry-run",
+    "refactor analysis", "cross-session state", "promotion policy",
+    "promotion rule", "recommendation generation", "policy memory",
+    "heuristic classification", "cross-session pattern",
+)
+_LAYER_NARROW_VERBS: tuple[str, ...] = (
+    "verify", "check", "existence", "evidence", "marker",
+    "completion", "artifact",
+)
+
 # --- Delegation policy (lightweight role/authority/freshness) ----------------
 # /go can delegate to claude_main, claude_subagent, local_fast, agy, pi_ccr.
 # This policy assigns bounded roles without a new multi-agent orchestrator.
@@ -1876,6 +1896,85 @@ def _extract_worker_scope(rewritten: str) -> list[str]:
         if p and p not in seen:
             seen.append(p)
     return seen[:8]  # bounded; a worker patch touching >8 paths is not "bounded"
+
+
+def classify_layer_placement(rewritten: str) -> dict:
+    """Layer-placement guard for hook/gate edits (reqs. 2-5).
+
+    Detects when a prompt proposes broad behaviors (pattern detection,
+    dry-run analysis, cross-session state, promotion policy) targeting a
+    Stop/PreToolUse/PostToolUse hook — the wrong architectural layer.
+    Stop hooks should narrowly verify session-bound artifacts/evidence;
+    preflight/report-gate owns broad analysis and promotion.
+    """
+    lower = rewritten.lower()
+    hook_hits = [m for m in _LAYER_HOOK_FILE_MARKERS if m in lower]
+    broad_hits = [m for m in _LAYER_BROAD_BEHAVIOR_MARKERS if m in lower]
+    narrow_hits = [m for m in _LAYER_NARROW_VERBS if _word_boundary_match(m, lower)]
+
+    if not hook_hits:
+        return {
+            "required": False,
+            "verdict": "not_applicable",
+            "reason": "no hook/gate file mentioned",
+        }
+
+    if broad_hits and hook_hits:
+        return {
+            "required": True,
+            "verdict": "wrong_layer",
+            "proposed_behavior": broad_hits,
+            "chosen_layer": "preflight/report-gate",
+            "rejected_layers": ["stop_hook", "pretooluse_hook", "posttooluse_hook"],
+            "reason": (
+                "Broad behaviors (pattern detection, dry-run analysis, "
+                "cross-session state, promotion policy) belong in preflight/"
+                "report-gate, NOT in Stop/PreToolUse/PostToolUse hooks. "
+                "Stop hooks verify narrow session-bound evidence only. "
+                "Implementing broad logic in a Stop hook creates cross-session "
+                "side effects, coupling the hook to non-session-scoped state, "
+                "and makes the hook untestable in isolation."
+            ),
+            "must_not_happen_in_layer": [
+                "cross-session state writes",
+                "pattern detection or pattern_candidate emission",
+                "dry-run refactor analysis",
+                "promotion policy or recommendation generation",
+                "heuristic classification beyond evidence-level mapping",
+            ],
+            "data_path": {
+                "writer": "preflight_propose.classify_layer_placement",
+                "storage": "task-proposal_{run_id}.json layer_placement",
+                "reader": "/go orchestrator + report gate",
+                "authority": "this function",
+                "freshness": "same as proposal (run_id bound)",
+                "failure_direction": "wrong_layer -> pause_for_authorization",
+            },
+            "hook_markers": hook_hits,
+        }
+
+    return {
+        "required": True,
+        "verdict": "allowed",
+        "proposed_behavior": narrow_hits or ["evidence/artifact verification"],
+        "chosen_layer": "stop_hook (narrow verification)",
+        "rejected_layers": [],
+        "reason": (
+            "Narrow session-bound evidence/artifact verification is the correct "
+            "layer for Stop hooks. No broad pattern detection, dry-run "
+            "analysis, or cross-session state detected."
+        ),
+        "must_not_happen_in_layer": _LAYER_BROAD_BEHAVIOR_MARKERS,
+        "data_path": {
+            "writer": "preflight_propose.classify_layer_placement",
+            "storage": "task-proposal_{run_id}.json layer_placement",
+            "reader": "/go orchestrator + report gate",
+            "authority": "this function",
+            "freshness": "same as proposal (run_id bound)",
+            "failure_direction": "allowed -> proceed",
+        },
+        "hook_markers": hook_hits,
+    }
 
 
 def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispatch) -> dict:

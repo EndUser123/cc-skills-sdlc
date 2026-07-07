@@ -818,24 +818,86 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
     return task
 
 
-def create_worktree(dispatch: str, state_dir: Path, run_id: str) -> Path:
+def _nearest_git_root(path: Path) -> Path | None:
+    """Nearest ancestor of ``path`` containing a ``.git`` entry (dir or file).
+
+    For a path inside an embedded/submodule repo this returns THAT repo's
+    root, not the parent's -- the basis for submodule-agnostic dispatch (#916).
+    """
+    p = path.resolve()
+    if p.is_file():
+        p = p.parent
+    while True:
+        if (p / ".git").exists():
+            return p
+        if p.parent == p:
+            return None
+        p = p.parent
+
+
+def resolve_target_repo(scope_in: list[str]) -> tuple[Path | None, str]:
+    """Resolve the single git repo a task's ``scope_in`` paths live in (#916).
+
+    Returns ``(repo_root, status)`` where status is:
+      - ``"single"``     -- all resolvable paths share one repo root
+      - ``"unknown"``    -- scope_in empty or no paths resolve (caller falls back to parent)
+      - ``"cross-repo"`` -- paths span >1 repo; caller must reject
+
+    Globs expand relative to CWD. Non-existent literal paths are skipped
+    (a scope_in entry may name a file the worker will create).
+    """
+    import glob as glob_mod
+
+    roots: set[Path] = set()
+    for item in scope_in or []:
+        spec = (item or "").strip()
+        if not spec:
+            continue
+        matches = glob_mod.glob(spec) or ([spec] if Path(spec).exists() else [])
+        for m in matches:
+            root = _nearest_git_root(Path(m))
+            if root is not None:
+                roots.add(root)
+    if not roots:
+        return None, "unknown"
+    if len(roots) > 1:
+        return None, "cross-repo"
+    return next(iter(roots)), "single"
+
+
+def create_worktree(
+    dispatch: str, state_dir: Path, run_id: str, target_repo: Path | None = None
+) -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     prefix = "pi" if dispatch == "pi" else "ai"
     run_suffix_source = run_id[4:] if run_id.startswith("run-") else run_id
     suffix = "".join(ch for ch in run_suffix_source if ch.isalnum())[:8] or uuid.uuid4().hex[:8]
-    root = Path("P:/worktrees")
-    worktree = root / f"{prefix}-task-{ts}-{suffix}"
+    # Submodule-agnostic (#916): create the worktree in the target's real repo,
+    # not always the parent. A parent-level worktree is empty for
+    # gitlink-without-.gitmodules plugins, so the worker would land in a bare dir.
+    repo = target_repo if target_repo is not None else Path.cwd()
+    base = f"{prefix}-task-{ts}-{suffix}"
+    if target_repo is not None:
+        base = f"{base}-{(repo.name or 'repo').replace(' ', '-')}"
+    root = Path(os.environ.get("GO_WORKTREE_ROOT", "P:/worktrees"))
+    worktree = root / base
+    branch = f"{prefix}/{prefix}-task-{ts}-{suffix}"
     root.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["git", "worktree", "add", "-b", f"{prefix}/{prefix}-task-{ts}-{suffix}", str(worktree), "HEAD"],
+        ["git", "-C", str(repo), "worktree", "add", "-b", branch, str(worktree), "HEAD"],
         check=False,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        raise RuntimeError(f"git worktree add failed for {worktree}: {detail}")
-    write_json(state_dir / f"worktree-{run_id}.json", {"worktree": str(worktree)})
+        raise RuntimeError(
+            f"git worktree add failed for {worktree} (repo={repo}): {detail}"
+        )
+    write_json(
+        state_dir / f"worktree-{run_id}.json",
+        {"worktree": str(worktree), "target_repo": str(repo)},
+    )
     phase_marker(state_dir, "worktree-ready", run_id)
     return worktree
 
@@ -1448,8 +1510,23 @@ def orchestrate(args: argparse.Namespace) -> str:
         # re-invokes with --claude-resume <run_id> for phase 2.
         return "<promise>SPAWN_CLAUDE_SUBAGENT</promise>"
 
+    # Submodule-agnostic dispatch (#916): resolve the real repo the task targets.
+    target_repo, repo_status = resolve_target_repo(task.scope_in)
+    if repo_status == "cross-repo":
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "phase": "scope",
+                "error": "cross-repo task",
+                "detail": "scope_in spans multiple git repos; /go dispatches one repo at a time. Split the task.",
+                "scope_in": task.scope_in,
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return finish("blocked")
+
     try:
-        worktree = create_worktree(args.dispatch, state_dir, run_id)
+        worktree = create_worktree(args.dispatch, state_dir, run_id, target_repo)
     except RuntimeError as exc:
         write_json(
             state_dir / f"blocked_{run_id}.json",
