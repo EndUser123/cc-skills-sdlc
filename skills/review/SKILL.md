@@ -98,6 +98,16 @@ Markdown by default (verdict → findings with impact/effort → cross-agent val
 - **E4**: read source before reviewing; don't ask the user for what you can find.
 - **E5**: no "I assume / probably" without tool verification.
 
+## Cross-Skill Transfer Check (XSTC)
+
+`/review` emits XSTC only for **recurring** code-review/test-quality
+patterns (≥2 occurrences across runs), not every routine finding. Recurring
+patterns → `classification: applies_to_related_skills` with owner
+`/improve` (if a workflow change) or `/skill-audit` (if it's about how
+`/review` itself is invoked). One-off findings → no XSTC; just include in
+the file:line output. Canonical template at
+`debrief/references/cross-skill-transfer-check.md`.
+
 ## Deprecated aliases
 
 `/review-pr`, `/uci`, `/sqd` still resolve (5-line router stubs in their own SKILL.md) and forward here. They will be removed after one release cycle.
