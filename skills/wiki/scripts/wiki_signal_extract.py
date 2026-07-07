@@ -112,6 +112,12 @@ def main() -> int:
 
     exts = tuple("." + e.lstrip(".").lower() for e in args.exts.split(","))
 
+    # Default skip patterns: session-export chain files are already ingested
+    # by a previous /wiki signal-extract run (their signal-* pages exist in the
+    # wiki). Scanning them wastes time — they're the same transcripts the
+    # LLM-skim agents already processed.
+    DEFAULT_SKIP = {"chain_*.md"}
+
     # 1. Build wiki shingle index
     wiki_shingles: set[str] = set()
     wiki_pages = list(wiki.glob("*.md")) if wiki.is_dir() else []
@@ -122,9 +128,25 @@ def main() -> int:
             pass
     print(f"wiki shingle index: {len(wiki_shingles)} unique (from {len(wiki_pages)} pages)")
 
-    # 2. Walk source, extract signal sentences
-    files = [f for f in source.iterdir() if f.is_file() and f.suffix.lower() in exts]
-    print(f"scanning {len(files)} files...")
+    # 1b. Load SHA256 hashes already in wiki log.md (reuse wiki_manifest dedup)
+    log_file = (Path(wiki) / "log.md") if wiki.is_dir() else None
+    existing_hashes: set[str] = set()
+    if log_file and log_file.exists():
+        log_text = log_file.read_text(encoding="utf-8", errors="replace")
+        existing_hashes = set(re.findall(r"SHA256:([a-f0-9]{64})", log_text))
+    print(f"log.md already-injected hashes: {len(existing_hashes)}")
+
+    # 2. Walk source, extract signal sentences (skip chains + already-hashed files)
+    import fnmatch
+    def _is_skipped(f: Path) -> bool:
+        name = f.name
+        for pat in DEFAULT_SKIP:
+            if fnmatch.fnmatch(name, pat):
+                return True
+        return False
+
+    files = [f for f in source.iterdir() if f.is_file() and f.suffix.lower() in exts and not _is_skipped(f)]
+    print(f"scanning {len(files)} files (skipped {sum(1 for f in source.iterdir() if f.is_file() and _is_skipped(f))} chain files)...")
 
     per_file: dict[str, list[tuple[int, str, float]]] = defaultdict(list)
     seen_sentences: set[str] = set()
