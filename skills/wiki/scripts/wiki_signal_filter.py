@@ -116,8 +116,35 @@ ANCHOR_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(?:apply_epistemic_policy|extract_targeted_context|resolve_terminal_key|load_raw_handoff|should_block_claim)\w*"),
 ]
 
-# Minimum signature: 1 decision verb AND >= 1 anchor
+# High-confidence verbs that are strong enough signals on their own — they
+# don't need a concrete anchor. These are explicit causality/decision/rejection
+# claims that rarely appear in ordinary prose.
+HIGH_CONFIDENCE_VERBS = re.compile(
+    r"\b(?:root cause|the (?:real|actual|underlying)\s+(?:reason|cause|issue)|"
+    r"the fix (?:is|was|was to)\b|fix(?:ed|es)? (?:by|via|requires?|is to)\b|"
+    r"caused by\b|happens when\b|"
+    r"by design\b|"
+    r"dead code\b|"
+    r"reject(?:ed|s)?\b(?:\s+(?:the|because|since|in favor))?|"
+    r"trade-?off\b|"
+    r"we (?:decided|chose|rejected|adopted)\b|"
+    r"platform (?:limit|constraint)\b|"
+    r"this is (?:the (?:actual|real))?\s*(?:root cause|bug|fix)|"
+    r"never (?:fires?|runs?|reaches?|executes?|registered|wired|importing)\b|"
+    r"silently\b.{0,40}(?:fail|drop|ignore|swallow|discard)|"
+    r"catching\b.{0,60}\bnever\b|"
+    r"three names for the same\b|"
+    r"are (?:the same|identical|equivalent)\b|"
+    r"caches?\s+(?:imported|module|in memory|the old|buggy)\b"
+    r")",
+    re.I,
+)
+
+
+# Minimum signature: 1 decision verb AND >= 1 anchor, OR 1 high-confidence verb alone.
 def has_durable_signature(sent: str) -> tuple[bool, str]:
+    if HIGH_CONFIDENCE_VERBS.search(sent):
+        return True, "high-confidence-verb"
     if not DECISION_VERBS.search(sent):
         return False, "no-decision-verb"
     for pat in ANCHOR_PATTERNS:
