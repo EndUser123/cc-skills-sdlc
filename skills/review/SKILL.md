@@ -20,6 +20,24 @@ suggest:
 
 Single entry point for every code-review flavor in the marketplace. Pick a mode or let the default `pr` mode run.
 
+## Escalation — when to leave `/review`
+
+`/review` is a **routine code/diff review** workflow. It produces file:line
+findings, not trust verdicts. Escalate to a specialized command when the work
+crosses into a different layer:
+
+| If the work involves... | Escalate to | Why |
+|---|---|---|
+| Hook wiring, gate ordering, dispatch double-fire, plugin loading, marketplace cache hygiene | `/claude-audit` | Runtime/environment/config layer. `/review` can find the bug; `/claude-audit` owns the surface. |
+| Skill/command contracts, capability preservation, absorbed/stub claims, alias routing, advertised capabilities | `/skill-audit` | 8-category rubric + capability-preservation check. `/review` is wrong layer for skill design. |
+| Trust/adversarial verdict on a proposal (PROCEED/REVISE/BLOCK), security boundary, secret handling, prompt-injection surface | `/red-team` | Adversarial specialist dispatch + critic verdict. `/review` doesn't run specialists. |
+| Improving a single artifact's design (prompt, hook config, code slice) | `/improve` | Review-with-recommendation machinery. |
+
+Use the routing table. Do not let `/review` absorb adversarial or audit work
+because the file:line findings are similar in shape.
+
+## Modes
+
 ## Modes
 
 | Mode | What it does | Engine |
