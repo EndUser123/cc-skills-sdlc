@@ -2152,9 +2152,24 @@ def generate_proposal(
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
     )
+    layer_placement = classify_layer_placement(rewritten)
+    # Wrong-layer escalation: if pattern detection/dry-run is proposed for a
+    # Stop hook, force pause_for_authorization before any implementation.
+    if layer_placement.get("verdict") == "wrong_layer":
+        execution_tier = "pause_for_authorization"
+        mixed_work_status_override = "blocked_policy"
+        notes.append(
+            f"LAYER_PLACEMENT wrong_layer: {layer_placement['reason']} "
+            "Broad behaviors must move to preflight/report-gate. "
+            "Do NOT implement in the Stop hook."
+        )
+    else:
+        mixed_work_status_override = None
     mixed_work_status = classify_mixed_work_status(
         rewritten, task_intent, execution_tier, risk, _PROMPT_REVIEW_SUPPORT
     )
+    if mixed_work_status_override:
+        mixed_work_status = mixed_work_status_override
     decision_kind = classify_decision_kind(rewritten, task_intent, execution_tier, risk)
     prompt_review_required = bool(risk["prompt_review_required"])
     high_risk = bool(risk.get("high_risk"))
@@ -2229,6 +2244,7 @@ def generate_proposal(
         "closure_check": closure_check,
         "repro_policy": repro_policy,
         "operational_discovery": operational_discovery,
+        "layer_placement": layer_placement,
         "capability_claims": capability_claims_raw[0] if capability_claims_raw else None,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),

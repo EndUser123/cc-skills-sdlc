@@ -46,6 +46,46 @@ Usage: `/wiki`
 
 ## Operations
 
+### Signal-extract (bulk noisy sources)
+
+For directories full of session dumps, chat exports, or other noisy text where
+whole-file LLM-skim agents miss gems buried past line 150. Two-script deterministic
+pipeline — NO LLM in the loop until the final triage step.
+
+**When to use**: source has 100+ files where most yield nothing and a few have
+buried root-cause / measurement / decision nuggets (e.g. `C:/Users/brsth/Downloads`).
+**When NOT to use**: curated single-author docs, YouTube transcripts, design docs —
+use the regular `Ingest` operation below (one page per source).
+
+```bash
+# Stage 1: scan all files, dedupe candidates vs existing wiki (4-shingle overlap)
+python skills/wiki/scripts/wiki_signal_extract.py \
+  --source C:/Users/brsth/Downloads \
+  --wiki P:/.data/wiki/concepts \
+  --out P:/.data/wiki/_incoming/signal_candidates.json \
+  --report P:/.data/wiki/_incoming/signal_report.md
+
+# Stage 2: filter — drop tool-output noise + require durable-claim signature
+python skills/wiki/scripts/wiki_signal_filter.py \
+  --in P:/.data/wiki/_incoming/signal_candidates.json \
+  --wiki P:/.data/wiki/concepts \
+  --out P:/.data/wiki/_incoming/durable_candidates.json \
+  --report P:/.data/wiki/_incoming/durable_report.md
+```
+
+**Stage 3 (LLM triage, in main session)**: read `durable_report.md`, group
+surviving candidates by theme, dispatch one subagent per cluster to distill them
+into real concept pages (verifying each against its source file first). Do NOT
+ingest the raw candidate sentences as pages — they are unverified classifier
+output. The triage subagent's job is: confirm the claim is real, generalize it,
+write the wiki page.
+
+**Tunables**:
+- `--wiki-overlap 0.5` (extractor): raise to keep more wiki-adjacent sentences, lower for stricter novelty.
+- `--noise-threshold 2` (filter): tool-output pattern hits to skip (2 = strict, 3 = loose).
+
+Usage: `/wiki signal-extract <source-dir>`
+
 ### Ingest
 
 3-phase pipeline: **Pre-phase** (Python script, no LLM) → **Ingest phase** (parallel per-file subagents) → **Post-phase** (QMD update, no file content).

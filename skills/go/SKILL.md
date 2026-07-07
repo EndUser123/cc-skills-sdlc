@@ -307,6 +307,8 @@ git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
 
+**Submodule-aware provisioning (#916).** `create_worktree` resolves each `scope_in` path to its nearest `.git` root and creates the worktree via `git -C <repo>` — so a task targeting an embedded/gitlink plugin (cc-skills-sdlc, skill-guard, snapshot, cc-skills-ai-api, cc-skills-media, cc-skills-utils, search-research — gitlinks without `.gitmodules`) gets a *populated* worktree, not an empty parent-level dir. `scope_in` spanning more than one git repo → `<promise>BLOCKED</promise>` (split the task). Override the worktree root with `GO_WORKTREE_ROOT` (default `P:/worktrees`).
+
 ### Claude native-subagent dispatch (two-phase)
 
 `/go` runs as a Bash-invoked Python script and cannot call the in-session
