@@ -2509,6 +2509,36 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def rebuild_with_discovery_evidence(proposal: dict, discovery_evidence: dict) -> dict:
+    """Rebuild proposal's refactor_escalation + pattern_candidates using
+    runtime discovery findings. Called after the worker fills discovery_evidence.
+
+    This is the ONLY entry point for runtime discovery merge. Preflight emits
+    discovery_evidence=None; this function fills it post-discovery.
+    """
+    rewritten = proposal.get("rewrittenGoal", "")
+    task_intent = proposal.get("task_intent", "implement")
+    execution_tier = proposal.get("execution_tier", "local_surgical")
+    merged_refactor = classify_refactor_escalation(
+        rewritten, task_intent, execution_tier,
+        discovery_evidence=discovery_evidence,
+    )
+    # Preserve prompt-based fields that discovery evidence may raise
+    # but never erase (merge requirement from goal req. 4).
+    old_re = proposal.get("refactor_escalation", {})
+    if old_re.get("required") and not merged_refactor.get("required"):
+        merged_refactor["required"] = True
+    if old_re.get("trigger_evidence"):
+        existing = set(merged_refactor.get("trigger_evidence", []))
+        for e in old_re["trigger_evidence"]:
+            if e not in existing:
+                merged_refactor["trigger_evidence"].append(e)
+                existing.add(e)
+    proposal["refactor_escalation"] = merged_refactor
+    proposal["pattern_candidates"] = classify_pattern_candidates(proposal)
+    return proposal
+
+
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 

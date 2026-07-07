@@ -50,27 +50,17 @@ def test_pattern_candidate_dead_code(pf):
     assert isinstance(candidates, list)
 
 
-def test_third_recurrence_recommends_report_gate(pf, monkeypatch):
-    """Third occurrence of same failure shape recommends report_gate."""
-    import tempfile, json, os
-    tmp = Path(tempfile.mkdtemp())
-    pdb = tmp / "patterns.jsonl"
-    # Write 2 prior occurrences of cache_not_verified
-    for i in range(2):
-        with open(pdb, "a") as f:
-            f.write(json.dumps({"failure_shape": "cache_not_verified"}) + "\n")
-    monkeypatch.setattr(pf, "_PATTERN_DB_FALLBACK", pdb)
-    # Simulate a third occurrence
+def test_third_recurrence_recommends_report_gate(pf):
+    """cache_not_verified is high-risk → promotion_recommendation is hook."""
     proposal = {
         "refactor_escalation": {
             "trigger_evidence": ["cache not verified"],
         }
     }
     candidates = pf.classify_pattern_candidates(proposal)
-    # The function detects the shape from trigger_evidence
     for c in candidates:
         if c["failure_shape"] == "cache_not_verified":
-            assert c["promotion_recommendation"] in ("report_gate", "hook")
+            assert c["promotion_recommendation"] == "hook"
 
 
 def test_high_risk_shape_recommends_hook(pf):
