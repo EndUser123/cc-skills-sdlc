@@ -155,7 +155,7 @@ def main() -> int:
         if len(words) < 5:
             continue
         overlap = len(words & wiki_shingles) / len(words)
-        if overlap >= 0.55:
+        if overlap >= 0.95:
             novel_dropped += 1
             continue
         kept.append({**c, "tool_output_hits": hits, "novelty_words": round(1 - overlap, 3)})

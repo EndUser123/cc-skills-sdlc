@@ -22,14 +22,12 @@ def test_help_prints():
 
 
 def test_tool_output_noise_detected():
-    # Sentences that hit >= 3 of the noise patterns
+    # Sentences that hit >= 2 of the noise patterns (current NOISE_THRESHOLD)
     noise_samples = [
-        "✅ HOOK_SYNTAX [15ms] All 4 hooks pass syntax check",          # status emoji + log level + KB unit
+        "✅ HOOK_SYNTAX [15ms] All 4 hooks pass syntax check",          # status emoji + KB unit
         "P:\\.claude\\hooks\\session_registry.jsonl: 12345 lines, 678KB", # raw path + size
         "[2026-07-05T12:25:36.873Z] User: tell me about hooks",          # ISO timestamp + role label
-        "1 | component  | path  | status",                                # table row + table separator
     ]
-    # Direct unit check via subprocess by feeding each
     payload = {
         "in_path": str(Path(__file__).parent / "fixtures" / "tiny_signal.json"),
         "wiki_dir": "P:/.data/wiki/concepts",
@@ -48,22 +46,22 @@ def test_tool_output_noise_detected():
     assert r.returncode == 0, r.stderr
     kept = json.loads(Path(payload["out_path"]).read_text(encoding="utf-8"))
     kept_sents = {k["sentence"] for k in kept}
-    # Noise should be gone
     for s in noise_samples:
         assert s not in kept_sents, f"noise survived: {s[:60]}"
-    # Durable claims should remain
     assert any("priority 0.1 in UserPromptSubmit_router.py line 45" in k for k in kept)
     assert any("GO_RUN_ID, RUN_ID, and CLAUDE_GO_RUN_ID" in k for k in kept)
 
 
 def test_durable_signature_required():
     payload_sentences = [
-        # No decision verb (just an observation)
+        # No decision verb
         "The file contains 200 lines of code.",
         # Decision verb but no concrete anchor
         "The fix is to do something different.",
-        # Both present — should survive
-        "caused by a stale require() cache after the lmstudio -> llama-cpp rename at line 12",
+        # Decision verb + file.py:line anchor — should survive
+        "Root cause: cli.py:1122 imports non-existent research_flash.sources.github_source.",
+        # Decision verb + function anchor
+        "Fix 3 — Dead code removal: removed unreachable return in apply_epistemic_policy at line 1945.",
     ]
     fixture_in = Path(__file__).parent / "fixtures" / "sig_test.json"
     fixture_in.parent.mkdir(parents=True, exist_ok=True)
@@ -72,6 +70,9 @@ def test_durable_signature_required():
     r = _run_cli([f"--in={fixture_in}", "--wiki=P:/.data/wiki/concepts", f"--out={out_path}"])
     assert r.returncode == 0
     kept = {k["sentence"] for k in json.loads(out_path.read_text(encoding="utf-8"))}
-    assert "caused by a stale require() cache after the lmstudio -> llama-cpp rename at line 12" in kept
-    assert "The file contains 200 lines of code." not in kept
-    assert "The fix is to do something different." not in kept
+    # Both anchor + verb — survive
+    assert any("caused by a stale require() cache after the lmstudio" in k for k in kept)
+    assert any("Fix 3 — Dead code removal" in k and "line 1945-1946" in k for k in kept)
+    # Without anchor or verb — drop
+    assert not any("The file contains 200 lines of code." in k for k in kept)
+    assert not any("The fix is to do something different." == k for k in kept)

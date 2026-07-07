@@ -1,0 +1,9 @@
+[
+  {
+    "file": "z.txt",
+    "sentence": "GO_RUN_ID, RUN_ID, and CLAUDE_GO_RUN_ID are three names for the same env var; carrier via process env is the root cause.",
+    "novelty": 0.95,
+    "tool_output_hits": 0,
+    "novelty_words": 0.143
+  }
+]
