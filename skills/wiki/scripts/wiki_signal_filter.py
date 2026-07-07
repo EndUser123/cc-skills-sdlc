@@ -116,18 +116,12 @@ ANCHOR_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(?:apply_epistemic_policy|extract_targeted_context|resolve_terminal_key|load_raw_handoff|should_block_claim)\w*"),
 ]
 
-# High-confidence verbs that are strong enough signals on their own — they
-# don't need a concrete anchor. These are explicit causality/decision/rejection
-# claims that rarely appear in ordinary prose.
-HIGH_CONFIDENCE_VERBS = re.compile(
+# Unambiguous high-confidence verbs — safe to pass WITHOUT an anchor because
+# they almost never appear in ordinary non-technical prose.
+UNAMBIGUOUS_HC_VERBS = re.compile(
     r"\b(?:root cause|the (?:real|actual|underlying)\s+(?:reason|cause|issue)|"
     r"the fix (?:is|was|was to)\b|fix(?:ed|es)? (?:by|via|requires?|is to)\b|"
     r"caused by\b|happens when\b|"
-    r"by design\b|"
-    r"dead code\b|"
-    r"reject(?:ed|s)?\b(?:\s+(?:the|because|since|in favor))?|"
-    r"trade-?off\b|"
-    r"we (?:decided|chose|rejected|adopted)\b|"
     r"platform (?:limit|constraint)\b|"
     r"this is (?:the (?:actual|real))?\s*(?:root cause|bug|fix)|"
     r"never (?:fires?|runs?|reaches?|executes?|registered|wired|importing)\b|"
@@ -140,12 +134,33 @@ HIGH_CONFIDENCE_VERBS = re.compile(
     re.I,
 )
 
+# Ambiguous high-confidence verbs — strong signal in technical context, but also
+# appear in ordinary prose ("we decided to go to lunch", "rejected his friend
+# request", "dead code in the city plan"). These require a concrete anchor
+# to pass, same as DECISION_VERBS. They're checked first (before DECISION_VERBS)
+# so they still get the "high-confidence" priority for tiebreaker purposes.
+AMBIGUOUS_HC_VERBS = re.compile(
+    r"\b(?:reject(?:ed|s)?\b(?:\s+(?:the|because|since|in favor))?|"
+    r"trade-?off\b|"
+    r"we (?:decided|chose|rejected|adopted)\b|"
+    r"by design\b|"
+    r"dead code\b"
+    r")",
+    re.I,
+)
 
-# Minimum signature: 1 decision verb AND >= 1 anchor, OR 1 high-confidence verb alone.
+
+# Minimum signature:
+#   - UNAMBIGUOUS_HC alone -> pass (no anchor needed)
+#   - AMBIGUOUS_HC + anchor -> pass
+#   - DECISION_VERBS + anchor -> pass
+#   - anything else -> drop
 def has_durable_signature(sent: str) -> tuple[bool, str]:
-    if HIGH_CONFIDENCE_VERBS.search(sent):
+    if UNAMBIGUOUS_HC_VERBS.search(sent):
         return True, "high-confidence-verb"
-    if not DECISION_VERBS.search(sent):
+    has_ambiguous = bool(AMBIGUOUS_HC_VERBS.search(sent))
+    has_standard = bool(DECISION_VERBS.search(sent))
+    if not has_ambiguous and not has_standard:
         return False, "no-decision-verb"
     for pat in ANCHOR_PATTERNS:
         if pat.search(sent):
