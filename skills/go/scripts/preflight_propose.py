@@ -2493,6 +2493,8 @@ def generate_proposal(
         "operational_discovery": operational_discovery,
         "layer_placement": layer_placement,
         "refactor_escalation": refactor_escalation,
+        "dry_run_trigger": dry_run_trigger,
+        "pattern_candidates": [],  # scaffold; filled at report time from discovery + evidence
         "capability_claims": capability_claims_raw[0] if capability_claims_raw else None,
         "verificationSuggestions": verification_suggestions(rewritten),
         "verificationPolicy": _verification_policy_key(rewritten),
