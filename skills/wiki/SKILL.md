@@ -382,7 +382,7 @@ Usage: `/wiki index`
 
 Refresh stale wiki pages by detecting topics that need updating and offering web-based refresh.
 
-**Phase 1 — Discovery**: Identify candidates via three signals:
+**Phase 1 — Discovery**: Identify candidates via four signals:
 1. **Stale page list (deterministic, shared with /main):**
    ```bash
    python P:/packages/.claude-marketplace/plugins/cc-skills-utils/skills/main/scripts/wiki_health_check.py --stale [--max-age 90] [--limit 20] [--json]
@@ -394,6 +394,12 @@ Refresh stale wiki pages by detecting topics that need updating and offering web
    ```
    Reports per-page reasons: `changed` (upstream content differs), `missing_hash` (page has `source_url` but no `source_hash` — needs initial population), `fetch_failed:<Error>` (network/HTTP). Pages without `source_url` are invisible to this scan.
 3. **QMD search frequency**: Run `qmd search --collection wiki <topic>` and track which topics are re-searched (implies active interest) — overlay this signal on the stale + drift lists to prioritize.
+4. **Git-commit delta (`--since <sha>`, deterministic):** pages whose `Sources:` frontmatter cites a file changed since `<sha>`. This catches doc-code drift the age and source-drift signals miss (a recently-edited page can still lag the code it documents). Pattern reused from `cc-skills-analysis/skills/top-problems/references/flags.md`:
+   ```bash
+   # changed files since the anchor sha
+   git -C P:/packages/.claude-marketplace log <sha>..HEAD --name-only --pretty=format: | sort -u
+   ```
+   Intersect that list with the `Sources:` entries on each `P:/.data/wiki/concepts/*.md` page. Any page citing a changed file is a refresh candidate. Anchor = the sha recorded at the last `/wiki update` (store it in `.claude/.artifacts/<terminal_id>/wiki/last_update_sha`), or a known-good tag when no anchor exists.
 
 **Phase 2 — Staleness scoring**: Rank candidates by:
 - Days since last update (page mtime vs current date)
@@ -437,6 +443,18 @@ Select items to refresh (e.g. "1,3,U" = update 1 & 3): _
 - `/wiki update <topic>` — update specific topic directly
 
 **Token cost**: No in-context tokens during auto-refresh. Each page refresh is an independent subagent call (out-of-context).
+
+### Init
+Seed the project `CLAUDE.md` with a Wiki Index pointer so every coding agent in the repo knows the wiki exists and how to query it — without re-explaining it each session. Idempotent: re-running updates the block, never duplicates it.
+
+1. Resolve the project CLAUDE.md: `P:/CLAUDE.md` if it exists, else the repo root `CLAUDE.md`.
+2. Inject (or replace) a fenced `<!-- BEGIN WIKI INDEX -->` … `<!-- END WIKI INDEX -->` block containing:
+   - Vault location: `P:/.data/wiki/` (concepts in `concepts/`, log at `log.md`).
+   - How to query: `/wiki query <question>` (QMD-backed; session-scope answers preferred for vague queries).
+   - How to refresh: `/wiki update` (4 Discovery signals incl. `--since <sha>`); `/wiki lint` for health.
+3. Do NOT rewrite the rest of CLAUDE.md — only the fenced block. If the markers already exist, replace only the content between them.
+
+Usage: `/wiki init`
 
 Usage: `/wiki update [--auto] [--max-age <days>] [--limit <n>] [<topic>]
 
