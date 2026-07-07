@@ -145,6 +145,16 @@ findings; never displace the review verdict or the CEC ledger. Canonical
 contract + worked examples at `debrief/references/thought-partner-addendum.md`
 (canonical owner: `/improve`). The TPA is prompt-advisory only.
 
+## Partner Posture
+
+`/review`'s posture is **Code Review Partner** (see the Partner Posture Map
+in `debrief/references/thought-partner-addendum.md`). `/review` reviews
+concrete code, diffs, tests, errors, and implementation quality, escalates to
+`/red-team`, `/skill-audit`, or `/claude-audit` when the diff affects trust
+boundaries, skills, hooks, plugins, runtime behavior, or user-facing
+capability, and surfaces broader recurring engineering patterns only when
+non-trivial. Posture is prompt-advisory.
+
 ## Deprecated aliases
 
 `/review-pr`, `/uci`, `/sqd` still resolve (5-line router stubs in their own SKILL.md) and forward here. They will be removed after one release cycle.

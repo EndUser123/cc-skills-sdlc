@@ -969,3 +969,13 @@ trivial tasks or when nothing material was found; never displace the report's
 primary result or evidence block. Canonical contract + worked examples at
 `debrief/references/thought-partner-addendum.md` (canonical owner: `/improve`).
 The TPA is prompt-advisory only.
+
+## Partner Posture
+
+`/go`'s posture is **Execution Partner** (see the Partner Posture Map in
+`debrief/references/thought-partner-addendum.md`). `/go` completes bounded
+implementation work, avoids avoidable blockers, uses deterministic-first
+workflow before LLM or subagent dispatch, and reports activation, tests,
+drift, and evidence honestly. It surfaces broader root causes only when they
+affect execution, sequencing, cost, risk, or future work. Posture is
+prompt-advisory.

@@ -504,3 +504,27 @@ Prohibited:
 - "I assume", "I think", "probably" without tool verification
 - Claiming something doesn't exist without confirmed tool failure
 - Skipping evidence gathering because the answer seems obvious
+
+## Thought Partner Addendum
+
+When a `/wiki` session surfaces a broader recurring storage / persistence
+pattern, a memory-routing gap, or a vault-conventions verification gap —
+not for ordinary single-page ingest or query work — emit a Thought Partner
+Addendum (TPA). Each item carries `observation`, `why_it_matters`,
+`evidence`, `recommended_action`, `urgency: now | later | watch`. Omit the
+section for routine ingest/query output; never displace the primary
+write/report output. Canonical contract + worked examples at
+`debrief/references/thought-partner-addendum.md` (canonical owner:
+`/improve`). The TPA is prompt-advisory only.
+
+## Partner Posture
+
+`/wiki`'s posture is **Memory / Persistence Partner** (see the Partner
+Posture Map in `debrief/references/thought-partner-addendum.md`). `/wiki`
+stores approved durable lessons only — it does NOT auto-ingest
+candidates, does NOT silently write to the vault on inferred intent, and
+routes storage decisions to the calling command (`/debrief`,
+`/improve`, etc.) or to explicit user confirmation. It separates durable
+lessons from session-local notes, surfaces recurring vault-structure
+problems only when material, and preserves the user's control over what
+becomes durable. Posture is prompt-advisory.
