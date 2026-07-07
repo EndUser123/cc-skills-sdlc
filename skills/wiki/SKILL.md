@@ -89,6 +89,12 @@ Emits one `<source-stem>.json` per source file + a `_manifest.json`. Chunks are
 
 **Stage 4 (dispatch distillation — choose one):**
 
+> ⚠️ **LLM agents are Stage 4 ONLY.**
+> Stages 1–3 are deterministic Python scripts that run in <10 seconds and cost
+> zero tokens. Never dispatch subagents to read source files for extraction or
+> filtering — that duplicates what the scripts already do for free. The LLM's job
+> is verification and generalization, not extraction.
+
 ```bash
 # Emits a markdown dispatch plan with one pre-filled Task-tool block per chunk.
 python skills/wiki/scripts/wiki_signal_dispatch.py \
