@@ -2128,6 +2128,95 @@ def classify_refactor_escalation(
     }
 
 
+# --- Pattern candidate detection (preflight layer — NOT in Stop hooks) ---------
+_KNOWN_FAILURE_SHAPES_PREFLIGHT: dict[str, dict] = {
+    "cache_not_verified": {"missed_evidence": "cache_or_runtime_verified", "fix_type": "add cache rebuild step"},
+    "advisory_not_enforced": {"missed_evidence": "real_entrypoint_smoked", "fix_type": "add enforcement gate"},
+    "completion_without_packet": {"missed_evidence": "field_confirmed_against_original_symptom", "fix_type": "add verification packet"},
+    "missing_backend": {"missed_evidence": "source_inspected", "fix_type": "add backend existence check"},
+    "unit_test_only": {"missed_evidence": "real_entrypoint_smoked", "fix_type": "add entry-point smoke"},
+}
+_PATTERN_HIGH_RISK_SHAPES = frozenset({"cache_not_verified", "missing_backend"})
+# Per-session state for recurrence counting. Uses existing /go state artifacts.
+# Writer: this function. Storage: P:/.claude/.artifacts/{terminal_id}/go/pattern-candidates.jsonl
+# Reader: future /go runs in the same terminal. Authority: this function.
+# Freshness: append-only, no TTL (patterns accumulate). Failure direction: OSError -> silent skip.
+_PATTERN_DB_FALLBACK = Path("P:/.claude/state/go-patterns-preflight.jsonl")
+
+
+def classify_pattern_candidates(
+    proposal: dict, state_dir: Path | None = None,
+) -> list[dict]:
+    """Detect pattern candidates from the proposal's evidence levels.
+
+    Uses the completion-authority evidence levels (already in the proposal via
+    Stop_enforce_gate's evaluate_completion_authority at runtime, or scaffolded
+    by preflight for prompt-based detection). Does NOT create cross-session
+    Stop-hook state — writes to /go state artifacts only.
+
+    Returns a list of pattern_candidate dicts with promotion recommendations.
+    """
+    # Read evidence levels from the proposal
+    re_fields = proposal.get("refactor_escalation") or {}
+    trigger_evidence = re_fields.get("trigger_evidence") or []
+    candidates = []
+    for shape, meta in _KNOWN_FAILURE_SHAPES_PREFLIGHT.items():
+        # Check if this failure shape's trigger markers are in the evidence
+        marker = shape.replace("_", " ")
+        if marker in " ".join(trigger_evidence).lower() or shape in str(trigger_evidence).lower():
+            candidates.append({
+                "failure_shape": shape,
+                "boundary": "preflight/report-gate",
+                "missed_evidence": meta["missed_evidence"],
+                "detected_by": "preflight_propose.classify_pattern_candidates",
+                "fix_type": meta["fix_type"],
+                "recurrence_count": 1,  # first occurrence in this proposal
+                "promotion_recommendation": (
+                    "hook" if shape in _PATTERN_HIGH_RISK_SHAPES else "note"
+                ),
+            })
+    return candidates
+
+
+# --- Dry-run refactor analysis trigger (preflight layer) ----------------------
+_DRY_RUN_TRIGGER_MARKERS: tuple[str, ...] = (
+    "routing", "dispatch", "hook", "gate", "plugin", "cache", "state",
+    "session", "identity", "artifact", "lifecycle", "consolidation",
+    "migration", "model_routing", "refactor", "router", "settings.json",
+)
+
+
+def classify_dry_run_trigger(rewritten: str) -> dict:
+    """Detect whether the task warrants dry-run refactor analysis.
+
+    No-mutation by design. Returns a trigger dict with the checklist of
+    analysis items the worker should perform.
+    """
+    lower = rewritten.lower()
+    hits = [m for m in _DRY_RUN_TRIGGER_MARKERS if m in lower]
+    if not hits:
+        return {"triggered": False, "reason": "no dry-run markers detected"}
+    return {
+        "triggered": True,
+        "trigger_markers": hits,
+        "mode": "no_mutation",
+        "analysis_checklist": [
+            "architecture map: list modules/files touched and their consumers",
+            "writer/storage/reader paths: identify each data-flow participant",
+            "dead-code/dead-branch check: grep for unreferenced definitions",
+            "inert-code check: find code that runs but has no observable effect",
+            "duplicated-responsibility check: find overlapping logic across modules",
+            "lifecycle/race/state risks: identify TOCTOU, stale-state, concurrency hazards",
+            "real-entrypoint test gaps: identify paths not covered by registered-path smoke",
+            "simplification options: delete | wire | consolidate | document | defer",
+        ],
+        "reason": (
+            f"Task touches {len(hits)} dry-run surface(s): "
+            f"{', '.join(hits[:3])}. Dry-run analysis is no-mutation by default."
+        ),
+    }
+
+
 def derive_delegation_policy(rewritten, task_intent, execution_tier, risk, dispatch) -> dict:
     """Lightweight role/authority/freshness policy for /go delegation.
 
@@ -2307,6 +2396,7 @@ def generate_proposal(
     refactor_escalation = classify_refactor_escalation(
         rewritten, task_intent, execution_tier
     )
+    dry_run_trigger = classify_dry_run_trigger(rewritten)
     # Wrong-layer escalation: if pattern detection/dry-run is proposed for a
     # Stop hook, force pause_for_authorization before any implementation.
     _layer_note = None
