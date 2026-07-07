@@ -53,6 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
 from preflight_propose import run_preflight as _run_preflight  # noqa: E402
 from preflight_propose import apply_discovery_evidence_merge as _apply_discovery_merge  # noqa: E402
+from preflight_propose import emit_discovery_evidence_telemetry as _emit_discovery_telemetry  # noqa: E402
 
 
 @dataclass
@@ -1127,6 +1128,41 @@ def task_prompt(task_file: Path) -> str:
         parts.append("  Lanes:")
         for lane in ps.get("lanes", []):
             parts.append(f"    {lane['name']}: {lane['purpose']} -> {lane['output']}")
+    # Phase 10: Discovery-evidence contract (always present, non-blocking).
+    # Tells the worker exactly how to emit structural findings so the
+    # apply_discovery_evidence_merge reader can act on them.
+    _run_id_from_file = task_file.stem.split("_", 1)[-1] if task_file.name.startswith("active-task_") else ""
+    _sd_env = os.environ.get("GO_STATE_DIR", "")
+    parts.append("")
+    parts.append("---")
+    parts.append("Discovery-evidence contract (structural issue reporting):")
+    parts.append("  If, while doing this task, you observe a structural issue in the")
+    parts.append("  code (e.g. wrong layer ownership, duplicated responsibility, dead")
+    parts.append("  producer/consumer, inert code, repeated patching, broad cross-file")
+    parts.append("  change needed), you MUST report it so /go can decide whether to")
+    parts.append("  recommend /refactor.")
+    parts.append("")
+    parts.append("  Report ONLY what you actually observed. Do not fabricate findings.")
+    parts.append("  Verified findings MUST include a concrete evidence string")
+    parts.append("  (file path, line number, grep output, or test result).")
+    parts.append("  Inference/assumption findings need source + summary only.")
+    parts.append("")
+    parts.append("  To report a finding, either:")
+    parts.append(f"    1. Write discovery-evidence_{_run_id_from_file}.json to the state_dir")
+    parts.append(f"       ({_sd_env}) with: "
+                 f'{{"findings": [{{"source": "...", "provenance": "verified|inference|assumption", '
+                 f'"summary": "...", "evidence": "...", "structural_issues": ["..."]}}], '
+                 f'"run_id": "{_run_id_from_file}"}}')
+    parts.append("       Canonical structural_issues: dead_producer_consumer, inert_code,")
+    parts.append("       duplicated_responsibility, wrong_layer_ownership, repeated_patching,")
+    parts.append("       state_identity_lifecycle_ambiguity, broad_cross_file_change_needed,")
+    parts.append("       excessive_test_setup_due_to_design_complexity.")
+    parts.append("")
+    parts.append("    2. Include a discovery_evidence field in your claude-task-result JSON:")
+    parts.append("       {\"discovery_evidence\": {\"findings\": [...]}}")
+    parts.append("")
+    parts.append("  Absence is acceptable if no structural issue was observed during the task.")
+    parts.append("  The telemetry in the common tail will record whether evidence was emitted.")
     return "\n".join(parts)
 
 
@@ -1448,6 +1484,13 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     # Step 11: Run loop check (non-blocking)
     loop_script = script_path("scripts", "loop-check.py")
     run_script(loop_script, [], state_dir, run_id, cwd=worktree)
+
+    # Step 12: Discovery-evidence compliance telemetry (non-blocking, run-local).
+    # Measures whether the worker wrote discovery_evidence; never blocks.
+    try:
+        _emit_discovery_telemetry(state_dir, run_id)
+    except Exception:
+        pass  # telemetry is best-effort; must never block the run
     return True
 
 

@@ -338,3 +338,82 @@ class TestWriteDiscoveryEvidence:
         )
         assert updated["refactor_escalation"]["recommendation"] == "finish_then_refactor"
 
+
+class TestEmitDiscoveryEvidenceTelemetry:
+    """Tests for emit_discovery_evidence_telemetry (non-blocking observability)."""
+
+    def test_telemetry_absent_discovery_is_non_blocking(self, tmp_path: Path):
+        """No discovery artifact → exists=False, source=absent, no exception."""
+        record = pf.emit_discovery_evidence_telemetry(tmp_path, "tel-001")
+        assert record["event"] == "discovery_evidence_status"
+        assert record["exists"] is False
+        assert record["findings_count"] == 0
+        assert record["source"] == "absent"
+        assert "non-blocking" in record["failure_direction"]
+
+    def test_telemetry_present_file_reports_counts(self, tmp_path: Path):
+        """Discovery file present → correct findings_count + structural count."""
+        rid = "tel-002"
+        pf.write_discovery_evidence(tmp_path, rid, [
+            {"source": "grep", "provenance": "verified",
+             "summary": "wrong layer", "evidence": "foo.py:1",
+             "structural_issues": ["wrong_layer_ownership"]},
+            {"source": "inference", "provenance": "inference",
+             "summary": "dup"},  # no structural_issues
+        ])
+        record = pf.emit_discovery_evidence_telemetry(tmp_path, rid)
+        assert record["exists"] is True
+        assert record["findings_count"] == 2
+        assert record["structural_issue_count"] == 1
+        assert record["source"] == "discovery-evidence file"
+        assert record["artifact_path"] is not None
+
+    def test_telemetry_malformed_discovery_soft_fails(self, tmp_path: Path):
+        """Malformed discovery file → non-blocking, source flips to absent."""
+        rid = "tel-003"
+        (tmp_path / f"discovery-evidence_{rid}.json").write_text(
+            "NOT VALID JSON", encoding="utf-8"
+        )
+        record = pf.emit_discovery_evidence_telemetry(tmp_path, rid)
+        assert record["exists"] is False
+        assert record["source"] == "absent"
+        assert "malformed" in record["failure_direction"]
+
+    def test_telemetry_is_run_local(self, tmp_path: Path):
+        """Telemetry writes only a per-run JSONL file, no cross-session state."""
+        rid = "tel-004"
+        pf.emit_discovery_evidence_telemetry(tmp_path, rid)
+        tel_file = tmp_path / f"telemetry-discovery-evidence_{rid}.jsonl"
+        assert tel_file.exists()
+        # Single record, single file, run_id-scoped.
+        lines = tel_file.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+
+
+class TestWorkerPromptDiscoveryContract:
+    """The task_prompt must contain explicit discovery_evidence instructions."""
+
+    def test_prompt_contains_discovery_contract(self):
+        """orchestrate.py task_prompt emits the discovery-evidence contract."""
+        orch_path = SCRIPTS / "orchestrate.py"
+        content = orch_path.read_text(encoding="utf-8")
+        # The block header must be present.
+        assert "Discovery-evidence contract" in content
+        # The worker must be told the canonical structural_issues enum.
+        assert "wrong_layer_ownership" in content
+        assert "dead_producer_consumer" in content
+        # The worker must be told not to fabricate.
+        assert "Do not fabricate findings" in content
+        # The telemetry reference (so the worker knows it's measured).
+        assert "telemetry" in content
+
+    def test_prompt_run_id_and_state_dir_placeholders(self):
+        """The contract block uses run_id/state_dir placeholders, not hardcodes."""
+        orch_path = SCRIPTS / "orchestrate.py"
+        content = orch_path.read_text(encoding="utf-8")
+        # _run_id_from_file derives from the task file stem.
+        assert "_run_id_from_file" in content
+        # GO_STATE_DIR is the source for the state_dir placeholder.
+        assert "GO_STATE_DIR" in content
+
+

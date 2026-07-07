@@ -2639,6 +2639,77 @@ def write_discovery_evidence(state_dir: Path, run_id: str, findings: list) -> ob
     _atomic_write_json(out, {"findings": valid, "run_id": run_id})
     return out
 
+
+
+def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
+    """Run-local, non-blocking telemetry for discovery_evidence worker compliance.
+
+    Reports whether the worker wrote discovery evidence, with the artifact path,
+    finding counts, and source. This is the observability hook that lets us
+    measure whether real Claude/pi workers actually emit the contract -- not a
+    gate. Returns a dict that the common tail can log or append to the proposal.
+
+    Failure direction: absent discovery_evidence is non-blocking. This function
+    must NEVER raise; it must NEVER block; it must NEVER write a pattern DB.
+    Side effects: optionally emits a single JSONL record to state_dir/
+    telemetry-discovery-evidence_{run_id}.jsonl (one record per run, run-local,
+    no cross-session recurrence).
+    """
+    import json as _json
+    import time as _time
+    record: dict = {
+        "event": "discovery_evidence_status",
+        "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "run_id": run_id,
+        "exists": False,
+        "findings_count": 0,
+        "structural_issue_count": 0,
+        "source": "absent",
+        "artifact_path": None,
+        "failure_direction": "absent is non-blocking",
+    }
+    de_path = state_dir / f"discovery-evidence_{run_id}.json"
+    ct_path = state_dir / f"claude-task-result_{run_id}.json"
+    chosen = None
+    chosen_path = None
+    if de_path.exists():
+        chosen, chosen_path = de_path, str(de_path)
+        record["source"] = "discovery-evidence file"
+    elif ct_path.exists():
+        chosen, chosen_path = ct_path, str(ct_path)
+        record["source"] = "claude-task-result fallback"
+    if chosen is not None:
+        try:
+            data = _json.loads(chosen.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            record["source"] = "absent"
+            record["failure_direction"] = "malformed -- non-blocking"
+        else:
+            findings = (data.get("findings")
+                        or (data.get("discovery_evidence") or {}).get("findings")
+                        or [])
+            if isinstance(findings, list) and findings:
+                record["exists"] = True
+                record["findings_count"] = len(findings)
+                record["structural_issue_count"] = sum(
+                    1 for f in findings
+                    if isinstance(f, dict)
+                    and isinstance(f.get("structural_issues"), list)
+                    and f["structural_issues"]
+                )
+                record["artifact_path"] = chosen_path
+            else:
+                record["source"] = "absent"
+                record["failure_direction"] = "artifact present, no findings -- non-blocking"
+    # Run-local: one JSONL record per run, no cross-session state.
+    try:
+        tel_path = state_dir / f"telemetry-discovery-evidence_{run_id}.jsonl"
+        with tel_path.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(record) + "\n")
+    except OSError:
+        pass  # telemetry is best-effort; never block
+    return record
+
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 
