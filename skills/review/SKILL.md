@@ -134,6 +134,17 @@ Contract governs the acceptance bar. The contract lives at
 If a `/review` report's claims can't be backed by Edit receipts + pytest
 output + Read receipts, the verdict is REVISE.
 
+## Thought Partner Addendum
+
+Emit a Thought Partner Addendum (TPA) ONLY when the review surfaced a broader
+recurring engineering pattern, a test-strategy gap, or a runtime/user-surface
+verification gap — not for routine reviews. Each item carries `observation`,
+`why_it_matters`, `evidence`, `recommended_action`,
+`urgency: now | later | watch`. Omit the section for ordinary file:line
+findings; never displace the review verdict or the CEC ledger. Canonical
+contract + worked examples at `debrief/references/thought-partner-addendum.md`
+(canonical owner: `/improve`). The TPA is prompt-advisory only.
+
 ## Deprecated aliases
 
 `/review-pr`, `/uci`, `/sqd` still resolve (5-line router stubs in their own SKILL.md) and forward here. They will be removed after one release cycle.

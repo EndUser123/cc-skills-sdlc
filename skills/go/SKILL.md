@@ -945,3 +945,16 @@ Prohibited:
 - "I assume", "I think", "probably" without tool verification
 - Claiming something doesn't exist without confirmed tool failure
 - Skipping evidence gathering because the answer seems obvious
+
+## Thought Partner Addendum
+
+In a `/go` **final implementation report** (not a trivial task), emit a
+Thought Partner Addendum (TPA) when the run surfaced something material the
+task framing did not ask about — a broader root cause, a hidden risk, an
+activation gap (plugin bumped but not enabled), cost-waste, or a deferred
+prerequisite. Each item carries `observation`, `why_it_matters`, `evidence`,
+`recommended_action`, `urgency: now | later | watch`. Omit the section for
+trivial tasks or when nothing material was found; never displace the report's
+primary result or evidence block. Canonical contract + worked examples at
+`debrief/references/thought-partner-addendum.md` (canonical owner: `/improve`).
+The TPA is prompt-advisory only.
