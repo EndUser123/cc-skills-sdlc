@@ -1577,6 +1577,21 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         return False
     phase_marker(state_dir, "coverage-passed", run_id)
 
+    # Step 9.5: Completion Evidence Review (post-implementation review gate).
+    # The reviewer inspects the worker's completion report, the worktree git
+    # diff, and existing evidence artifacts. It is read-only and runs in the
+    # orchestrator's process (not the Stop hook), so it adds no logic to
+    # Stop_enforce_gate.py. Triggers are documented in the reviewer's SKILL.md
+    # section and in completion_evidence_review.py:task_should_trigger().
+    review_script = script_path("scripts", "completion_evidence_review.py")
+    review_args = [str(worktree), "--state-dir", str(state_dir), "--run-id", run_id]
+    if os.environ.get("GO_COMPLETION_REVIEW_SKIP", "").strip() == "1":
+        review_args.append("--skip-on-low-risk")
+    rc = run_script(review_script, review_args, state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    phase_marker(state_dir, "completion-reviewed", run_id)
+
     # Step 10: Generate PR artifacts
     pr_script = script_path("scripts", "pr-artifacts.py")
     rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)

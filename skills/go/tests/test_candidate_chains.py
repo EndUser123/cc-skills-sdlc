@@ -37,23 +37,27 @@ class TestCandidateChains:
     def test_t0_gets_local_then_opencode_deepseek(self):
         chain = rm.resolve_chain("T0")
         assert "llama-cpp/ornith-1.0-9b" in chain
-        assert "deepseek-v4-flash" in chain
+        assert "opencode-go/deepseek-v4-flash" in chain
         assert chain[0] == "llama-cpp/ornith-1.0-9b"  # local first
 
     def test_t1_gets_local_then_opencode_deepseek(self):
         chain = rm.resolve_chain("T1")
-        assert chain == ["llama-cpp/ornith-1.0-9b", "deepseek-v4-flash"]
+        assert chain == ["llama-cpp/ornith-1.0-9b", "opencode-go/deepseek-v4-flash"]
 
     def test_t2_opencode_deepseek_only(self):
         chain = rm.resolve_chain("T2")
-        assert chain == ["deepseek-v4-flash"]
+        assert chain == ["opencode-go/deepseek-v4-flash"]
 
     def test_t4_glm_then_opencode_deepseek(self):
         chain = rm.resolve_chain("T4")
-        assert chain == ["zai/glm-5.2", "deepseek-v4-flash"]
+        assert chain == ["zai/glm-5.2", "opencode-go/deepseek-v4-flash"]
 
     def test_local_ornith_resolves(self):
         assert rm.resolve("LOCAL_ORNITH") == "llama-cpp/ornith-1.0-9b"
+
+    def test_opencode_deepseek_resolves_with_prefix(self):
+        # Bare 'deepseek-v4-flash' resolves to the wrong pi provider (no key).
+        assert rm.resolve("OPENCODE_DEEPSEEK") == "opencode-go/deepseek-v4-flash"
 
     def test_unknown_tier_defaults_m3(self):
         chain = rm.resolve_chain("T99")

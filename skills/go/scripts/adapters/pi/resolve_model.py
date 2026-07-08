@@ -25,7 +25,7 @@ MODEL_MAP: dict[str, str] = {
     "M3": "minimax/MiniMax-M3",
     "GLM-5.2": "zai/glm-5.2",
     "LOCAL_ORNITH": "llama-cpp/ornith-1.0-9b",
-    "OPENCODE_DEEPSEEK": "deepseek-v4-flash",  # opencode-go provider
+    "OPENCODE_DEEPSEEK": "opencode-go/deepseek-v4-flash",  # provider-prefixed: bare name resolves to wrong provider
 }
 
 # Candidate chains per tier: ordered list of aliases to try.
