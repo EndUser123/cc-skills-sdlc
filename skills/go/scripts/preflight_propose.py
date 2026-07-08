@@ -309,6 +309,20 @@ _VERIFICATION_RANKING: tuple[tuple[str, str, str], ...] = (
      "medium-low", "low"),
 )
 
+# --- Mechanism-change resolution (anti-duplication invariant) -----------------
+# When operational discovery already fires (source-anchored, real surfaces) OR
+# upstream plan/design metadata declares a mechanism-change task, the worker
+# must resolve the change against existing machinery before editing. Activated
+# ONLY by an existing signal — never by a new prompt keyword classifier: the
+# /go prompt surface is dominated by plan-handoff resumptions, so meta-change
+# intent lives upstream, not in /go prompt text.
+_MECHANISM_EXTENSION_PATHS = frozenset({
+    "NO_CHANGE", "CLARIFY_EXISTING", "EXTEND_EXISTING",
+    "SIMPLIFY_EXISTING", "NEW_MECHANISM_JUSTIFIED", "BLOCKED",
+})
+# Resolutions that forbid editing — report-only.
+_MECHANISM_REPORT_ONLY_PATHS = frozenset({"NO_CHANGE", "BLOCKED"})
+
 
 def _word_boundary_match(marker: str, text: str) -> bool:
     """Token/word-boundary match so bare markers like "gate" don't fire inside
@@ -1713,6 +1727,55 @@ def classify_operational_discovery(rewritten: str, task_intent: str) -> dict:
             "created resources (worktrees, branches, state dirs, markers, cache, "
             "exports) is NEVER auto-run — report-only dry run, then director approval."
             if required else ""
+        ),
+    }
+
+
+def classify_mechanism_change(
+    rewritten: str, task_intent: str, operational_discovery: dict | None,
+    upstream_signal: bool = False,
+) -> dict:
+    """Mechanism-change resolution scaffold (anti-duplication invariant).
+
+    Activated ONLY by an existing reliable signal, never by a new prompt keyword
+    classifier:
+      - ``operational_discovery.required`` is already True (the existing
+        source-anchored discovery contract), OR
+      - ``upstream_signal`` is True (a plan/design handoff declared this a
+        mechanism-change task — passed through by the orchestrator).
+
+    Preflight scaffolds the two fields; the worker resolves ``extension_path``
+    after reading source (via the discovery-evidence merge). NO_CHANGE/BLOCKED
+    => report-only, no edit (enforced by derive_report_gate).
+    """
+    od_required = bool((operational_discovery or {}).get("required"))
+    required = od_required or bool(upstream_signal)
+    if not required:
+        return {
+            "required": False,
+            "closest_existing_mechanisms": [],
+            "extension_path": None,
+            "report_only": False,
+            "rule": (
+                "not required — operational discovery did not fire and no "
+                "upstream mechanism-change signal arrived"
+            ),
+        }
+    return {
+        "required": True,
+        "closest_existing_mechanisms": [],  # worker fills after source search
+        "extension_path": None,             # worker resolves after source read
+        "report_only": False,               # set by derive_report_gate on NO_CHANGE/BLOCKED
+        "activated_by": "operational_discovery" if od_required else "upstream_signal",
+        "allowed_paths": sorted(_MECHANISM_EXTENSION_PATHS),
+        "rule": (
+            "Resolve the change as exactly one of "
+            "NO_CHANGE | CLARIFY_EXISTING | EXTEND_EXISTING | SIMPLIFY_EXISTING | "
+            "NEW_MECHANISM_JUSTIFIED | BLOCKED. Name the closest existing "
+            "mechanism(s) in closest_existing_mechanisms. NO_CHANGE or BLOCKED "
+            "=> report only, do NOT edit. NEW_MECHANISM_JUSTIFIED for a new "
+            "blocking gate/classifier requires real corpus/eval evidence "
+            "(expected TP + acceptable FP); without it, keep advisory or BLOCKED."
         ),
     }
 
