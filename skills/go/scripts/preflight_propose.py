@@ -323,6 +323,33 @@ _MECHANISM_EXTENSION_PATHS = frozenset({
 # Resolutions that forbid editing — report-only.
 _MECHANISM_REPORT_ONLY_PATHS = frozenset({"NO_CHANGE", "BLOCKED"})
 
+# Completion-authority ladder (req. 3). Worker starts at L0; the post-impl
+# omission-audit gate (scripts/omission_audit.py) raises the level from
+# observed artifacts. Never claimed higher than evidence supports.
+_AUTHORITY_LEVELS = (
+    "L0_asserted_by_worker",
+    "L1_source_inspected",
+    "L2_tests_passed",
+    "L3_real_entrypoint_smoked",
+    "L4_runtime_or_cache_verified",
+    "L5_original_symptom_confirmed_closed",
+)
+
+# Surfaces that trigger the mandatory final omission_audit (req. 2) and the
+# commit-boundary packet (req. 5). Word-boundary matched against the prompt.
+_HIGH_RISK_REPORT_SURFACES = (
+    "hook", "hooks", "gate", "Stop", "PreToolUse", "PostToolUse", "SessionStart",
+    "router", "settings.json", "hooks.json", "plugin.json", "plugin", "cache",
+    "state", "session", "identity", "dispatch", "routing", "telemetry", "metrics",
+    "artifact", "model", "auto-commit", "consolidation", "deprecation", "failover",
+)
+# Surfaces that trigger the dry-run simplification audit (req. 7).
+_DRY_RUN_SIMPLIFICATION_SURFACES = (
+    "routing", "dispatch", "hook", "hooks", "gate", "plugin", "cache", "state",
+    "session", "identity", "artifact", "model routing", "model", "consolidation",
+    "deprec", "auto-commit", "telemetry",
+)
+
 
 def _word_boundary_match(marker: str, text: str) -> bool:
     """Token/word-boundary match so bare markers like "gate" don't fire inside
@@ -1419,7 +1446,8 @@ def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
 
 def derive_report_gate(task_intent, execution_tier, closure_check=None,
                        operational_discovery=None, discovery_evidence=None,
-                       capability_claims=None, mechanism_change=None) -> dict:
+                       capability_claims=None, mechanism_change=None,
+                       high_risk_report=None) -> dict:
     """Completion-claim eligibility (goal reqs. 4, 8, 9).
 
     investigate/validate/decide never enable implementation-completion claims.
@@ -1477,6 +1505,15 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
         allow_completion = False
         allow_targeted_fix_only = False
 
+    # High-risk report → mandatory final omission audit + commit-boundary packet
+    # (reqs. 2, 5) + dry-run simplification audit (req. 7). The post-impl gate
+    # (scripts/omission_audit.py) raises completion_authority_level from observed
+    # artifacts and downgrades verdict wording when evidence is missing (req. 4).
+    hrr = high_risk_report or {}
+    oa_required = bool(hrr.get("required"))
+    cb_required = oa_required or task_intent == "implement"
+    drs_required = bool(hrr.get("dry_run_simplification_required"))
+
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,
@@ -1495,6 +1532,10 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
         "mechanism_change_extension_path": mc_path,
         "mechanism_change_report_only": mc_report_only,
         "mechanism_change_new_unjustified": mc_new_unjustified,
+        "omission_audit_required": oa_required,
+        "commit_boundary_required": cb_required,
+        "dry_run_simplification_required": drs_required,
+        "completion_authority_level": _AUTHORITY_LEVELS[0],  # L0; post-impl gate raises
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim. "
@@ -1517,6 +1558,21 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
                "NEW_MECHANISM_JUSTIFIED for a blocking gate/classifier requires corpus/eval "
                "evidence; without it the proposal stays advisory. "
                if mc_required else "")
+            + ("omission_audit.required: the final report MUST carry an omission_audit "
+               "section (what_was_proven / what_was_not_proven / what_was_inferred / "
+               "stale_state_risks / commit_boundary_risks / cache_runtime_risks / "
+               "writer_reader_wiring_risks / synthetic_vs_live_evidence / "
+               "what_would_falsify_pass / recommended_next_verification). Completion-"
+               "authority level must not exceed observed evidence (L0..L5). "
+               if oa_required else "")
+            + ("commit_boundary.required: classify every changed/untracked file as "
+               "mine_for_this_task | parallel_session | pre_existing_unrelated | generated | "
+               "unknown; commit only owned files via explicit pathspecs; no broad git add. "
+               if cb_required else "")
+            + ("dry_run_simplification.required: answer can-this-be-smaller / extend-existing-"
+               "mechanism / new-artifact-format-necessary / writer-reader-connected / "
+               "dead-or-inert-code / tests-at-real-entry-point. "
+               if drs_required else "")
         ),
     }
 
@@ -1795,6 +1851,16 @@ def classify_mechanism_change(
         "report_only": False,               # set by derive_report_gate on NO_CHANGE/BLOCKED
         "activated_by": "operational_discovery" if od_required else "upstream_signal",
         "allowed_paths": sorted(_MECHANISM_EXTENSION_PATHS),
+        # Mechanism-change contract (req. 6): worker fills after reading source.
+        # The post-impl omission-audit gate verifies these are populated when a
+        # new gate/telemetry/routing/state/artifact was added.
+        "writer": None,                     # what emits/registers it
+        "storage": None,                    # where state/artifacts live (run-scoped?)
+        "reader": None,                     # what consumes it (or "none yet")
+        "authority": None,                  # what makes it binding vs advisory
+        "freshness": None,                  # run_id / mtime / version key
+        "failure_behavior": None,           # fail-open / fail-closed / non-blocking
+        "live_acceptance_evidence": None,   # real entry-point/runtime proof path
         "rule": (
             "Resolve the change as exactly one of "
             "NO_CHANGE | CLARIFY_EXISTING | EXTEND_EXISTING | SIMPLIFY_EXISTING | "
@@ -1802,7 +1868,45 @@ def classify_mechanism_change(
             "mechanism(s) in closest_existing_mechanisms. NO_CHANGE or BLOCKED "
             "=> report only, do NOT edit. NEW_MECHANISM_JUSTIFIED for a new "
             "blocking gate/classifier requires real corpus/eval evidence "
-            "(expected TP + acceptable FP); without it, keep advisory or BLOCKED."
+            "(expected TP + acceptable FP); without it, keep advisory or BLOCKED. "
+            "Fill the contract fields (writer/storage/reader/authority/freshness/"
+            "failure_behavior/live_acceptance_evidence) from source, not memory."
+        ),
+    }
+
+
+def classify_high_risk_report(
+    rewritten: str, task_intent: str, operational_discovery: dict | None,
+    layer_placement: dict | None,
+) -> dict:
+    """Trigger the mandatory final omission audit (reqs. 2, 3, 4, 5, 7).
+
+    Fires when an implement/mixed task touches a high-risk surface
+    (hook/gate/state/identity/dispatch/cache/plugin/routing/telemetry/model/...),
+    OR operational_discovery already fired, OR layer_placement flagged a
+    wrong-layer risk. commit_boundary fires for any implement task; the
+    dry-run simplification audit fires for the routing/dispatch/hooks/gates/
+    plugin/cache/state/model/consolidation surface set. Rides existing surface
+    signals; no new workflow engine.
+    """
+    od_required = bool((operational_discovery or {}).get("required"))
+    wrong_layer = bool((layer_placement or {}).get("verdict") == "wrong_layer")
+    implement_like = task_intent in ("implement", "mixed")
+    hits = sorted({m for m in _HIGH_RISK_REPORT_SURFACES if _word_boundary_match(m, rewritten)})
+    required = (implement_like and bool(hits)) or od_required or wrong_layer
+    drs_hits = sorted({
+        m for m in _DRY_RUN_SIMPLIFICATION_SURFACES if _word_boundary_match(m, rewritten)
+    })
+    dry_run_required = implement_like and bool(drs_hits)
+    return {
+        "required": bool(required),
+        "triggered_surfaces": hits,
+        "dry_run_simplification_required": bool(dry_run_required),
+        "commit_boundary_required": bool(required) or implement_like,
+        "rule": (
+            "high-risk-report surfaces detected -> mandatory omission_audit + "
+            "completion-authority ladder (L0..L5) + commit-boundary packet. "
+            "Verdict wording downgrades when evidence is missing (req. 4)."
         ),
     }
 
@@ -2480,19 +2584,23 @@ def generate_proposal(
     repro_policy = derive_repro_policy(rewritten, task_intent, closure_check)
     operational_discovery = classify_operational_discovery(rewritten, task_intent)
     mechanism_change = classify_mechanism_change(rewritten, task_intent, operational_discovery)
+    layer_placement = classify_layer_placement(rewritten)
+    high_risk_report = classify_high_risk_report(
+        rewritten, task_intent, operational_discovery, layer_placement
+    )
     report_gate = derive_report_gate(
         task_intent, execution_tier, closure_check,
         operational_discovery=operational_discovery,
         discovery_evidence=None,  # scaffold — worker fills findings during the run
         capability_claims=capability_claims_raw,
         mechanism_change=mechanism_change,
+        high_risk_report=high_risk_report,
     )
     mechanism_change["report_only"] = bool(report_gate.get("mechanism_change_report_only"))
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
     )
-    layer_placement = classify_layer_placement(rewritten)
     refactor_escalation = classify_refactor_escalation(
         rewritten, task_intent, execution_tier
     )
