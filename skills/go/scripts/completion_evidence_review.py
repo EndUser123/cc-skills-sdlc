@@ -23,6 +23,7 @@ Read-only invariant:
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -39,6 +40,39 @@ _LIVE_BEHAVIOR_TERMS = frozenset({
     "enforced", "deployed", "connected", "failover", "failover verified",
     "activation confirmed", "passed", "tests passed", "all tests pass",
 })
+
+# --- Claim-integrity discipline ------------------------------------------------
+# Uncertainty terms that, in a high-risk verification context, let a report
+# sound complete while the mechanism is not actually proven. Example: "commit
+# → version bump likely auto-bumped to 1.0.183" is not a valid proof.
+_UNCERTAINTY_TERMS = (
+    "likely", "probably", "presumably", "apparently",
+    "seems", "appears", "maybe", "i think", "i believe",
+    "should be", "should work", "should now",
+)
+# High-risk claim contexts: an uncertainty term co-occurring in the SAME
+# SENTENCE as one of these single-word tokens makes the claim load-bearing
+# uncertain -> blocks a full COMPLETE verdict. Single tokens (not phrases) so
+# the match survives the uncertainty word splitting a phrase ("hook likely ran"
+# must still match the "hook" token).
+_HIGH_RISK_CLAIM_CONTEXTS = (
+    # completion / delivery
+    "complete", "completed", "done", "fixed", "resolved",
+    "shipped", "delivered", "finished",
+    # verification artifacts
+    "tests", "test", "rebuilt", "rebuild", "drift",
+    "aligned", "alignment", "bumped", "version",
+    # runtime / mechanism
+    "live", "wired", "registered", "enforced", "deployed", "running",
+    "hook", "fires", "fired", "executed",
+    "routing", "dispatch", "router", "backend", "failover",
+    "committed", "commit", "pushed", "propagat",
+)
+# Required replacement vocabulary for verification claims.
+_CLAIM_INTEGRITY_FORMAT = (
+    "PROVEN with evidence | INFERRED with basis+risk | "
+    "UNVERIFIED with missing evidence | BLOCKED if required evidence missing"
+)
 
 # Files that constitute hook wiring — used by the wrong-layer detector.
 _HOOK_FILE_MARKERS = (
@@ -93,6 +127,46 @@ _ENTRY_POINT_NAMES = frozenset({
     "main", "run", "cli", "app", "__main__", "handle", "handler",
     "lambda_handler", "main_func", "entrypoint", "serve", "start",
 })
+
+# --- Review-boundary discipline ----------------------------------------------
+# Surfaces whose change is load-bearing: a generic/misleading commit title or
+# a cache/HEAD divergence here can hide a runtime/hook/orchestrator impact the
+# way "chore(tests): update tests" once hid an orchestrate.py arg-shape fix.
+_RUNTIME_LOAD_BEARING_MARKERS = (
+    "skills/go/scripts/orchestrate.py",
+    "skills/go/scripts/completion_evidence_review.py",
+    "skills/go/hooks/",
+    "/hooks/",            # any hook wiring
+    "router.py",
+    "__lib/router.py",
+    "dispatch",           # routing/dispatch code
+    "/state", "state_dir", "go-sessions", "session",
+    "telemetry",
+    "plugin.json", ".claude-plugin/", "hooks/hooks.json", "hooks.json",
+)
+# SKILL.md is load-bearing for behavior only when its hook frontmatter changes;
+# a docs-only SKILL.md edit with a "docs:" title is appropriate, not risky.
+_DOCS_LOAD_BEARING_MARKERS = (
+    "SKILL.md",
+)
+# Conventional-commit prefixes that routinely understate runtime impact. A
+# title is "generic" only when paired with a runtime load-bearing change.
+_GENERIC_TITLE_RE = re.compile(
+    r"^\s*(?:chore|docs|test|tests|style|refactor|build|ci|bump|misc)"
+    r"(?:\([^)]+\))?\s*:",
+    re.IGNORECASE,
+)
+# Generic maintenance bodies that carry no behavior-impact statement.
+_GENERIC_BODY_MARKERS = (
+    "update files", "update settings", "update tests", "update skill documentation",
+    "maintenance update", "update python module",
+)
+# Surface nouns; if the commit body names one, a generic prefix is honest.
+_TITLE_SURFACE_NOUNS = (
+    "orchestrat", "hook", "router", "dispatch", "cache", "plugin", "version",
+    "stop gate", "continuation", "completion", "telemetry", "routing", "session",
+    "worktree", "arg-shape", "arg shape", "positional",
+)
 
 
 @dataclass
@@ -831,6 +905,288 @@ def _detect_report_overclaim(
 
 
 # ---------------------------------------------------------------------------
+# Review-boundary discipline: surface load-bearing auto-committed changes that
+# a clean git status or a generic commit title would otherwise hide.
+# ---------------------------------------------------------------------------
+
+def _git_capture(worktree: Path, *args: str) -> str:
+    """Run git in worktree, return stripped stdout. Fail-open ('') on error."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(worktree), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _classify_load_bearing(changed: list[str]) -> dict[str, list[str]]:
+    """Split changed files into runtime vs docs load-bearing buckets."""
+    runtime: list[str] = []
+    docs: list[str] = []
+    for rel in changed:
+        if any(m in rel for m in _RUNTIME_LOAD_BEARING_MARKERS):
+            runtime.append(rel)
+        elif any(rel.endswith(m) or m in rel for m in _DOCS_LOAD_BEARING_MARKERS):
+            docs.append(rel)
+    return {"runtime": sorted(set(runtime)), "docs": sorted(set(docs))}
+
+
+def _commit_title_understates(title: str, runtime_files: list[str]) -> bool:
+    """True when a generic title pairs with a runtime load-bearing change.
+
+    A conventional-commit prefix from the generic set (chore/docs/test/style...)
+    on a change that touches runtime surfaces understates the impact — unless
+    the body actually names the surface/behavior (orchestrator, hook, router,
+    cache, plugin, dispatch, etc.), in which case the title is honest.
+    """
+    if not runtime_files or not title:
+        return False
+    subject = title.split("\n", 1)[0]
+    if not _GENERIC_TITLE_RE.search(subject):
+        return False
+    body = title.lower()
+    # Body names a runtime surface → honest despite generic prefix.
+    if any(noun in body for noun in _TITLE_SURFACE_NOUNS):
+        return False
+    return True  # generic prefix, no surface named → understates
+
+
+def _head_commit_info(worktree: Path) -> dict[str, object]:
+    """Gather HEAD commit evidence: sha, title, name-only, stat. Fail-open."""
+    sha = _git_capture(worktree, "rev-parse", "--short", "HEAD")
+    if not sha:
+        return {"available": False}
+    title = _git_capture(worktree, "log", "-1", "--format=%s%n%n%b", "HEAD")
+    name_only = _git_capture(worktree, "show", "--name-only", "--pretty=format:", "HEAD")
+    stat = _git_capture(worktree, "show", "--stat", "--format=", "HEAD")
+    return {
+        "available": True,
+        "sha": sha,
+        "title": title,
+        "name_only": [ln for ln in name_only.splitlines() if ln.strip()],
+        "stat": stat,
+    }
+
+
+def _plugin_cache_root() -> Path:
+    """Cache root for plugin version lookup. Env-overridable for tests."""
+    return Path(os.environ.get("GO_PLUGIN_CACHE_ROOT", str(Path.home() / ".claude" / "plugins" / "cache" / "local")))
+
+
+def _source_cache_head_alignment(worktree: Path, cache_affecting: list[str]) -> dict[str, object]:
+    """Compare source / cache / HEAD for plugin/cache-affecting changes.
+
+    Fail-open: if no plugin.json is resolvable, report 'not_applicable' rather
+    than claiming alignment. Never asserts alignment without evidence.
+    """
+    if not cache_affecting:
+        return {"applicable": False}
+    pj = worktree / ".claude-plugin" / "plugin.json"
+    if not pj.is_file():
+        return {"applicable": True, "source_version": None, "note": "no .claude-plugin/plugin.json in worktree"}
+    try:
+        pj_data = json.loads(pj.read_text(encoding="utf-8"))
+        source_version = pj_data.get("version")
+        plugin_name = pj_data.get("name", "")
+    except (OSError, ValueError):
+        return {"applicable": True, "source_version": None, "note": "plugin.json unreadable"}
+    # Working-tree vs HEAD cleanliness (cache-ahead-of-HEAD detection).
+    # `git diff --quiet HEAD` exits 0 when clean, 1 when dirty.
+    try:
+        wt_proc = subprocess.run(
+            ["git", "-C", str(worktree), "diff", "--quiet", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        wt_clean = wt_proc.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        wt_clean = None  # unknown
+    # Cache version lookup.
+    cache_version = None
+    cache_note = "no cache dir found"
+    if plugin_name:
+        croot = _plugin_cache_root() / plugin_name
+        if croot.is_dir():
+            versions = sorted(d.name for d in croot.iterdir() if d.is_dir())
+            if versions:
+                cache_version = versions[-1]
+                cache_note = f"cache dir(s): {versions}"
+    # Alignment is PROVEN only when versions match AND working tree == HEAD.
+    # Unknown working-tree state → not proven (fail toward flagging).
+    aligned = (
+        source_version is not None
+        and cache_version == source_version
+        and wt_clean is True
+    )
+    return {
+        "applicable": True,
+        "source_version": source_version,
+        "cache_version": cache_version,
+        "cache_note": cache_note,
+        "working_tree_clean_vs_head": wt_clean,
+        "aligned": aligned,
+    }
+
+
+def _detect_review_boundary_risk(
+    changed_files: list[str], worktree: Path, evidence: list[EvidenceRow],
+) -> tuple[list[str], list[EvidenceRow]]:
+    """Surface load-bearing changes that a clean status / generic title hides.
+
+    Non-blocking (WEAK) by design: REVIEW_BOUNDARY_RISK is a follow-up flag,
+    not a failure. Examines BOTH the working-tree diff AND the HEAD commit so
+    an auto-commit cannot hide a load-bearing change behind `git status` clean.
+    """
+    # Consider HEAD commit's files too: after auto-commit the working tree is
+    # clean and changed_files is empty, yet the load-bearing change is real.
+    head = _head_commit_info(worktree)
+    head_files = head.get("name_only", []) if isinstance(head.get("name_only"), list) else []
+    surface_files = sorted(set(changed_files) | set(head_files))
+    buckets = _classify_load_bearing(surface_files)
+    runtime_files = buckets["runtime"]
+    # Docs-only load-bearing (e.g. SKILL.md) is not a boundary risk on its own.
+    if not runtime_files:
+        return [], evidence
+
+    title = ""
+    sha = ""
+    committed = False
+    if head.get("available"):
+        title = str(head.get("title", "")).strip()
+        sha = str(head.get("sha", ""))
+        committed = any(set(runtime_files) & set(head_files))
+    understates = _commit_title_understates(title, runtime_files)
+
+    cache_affecting = [
+        f for f in runtime_files
+        if any(m in f for m in ("plugin.json", ".claude-plugin/", "hooks/hooks.json", "hooks.json"))
+    ]
+    alignment = _source_cache_head_alignment(worktree, cache_affecting)
+
+    risk = understates or (alignment.get("applicable") and alignment.get("aligned") is False)
+    parts = [
+        f"committed={committed}",
+        f"sha={sha or '(uncommitted)'}",
+        f"runtime_load_bearing={runtime_files}",
+    ]
+    if head.get("available"):
+        stat = str(head.get("stat", ""))
+        parts.append(f"git_show_stat={stat.splitlines()[:6]}")
+    parts.append(f"title_understates_runtime_impact={understates}")
+    if alignment.get("applicable"):
+        parts.append(
+            f"source/cache/HEAD aligned={alignment.get('aligned')} "
+            f"(source={alignment.get('source_version')} cache={alignment.get('cache_version')} "
+            f"wt_clean_vs_head={alignment.get('working_tree_clean_vs_head')})"
+        )
+    observed = " | ".join(parts)
+    if risk:
+        note = "REVIEW_BOUNDARY_RISK: load-bearing change present"
+        if understates:
+            note += "; commit title understates runtime impact — cite the behavior change"
+        if alignment.get("applicable") and alignment.get("aligned") is False:
+            note += "; source/cache/HEAD alignment unproven — show zero-drift evidence"
+    else:
+        note = "load-bearing change present and reviewable (title + alignment OK)"
+    verdict = "WEAK" if risk else "OK"
+    evidence.append(EvidenceRow(
+        claim="load-bearing change reviewable (commit SHA + title + cache alignment)",
+        required_evidence="commit SHA + git show --stat/--name-only + title matches behavior + source/cache/HEAD aligned",
+        observed_evidence=observed,
+        verdict=verdict,
+        note=note,
+    ))
+    if risk:
+        return ["REVIEW_BOUNDARY_RISK: load-bearing change with understated title or unproven alignment"], evidence
+    return [], evidence
+
+
+# ---------------------------------------------------------------------------
+# Claim-integrity discipline: distinguish proven claims from inferred ones in
+# the worker's verification language. An uncertainty term in a high-risk claim
+# context is load_bearing_uncertainty -> blocks a full COMPLETE verdict.
+# ---------------------------------------------------------------------------
+
+def _split_sentences(text):
+    """Coarse sentence splitter for claim scanning (newline + period + bang)."""
+    if not text:
+        return []
+    chunks = re.split(r"(?:\n|(?<=[.!?])\s+)", text)
+    return [c.strip() for c in chunks if c.strip()]
+
+
+def classify_claim_integrity(claim_text):
+    """Classify uncertainty in the claim text.
+
+    Returns one dict per (uncertainty term, high-risk context) co-occurrence in
+    a sentence. Each dict carries: term, context, sentence, tier
+    (load_bearing_uncertainty | advisory_uncertainty). Advisory rows (no
+    high-risk context) are returned but do NOT block -- callers filter on tier.
+    """
+    findings = []
+    seen = set()
+    for sentence in _split_sentences(claim_text):
+        lower = sentence.lower()
+        if "proven" in lower or "unverified" in lower or "inferred" in lower or "blocked" in lower:
+            continue
+        term_hits = [t for t in _UNCERTAINTY_TERMS if t in lower]
+        if not term_hits:
+            continue
+        ctx_hits = [c for c in _HIGH_RISK_CLAIM_CONTEXTS if c in lower]
+        for term in term_hits:
+            for ctx in ctx_hits:
+                key = (term, ctx)
+                if key in seen:
+                    continue
+                seen.add(key)
+                findings.append({
+                    "term": term,
+                    "context": ctx,
+                    "tier": "load_bearing_uncertainty",
+                    "sentence": sentence[:200],
+                })
+            if not ctx_hits:
+                key = (term, "none")
+                if key not in seen:
+                    seen.add(key)
+                    findings.append({
+                        "term": term,
+                        "context": "(none -- advisory)",
+                        "tier": "advisory_uncertainty",
+                        "sentence": sentence[:200],
+                    })
+    return findings
+
+
+def _detect_claim_integrity_risk(claim_text, evidence):
+    """Flag load-bearing uncertainty in high-risk verification claims.
+
+    Blocking (-> REVISE): uncertainty term + high-risk context. The report must
+    re-state the claim as PROVEN / INFERRED / UNVERIFIED / BLOCKED instead of
+    hedging with 'likely'/'probably'/etc. Advisory uncertainty (no high-risk
+    context, e.g. 'this likely belongs in Priority 4') is allowed.
+    """
+    classified = classify_claim_integrity(claim_text)
+    load_bearing = [f for f in classified if f["tier"] == "load_bearing_uncertainty"]
+    if not load_bearing:
+        return [], evidence
+    summary = ", ".join(sorted({"'" + f["term"] + "' / " + f["context"] for f in load_bearing}))
+    evidence.append(EvidenceRow(
+        claim="verification claims use honest evidence vocabulary",
+        required_evidence=_CLAIM_INTEGRITY_FORMAT,
+        observed_evidence="load_bearing_uncertainty co-occurrences: " + summary,
+        verdict="WEAK",
+        note=("Downgrade COMPLETE -> INCOMPLETE/PASS_WITH_BLOCKING_FOLLOWUP: "
+              "replace hedged verification with PROVEN/INFERRED/UNVERIFIED/BLOCKED."),
+    ))
+    return [
+        "CLAIM_INTEGRITY: load_bearing_uncertainty in high-risk claim (" + summary + ") "
+        "-- re-state as PROVEN/INFERRED/UNVERIFIED/BLOCKED"
+    ], evidence
+
+
+# ---------------------------------------------------------------------------
 # Verdict assembly
 # ---------------------------------------------------------------------------
 
@@ -986,6 +1342,20 @@ def run_review(
         claim_text, evidence, blocking_gaps
     )
     overclaim_list.extend(report_overclaims)
+
+    # Review-boundary discipline: advisory (WEAK). NOT added to blocking_gaps —
+    # REVIEW_BOUNDARY_RISK surfaces as PASS_WITH_FOLLOWUP, not failure. Examines
+    # HEAD commit too so an auto-commit can't hide a load-bearing change behind
+    # a clean working tree.
+    _boundary_findings, evidence = _detect_review_boundary_risk(
+        changed_files, worktree, evidence
+    )
+
+    # Claim-integrity discipline: an uncertainty term ('likely'/'probably'/...)
+    # co-occurring with a high-risk verification context is load_bearing →
+    # blocks a full COMPLETE verdict (downgrade to REVISE).
+    integrity_findings, evidence = _detect_claim_integrity_risk(claim_text, evidence)
+    blocking_gaps.extend(integrity_findings)
 
     # Synthetic-failover findings are NOT auto-promoted to overclaims. The
     # detector is heuristic; it surfaces as blocking_gaps and yields REVISE

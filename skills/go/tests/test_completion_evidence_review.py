@@ -493,3 +493,280 @@ def test_cli_accepts_orchestrator_arg_shape(tmp_path):
     assert "usage:" not in proc.stderr, proc.stderr
     out = state_dir / f"completion-evidence-review_{run_id}.json"
     assert out.is_file(), "reviewer must emit its artifact on the orchestrator arg shape"
+
+
+# ---------------------------------------------------------------------------
+# Review-boundary discipline (goal: surface load-bearing auto-committed
+# changes that a clean git status or a generic commit title would hide).
+# Each test exercises the real run_review path against a tmp_path git worktree.
+# ---------------------------------------------------------------------------
+
+def _boundary_row(result):
+    """Find the review-boundary evidence row, if any."""
+    for row in result.evidence:
+        if "load-bearing change reviewable" in row.claim:
+            return row
+    return None
+
+
+def test_load_bearing_orchestrate_change_with_generic_title_flagged(tmp_path):
+    """orchestrate.py changed + generic 'chore(tests):' title → REVIEW_BOUNDARY_RISK."""
+    state_dir = tmp_path / "state"
+    run_id = "rb-generic"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    orch = worktree / "skills" / "go" / "scripts" / "orchestrate.py"
+    orch.parent.mkdir(parents=True, exist_ok=True)
+    orch.write_text("def run():\n    return 1\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    orch.write_text("def run():\n    return 2\n", encoding="utf-8")
+    _commit_all(worktree, "chore(tests): update tests\n\n## WHY\nMaintenance update required.")
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Fix orchestrator arg shape",
+        objective="Fix orchestrator arg shape",
+        summary="Implementation finished.",
+        files_modified=[{"path": "skills/go/scripts/orchestrate.py", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation finished.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _boundary_row(result)
+    assert row is not None, f"boundary row missing: {[r.claim for r in result.evidence]}"
+    assert row.verdict == "WEAK", row
+    assert "REVIEW_BOUNDARY_RISK" in row.note, row.note
+    assert "understates" in row.observed_evidence.lower() or "true" in row.observed_evidence.lower(), row.observed_evidence
+
+
+def test_tests_only_change_with_generic_title_not_flagged(tmp_path):
+    """A tests-only change carries no load-bearing surface → no boundary row."""
+    state_dir = tmp_path / "state"
+    run_id = "rb-testsonly"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    (worktree / "calc.py").write_text("def add(a,b): return a+b\n", encoding="utf-8")
+    (worktree / "test_calc.py").write_text("def test_add(): assert True\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    (worktree / "test_calc.py").write_text("def test_add(): assert True\ndef test_more(): assert 1\n", encoding="utf-8")
+    _commit_all(worktree, "chore(tests): update tests\n\n## WHY\nMaintenance update required.")
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Extend tests",
+        objective="Extend tests",
+        summary="Implementation finished.",
+        files_modified=[{"path": "test_calc.py", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation finished.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _boundary_row(result)
+    assert row is None, f"tests-only change must not produce a boundary row: {row}"
+
+
+def test_hook_change_requires_commit_sha_and_git_show_evidence(tmp_path):
+    """A hook change must surface commit SHA + git show --stat evidence."""
+    state_dir = tmp_path / "state"
+    run_id = "rb-hook"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    hooks = worktree / "skills" / "go" / "hooks"
+    hooks.mkdir(parents=True, exist_ok=True)
+    (hooks / "Stop_enforce_gate.py").write_text("def main():\n    return 0\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    (hooks / "Stop_enforce_gate.py").write_text("def main():\n    return 1\n", encoding="utf-8")
+    _commit_all(worktree, "fix(stop): narrow completion-authority downgrade for shipping claims\n\n## WHY\nStop FP.")
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Narrow Stop hook",
+        objective="Narrow Stop hook",
+        summary="Implementation finished.",
+        files_modified=[{"path": "skills/go/hooks/Stop_enforce_gate.py", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation finished.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _boundary_row(result)
+    assert row is not None, "hook change must produce a boundary row"
+    obs = row.observed_evidence
+    # Specific title (fix:) → not understating; still must carry SHA + stat.
+    assert "sha=" in obs and "(uncommitted)" not in obs, obs
+    assert "git_show_stat=" in obs, obs
+    assert "Stop_enforce_gate.py" in obs, obs
+
+
+def test_clean_git_status_alone_insufficient_after_autocommit(tmp_path):
+    """After auto-commit the working tree is clean, but the load-bearing change
+    is still in HEAD and must still be surfaced (not hidden by clean status)."""
+    state_dir = tmp_path / "state"
+    run_id = "rb-clean"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    orch = worktree / "skills" / "go" / "scripts" / "orchestrate.py"
+    orch.parent.mkdir(parents=True, exist_ok=True)
+    orch.write_text("def run():\n    return 1\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    orch.write_text("def run():\n    return 2\n", encoding="utf-8")
+    _commit_all(worktree, "chore(tests): update tests\n\n## WHY\nMaintenance update.")
+    # Working tree is now CLEAN — auto-commit captured the change.
+    clean = _git(worktree, "status", "--porcelain")
+    assert clean.stdout.strip() == "", "precondition: working tree clean"
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Fix orchestrator",
+        objective="Fix orchestrator",
+        summary="Implementation finished.",
+        files_modified=[{"path": "skills/go/scripts/orchestrate.py", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation finished.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _boundary_row(result)
+    assert row is not None, "clean status must NOT hide a committed load-bearing change"
+    assert "committed=True" in row.observed_evidence, row.observed_evidence
+
+
+def test_cache_alignment_evidence_required_for_plugin_change(tmp_path, monkeypatch):
+    """A plugin.json (cache-affecting) change with no matching cache version →
+    alignment unproven → REVIEW_BOUNDARY_RISK flagged."""
+    cache_root = tmp_path / "cache" / "local"
+    monkeypatch.setenv("GO_PLUGIN_CACHE_ROOT", str(cache_root))
+    state_dir = tmp_path / "state"
+    run_id = "rb-cache"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    pj_dir = worktree / ".claude-plugin"
+    pj_dir.mkdir(parents=True, exist_ok=True)
+    (pj_dir / "plugin.json").write_text(
+        json.dumps({"name": "test-plugin", "version": "1.0.0"}), encoding="utf-8"
+    )
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    (pj_dir / "plugin.json").write_text(
+        json.dumps({"name": "test-plugin", "version": "1.0.1"}), encoding="utf-8"
+    )
+    _commit_all(worktree, "chore: bump version\n\n## WHY\nMaintenance update.")
+    # NOTE: cache_root has NO test-plugin dir → cache_version=None → not aligned.
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Bump plugin",
+        objective="Bump plugin version",
+        summary="Implementation finished.",
+        files_modified=[{"path": ".claude-plugin/plugin.json", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation finished.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _boundary_row(result)
+    assert row is not None, "plugin/cache change must produce a boundary row"
+    assert row.verdict == "WEAK", row
+    assert "aligned=False" in row.observed_evidence, row.observed_evidence
+    assert "alignment unproven" in row.note, row.note
+
+
+# ---------------------------------------------------------------------------
+# Claim-integrity discipline (goal: distinguish proven claims from inferred
+# ones; 'likely' in a high-risk verification context blocks full COMPLETE).
+# ---------------------------------------------------------------------------
+
+def _integrity_row(result):
+    for row in result.evidence:
+        if "honest evidence vocabulary" in row.claim:
+            return row
+    return None
+
+
+def _ci_worktree_with_orchestrate(tmp_path, commit_msg, report_text):
+    """Shared fixture: a worktree with a load-bearing orchestrate.py change so
+    run_review is triggered, plus a worker report carrying the claim text."""
+    state_dir = tmp_path / "state"
+    run_id = "ci-" + commit_msg[:6].replace(" ", "").replace(":", "")
+    worktree = tmp_path / ("wt-" + run_id)
+    _init_repo(worktree)
+    orch = worktree / "skills" / "go" / "scripts" / "orchestrate.py"
+    orch.parent.mkdir(parents=True, exist_ok=True)
+    orch.write_text("def run():\n    return 1\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _git(worktree, "checkout", "-q", "-b", "feature")
+    orch.write_text("def run():\n    return 2\n", encoding="utf-8")
+    _commit_all(worktree, commit_msg)
+    _make_active_task(
+        state_dir, run_id,
+        title="Fix orchestrator arg shape",
+        objective="Fix orchestrator arg shape",
+        summary=report_text,
+        files_modified=[{"path": "skills/go/scripts/orchestrate.py", "change_type": "modified"}],
+    )
+    _make_claude_result(state_dir, run_id, report_text)
+    return state_dir, run_id, worktree
+
+
+def test_cache_likely_rebuilt_in_high_risk_report_flagged(tmp_path):
+    report = "Implementation complete. The cache was likely rebuilt after the bump."
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: bump", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _integrity_row(result)
+    assert row is not None, "'likely' + 'cache rebuilt' must produce a claim-integrity row"
+    assert row.verdict == "WEAK", row
+    assert "load_bearing_uncertainty" in row.observed_evidence, row.observed_evidence
+    # Downgrade COMPLETE → not PASS.
+    assert result.verdict != "PASS", result
+    assert any("CLAIM_INTEGRITY" in g for g in result.blocking_gaps), result.blocking_gaps
+
+
+def test_advisory_uncertainty_language_allowed(tmp_path):
+    """'this likely belongs in Priority 4' has no high-risk context → allowed."""
+    report = "Implementation finished. This likely belongs in Priority 4 follow-up."
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: x", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _integrity_row(result)
+    assert row is None, f"advisory uncertainty must NOT produce a row: {row}"
+    assert "CLAIM_INTEGRITY" not in " ".join(result.blocking_gaps), result.blocking_gaps
+
+
+def test_honest_replacement_vocabulary_passes(tmp_path):
+    """'proven'/'unverified' replacement wording is honest → passes."""
+    report = ("Source/cache line match PROVEN via normalized diff. "
+              "Rebuild mechanism UNVERIFIED — no propagation trace captured.")
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: y", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _integrity_row(result)
+    assert row is None, f"honest vocabulary must NOT be flagged: {row}"
+
+
+def test_hook_likely_ran_blocks_live_hook_claim(tmp_path):
+    report = "Done. The hook likely ran during the last session."
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: z", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _integrity_row(result)
+    assert row is not None, "'likely' + 'hook ran' must block the live-hook claim"
+    assert "load_bearing_uncertainty" in row.observed_evidence, row.observed_evidence
+    assert result.verdict != "PASS", result
+
+
+def test_tests_likely_cover_blocks_tests_passed_claim(tmp_path):
+    report = "Fixed. The tests likely cover this change."
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: w", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    row = _integrity_row(result)
+    assert row is not None, "'likely' + 'tests' must block the tests-passed claim"
+    assert "load_bearing_uncertainty" in row.observed_evidence, row.observed_evidence
+    assert result.verdict != "PASS", result
+
+
+def test_evidence_backed_wording_passes(tmp_path):
+    report = ("Verified: the artifact exists at the registered path (evidence: "
+              "Read of the dispatch file at line 42). The run completed.")
+    state_dir, run_id, worktree = _ci_worktree_with_orchestrate(tmp_path, "fix: v", report)
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    # No uncertainty term in a high-risk context → no claim-integrity row.
+    row = _integrity_row(result)
+    assert row is None, f"evidence-backed wording must not be flagged: {row}"
