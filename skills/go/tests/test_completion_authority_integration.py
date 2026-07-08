@@ -1,12 +1,12 @@
 """Integration test: invoke Stop_enforce_gate.main() via real subprocess with
-real stdin payload, real pointer file, real state dir. Proves the wiring in
-main() actually invokes evaluate_completion_authority and emits the documented
-JSON block shape on stdout.
+real stdin payload, real pointer file, real state dir. After the broad
+completion-authority reduction, main() must NOT block on overclaim terms in
+the active-task summary — that classification now belongs to the
+orchestrator-side completion_evidence_review.py.
 """
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import time
@@ -18,7 +18,6 @@ GATE_PY = Path(__file__).resolve().parent.parent / "hooks" / "Stop_enforce_gate.
 
 
 def _setup_state(tmp_path: Path, session_id: str, run_id: str, active_task: dict) -> tuple[Path, Path]:
-    """Create pointer + state dir + active-task. Returns (artifacts_root, state_dir)."""
     state_dir = tmp_path / "go-state" / run_id
     state_dir.mkdir(parents=True)
     (state_dir / f"active-task_{run_id}.json").write_text(json.dumps(active_task), encoding="utf-8")
@@ -34,7 +33,6 @@ def _setup_state(tmp_path: Path, session_id: str, run_id: str, active_task: dict
 
 
 def _run_gate(tmp_path: Path, artifacts: Path, payload: dict) -> subprocess.CompletedProcess:
-    """Run the gate as a subprocess, patching _ARTIFACTS_ROOT to the tmp artifacts dir."""
     wrapper = tmp_path / "wrapper.py"
     wrapper.write_text(
         "import sys; from pathlib import Path; "
@@ -52,20 +50,26 @@ def _run_gate(tmp_path: Path, artifacts: Path, payload: dict) -> subprocess.Comp
     )
 
 
-def test_main_blocks_on_overclaim_without_evidence(tmp_path):
-    """End-to-end: main() reads payload, resolves pointer, runs completion-authority,
-    emits {"decision":"block","reason":"continue: ..."} on stdout, exits 0."""
+def test_main_does_not_block_on_overclaim_summary(tmp_path):
+    """Regression: a worker summary containing 'fixed'/'complete' must NOT
+    trigger a Stop-side completion-authority block. The old gate used to emit
+    {"decision":"block","reason":"continue: ..."} here; the new gate must not."""
     sid = "11111111-2222-3333-4444-555555555555"
     rid = "run-int-1"
-    active = {"task": {"summary": "Bug fixed in handler"}}
+    active = {"task": {"summary": "Bug fixed in handler; migration complete"}}
     artifacts, _ = _setup_state(tmp_path, sid, rid, active)
     r = _run_gate(tmp_path, artifacts, {"session_id": sid, "stop_hook_active": False})
-    assert r.returncode == 0, f"unexpected exit code; stderr: {r.stderr.decode()}"
-    out = r.stdout.decode().strip()
-    assert out, f"expected block JSON on stdout, got empty. stderr={r.stderr.decode()}"
-    parsed = json.loads(out)
-    assert parsed["decision"] == "block"
-    assert parsed["reason"].startswith("continue:")
+    # Downstream SDLC hard-gate may exit 2 + write stderr; that's expected and
+    # out of scope here. What matters: no completion-authority block on stdout.
+    stdout = r.stdout.decode().strip()
+    if stdout:
+        try:
+            parsed = json.loads(stdout)
+        except json.JSONDecodeError:
+            pytest.fail(f"unexpected non-JSON stdout: {stdout!r}")
+        assert parsed.get("decision") != "block" or "completion" not in parsed.get("reason", "").lower(), (
+            f"Stop-side completion-authority block fired on overclaim summary: {parsed}"
+        )
 
 
 def test_main_silent_on_no_session_id(tmp_path):
@@ -84,24 +88,3 @@ def test_main_silent_on_stop_hook_active(tmp_path):
     r = _run_gate(tmp_path, artifacts, {"session_id": sid, "stop_hook_active": True})
     assert r.returncode == 0
     assert r.stdout.decode().strip() == ""
-
-
-def test_main_allows_when_no_overclaim(tmp_path):
-    """Active-task with no overclaim terms -> completion-authority gate passes
-    (no stdout block). The downstream SDLC hard-gate enforcement may still block
-    with exit 2 + stderr — that's a different gate, not the completion-authority."""
-    sid = "33333333-4444-5555-6666-777777777777"
-    rid = "run-int-3"
-    active = {"task": {"summary": "Implementation in progress"}}
-    artifacts, _ = _setup_state(tmp_path, sid, rid, active)
-    r = _run_gate(tmp_path, artifacts, {"session_id": sid, "stop_hook_active": False})
-    # Completion-authority gate passed: no stdout block JSON. The gate may exit
-    # 2 from the SDLC hard-gate enforcement (which is expected for a run that
-    # hasn't completed all SDLC phases). The key assertion: no
-    # completion-authority block on stdout.
-    stdout = r.stdout.decode().strip()
-    if stdout:
-        parsed = json.loads(stdout)
-        assert "completion" not in parsed.get("reason", "").lower(), (
-            f"completion-authority should not block on 'in progress': {parsed}"
-        )

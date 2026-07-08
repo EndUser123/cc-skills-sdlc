@@ -38,12 +38,12 @@ from pathlib import Path
 _ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
 _SESSIONS_DIR = "go-sessions"
 
-# Completion-authority overclaim terms (re-asserted per session; signal=overclaim)
-_OVERCLAIM_TERMS = frozenset({
-    "complete", "completed", "fix", "fixed", "ship", "shipped", "production",
-    "available", "enforced", "absorbed", "cache rebuilt", "tests passed",
-    "zero drift", "verified", "runtime-delivered", "live",
-})
+# Broad completion-authority logic (overclaim detection, evidence-level downgrade,
+# nearest-target binding, completion-authority log) was intentionally removed.
+# The orchestrator-side completion_evidence_review.py is the single source of
+# truth for broad completion evidence; Stop hooks verify only narrow, session-
+# bound artifacts (pointer, validation-mode marker, enforce.stop_gate). See
+# skills/go/SKILL.md layer architecture for the rationale.
 
 
 def _read_active_task(state_dir: Path, run_id: str) -> dict:
@@ -67,135 +67,6 @@ def _read_active_task(state_dir: Path, run_id: str) -> dict:
     return data
 
 
-def _detect_overclaim(text: str) -> list[str]:
-    """Return list of overclaim terms found in lowercase text."""
-    if not text:
-        return []
-    lower = text.lower()
-    return sorted(t for t in _OVERCLAIM_TERMS if t in lower)
-
-
-def _has_evidence_file(state_dir: Path, run_id: str, kind: str) -> bool:
-    """True if a verification-packet artifact exists for this run."""
-    for pat in (f".{kind}*{run_id}*", f".{kind}_*", f"{kind}-{run_id}*"):
-        if any(state_dir.glob(pat)):
-            return True
-    return False
-
-
-def _evaluate_completion_evidence(active: dict, state_dir: Path, run_id: str) -> dict:
-    """Map each claim to the highest level the evidence supports.
-
-    Levels: asserted_by_worker < source_inspected < tests_passed <
-            real_entrypoint_smoked < cache_or_runtime_verified <
-            field_confirmed_against_original_symptom.
-    """
-    levels = []
-    if active:
-        levels.append("asserted_by_worker")  # anything in the record is at least worker-asserted
-    if active.get("verified_source_paths"):
-        for p in active["verified_source_paths"]:
-            if Path(p).exists():
-                levels.append("source_inspected")
-                break
-    if _has_evidence_file(state_dir, run_id, "test-pass") or active.get("tests_pass"):
-        levels.append("tests_passed")
-    if _has_evidence_file(state_dir, run_id, "smoke") or active.get("smoke_ok"):
-        levels.append("real_entrypoint_smoked")
-    if _has_evidence_file(state_dir, run_id, "cache-rebuild") or active.get("cache_ok"):
-        levels.append("cache_or_runtime_verified")
-    if active.get("closure_check_passed") is True:
-        levels.append("field_confirmed_against_original_symptom")
-    return {"levels": levels, "highest": levels[-1] if levels else "asserted_by_worker"}
-
-
-def _downgrade_from_overclaim(levels: list[str], overclaim_terms: list[str]) -> dict:
-    """Map overclaim terms + highest evidence level to a downgrade verdict.
-
-    Downgrade rules (per goal req 4):
-      - all overclaim terms + no source_inspected      -> INCOMPLETE
-      - shipped/available/absorbed/production/live terms  -> PENDING/UNVERIFIED
-      - fixed/complete term without field_confirmed     -> INCOMPLETE
-      - else                                            -> ADVISORY
-    """
-    high = levels[-1] if levels else "asserted_by_worker"
-    shipping = {"shipped", "available", "absorbed", "production", "runtime-delivered", "live"}
-    fix_or_complete = {"complete", "completed", "fix", "fixed", "tests passed", "zero drift", "cache rebuilt", "verified", "enforced"}
-
-    if not overclaim_terms:
-        return {"downgrade": "ADVISORY", "reason": "no overclaim terms detected", "highest": high}
-
-    is_shipping = bool(shipping & set(overclaim_terms))
-    is_fix = bool(fix_or_complete & set(overclaim_terms))
-
-    if is_shipping and "source_inspected" not in levels:
-        return {"downgrade": "BLOCK", "reason": f"shipping claim without source_inspected (terms: {sorted(shipping & set(overclaim_terms))})", "highest": high}
-    if is_shipping:
-        return {"downgrade": "INCOMPLETE", "reason": f"shipping claim missing field-confirmed evidence", "highest": high}
-    if is_fix and "field_confirmed_against_original_symptom" not in levels:
-        return {"downgrade": "BLOCK", "reason": f"fixed/complete claim without field_confirmed (terms: {sorted(fix_or_complete & set(overclaim_terms))})", "highest": high}
-    return {"downgrade": "ADVISORY", "reason": f"overclaim present (terms: {overclaim_terms})", "highest": high}
-
-
-def _write_completion_log(state_dir: Path, run_id: str, verdict: dict) -> None:
-    """Append-only log of completion-authority verdicts. Fail-silent on write error."""
-    try:
-        log_path = state_dir / f"completion-authority_{run_id}.jsonl"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as fh:
-            entry = {
-                "ts": time.time(),
-                "run_id": run_id,
-                "downgrade": verdict.get("downgrade"),
-                "reason": verdict.get("reason"),
-                "highest": verdict.get("highest"),
-            }
-            fh.write(json.dumps(entry) + "\n")
-    except OSError:
-        pass
-
-
-def _select_nearest_target(state_dir: Path, run_id: str) -> dict:
-    """Nearest-target binding rule: the most recent completion-authority log
-    entry in this run is the target report (the work just declared done)."""
-    log_path = state_dir / f"completion-authority_{run_id}.jsonl"
-    if not log_path.is_file():
-        return {}
-    last = None
-    try:
-        for line in log_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            last = json.loads(line)
-    except (json.JSONDecodeError, OSError):
-        return {}
-    return last if isinstance(last, dict) else {}
-
-
-def evaluate_completion_authority(state_dir: Path, run_id: str) -> dict:
-    """Public entry: classify /go's claim-to-done against the evidence record.
-
-    Returns: {downgrade, reason, highest, levels, overclaim_terms, target}.
-    """
-    active = _read_active_task(state_dir, run_id)
-    target = _select_nearest_target(state_dir, run_id) or {}
-    # Compose the text the worker used to declare done. Preference order:
-    # 1) latest completion-authority log (the report just emitted)
-    # 2) active-task summary field
-    # 3) status field
-    claim_text = " ".join(str(v) for v in [
-        target.get("reason") or "",
-        active.get("summary") or "",
-        active.get("status") or "",
-    ]).strip()
-    overclaim = _detect_overclaim(claim_text)
-    levels = _evaluate_completion_evidence(active, state_dir, run_id)
-    downgrade = _downgrade_from_overclaim(levels["levels"], overclaim)
-    downgrade["overclaim_terms"] = overclaim
-    downgrade["levels"] = levels["levels"]
-    downgrade["target"] = "active_task"
-    return downgrade
 _STALE_TTL_SECONDS = 6 * 3600  # 6h — same as G4
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -324,22 +195,6 @@ def main() -> None:
     run_id = pointer.get("run_id") or ""
     # Malformed pointer (no run_id) -> fail silent.
     if not run_id:
-        sys.exit(0)
-
-    # Completion-authority gate: downgrade overclaim before /go declares done.
-    # Fail-soft: advisory downgrade is logged only; block only on
-    # "BLOCK" downgrade (incomplete or missing required packet for high-risk).
-    try:
-        verdict = evaluate_completion_authority(state_dir, run_id)
-    except Exception as _e:
-        # Fail-silent: don't block /go on a gate failure; log the reason.
-        verdict = {"downgrade": "ADVISORY", "reason": f"gate-error: {_e}"}
-    _write_completion_log(state_dir, run_id, verdict)
-    if verdict.get("downgrade") == "BLOCK":
-        reason = verdict.get("reason") or "Completion claim lacks required evidence"
-        # cc-skills-sdlc CLAUDE.md stop-output contract: emit {"decision":"block",...}
-        # and exit 0. Reason must lead with "continue: " so CC continues the loop.
-        print(json.dumps({"decision": "block", "reason": f"continue: {reason}"}))
         sys.exit(0)
 
     # Validation mode: if the validation contract is satisfied, allow.

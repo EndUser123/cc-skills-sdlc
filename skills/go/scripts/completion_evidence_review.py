@@ -87,6 +87,13 @@ _TRACKING_PATH_HINTS = (
 # Verdict severity for downgrade thresholds.
 _BLOCKING_VERDICTS = {"REVISE", "BLOCK"}
 
+# Conventional entry-point names invoked by runtime/CLI convention, not by an
+# explicit Python call site. Exempt from the helper-without-caller check.
+_ENTRY_POINT_NAMES = frozenset({
+    "main", "run", "cli", "app", "__main__", "handle", "handler",
+    "lambda_handler", "main_func", "entrypoint", "serve", "start",
+})
+
 
 @dataclass
 class EvidenceRow:
@@ -433,16 +440,41 @@ def _detect_wrong_layer_stop_hook_edits(
     return ["Stop hook contaminated with broad-analysis verbs: " + "; ".join(broad_violations)], evidence
 
 
+def _is_untracked(worktree: Path, rel: str) -> bool:
+    """True if rel is an untracked file in the worktree (porcelain '??')."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(worktree), "status", "--porcelain", "--", rel],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return False
+    # First two chars are the XY status; "??" = untracked.
+    return proc.stdout.startswith("?? ")
+
+
 def _detect_helper_without_caller(
-    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow]
+    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow],
+    declared_files: list[str] | None = None,
 ) -> tuple[list[str], list[EvidenceRow]]:
     """A new function/class was added to a changed file but no caller exists.
 
     Test files are excluded — their new test functions ARE the entry point.
+
+    Caller search runs in two passes:
+      1) `git grep` over tracked files (matches existing callers).
+      2) Grep over the working tree, including untracked greenfield caller
+         files. This closes the blind spot where both helper and caller are
+         new and neither is yet tracked.
+      3) Files explicitly declared in active-task.files_modified (the worker's
+         own contract) are always searched, tracked or not.
     """
     if not changed_files:
         return [], evidence
     findings: list[str] = []
+    declared_set = set(declared_files or [])
     for rel in changed_files:
         full = worktree / rel
         if not full.is_file() or not full.suffix == ".py":
@@ -456,21 +488,42 @@ def _detect_helper_without_caller(
         ):
             continue
         diff_text = _file_diff(worktree, rel, base)
-        if not diff_text:
-            continue
         new_defs: list[str] = []
-        for line in diff_text.splitlines():
-            stripped = line[1:] if line.startswith("+") else ""
-            for prefix in ("def ", "async def "):
-                if stripped.startswith(prefix):
-                    rest = stripped[len(prefix):]
-                    name = rest.split("(", 1)[0].strip()
-                    if name and name.isidentifier():
-                        new_defs.append(name)
-                    break
+        if diff_text:
+            for line in diff_text.splitlines():
+                stripped = line[1:] if line.startswith("+") else ""
+                for prefix in ("def ", "async def "):
+                    if stripped.startswith(prefix):
+                        rest = stripped[len(prefix):]
+                        name = rest.split("(", 1)[0].strip()
+                        if name and name.isidentifier():
+                            new_defs.append(name)
+                        break
+        else:
+            # No diff text: either no change, or an untracked greenfield file
+            # (git diff doesn't see untracked files). For untracked files the
+            # whole file is "added", so scan every def in the full content.
+            if _is_untracked(worktree, rel):
+                try:
+                    body = full.read_text(encoding="utf-8")
+                except OSError:
+                    body = ""
+                for line in body.splitlines():
+                    stripped = line.lstrip()
+                    for prefix in ("def ", "async def "):
+                        if stripped.startswith(prefix):
+                            rest = stripped[len(prefix):]
+                            name = rest.split("(", 1)[0].strip()
+                            if name and name.isidentifier():
+                                new_defs.append(name)
+                            break
         if not new_defs:
             continue
         for name in new_defs:
+            if name in _ENTRY_POINT_NAMES:
+                continue  # conventional entry point — invoked by runtime/CLI
+            hits: list[str] = []
+            # Pass 1: tracked files via git grep.
             try:
                 grep = subprocess.run(
                     ["git", "-C", str(worktree), "grep", "-l", "-w", "-F", "--", name],
@@ -478,17 +531,50 @@ def _detect_helper_without_caller(
                     text=True,
                     timeout=15,
                 )
-                hits = [h.strip() for h in grep.stdout.splitlines() if h.strip()]
+                hits.extend(h.strip() for h in grep.stdout.splitlines() if h.strip())
             except (OSError, subprocess.TimeoutExpired):
-                hits = []
-            hits = [h for h in hits if h != rel and not h.endswith("/" + rel)]
+                pass
+            # Pass 2: working-tree grep, including untracked files.
+            try:
+                wt_grep = subprocess.run(
+                    ["grep", "-rlwF", "--include=*.py", "--", name, str(worktree)],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                for h in wt_grep.stdout.splitlines():
+                    h_stripped = h.strip()
+                    if not h_stripped:
+                        continue
+                    # Normalize absolute paths back to repo-relative.
+                    try:
+                        rel_h = str(Path(h_stripped).resolve().relative_to(worktree.resolve()))
+                    except ValueError:
+                        rel_h = h_stripped
+                    hits.append(rel_h)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            # Pass 3: any declared file (may not exist on disk yet).
+            for df in declared_set:
+                if df == rel or df.endswith("/" + rel):
+                    continue
+                df_full = worktree / df
+                if df_full.is_file():
+                    try:
+                        text = df_full.read_text(encoding="utf-8")
+                    except OSError:
+                        continue
+                    if name in text:
+                        hits.append(df)
+            # Dedupe and filter self.
+            hits = sorted(set(h for h in hits if h != rel and not h.endswith("/" + rel)))
             if not hits:
                 findings.append(f"{rel}::{name} (no caller)")
     if not findings:
         evidence.append(EvidenceRow(
             claim="new helpers have runtime callers (or are tests)",
-            required_evidence="git grep finds >=1 caller for each new def",
-            observed_evidence="checked all new defs across changed .py files",
+            required_evidence="git grep / working-tree grep finds >=1 caller for each new def",
+            observed_evidence="checked all new defs across changed .py files (tracked + untracked + declared)",
             verdict="OK",
             note="",
         ))
@@ -608,8 +694,8 @@ def _detect_synthetic_only_failover_claim(
         claim="failover/fallback behavior verified",
         required_evidence=">=1 subprocess or run_script call in changed files",
         observed_evidence=f"subprocess={has_subprocess} test-mock density={synthetic_markers}",
-        verdict="OVERCLAIM",
-        note="synthetic-only evidence",
+        verdict="MISSING",
+        note="synthetic-only evidence (uncalibrated heuristic; REVISE not BLOCK)",
     ))
     return ["failover claim without subprocess evidence"], evidence
 
@@ -767,16 +853,18 @@ def _assemble_verdict(
             "cache-rebuild, dispatch-result) before commit/push."
         )
     if blocking_gaps:
-        # Hard gaps: REVISE on layer-placement violations, otherwise REVISE.
+        # Hard promotion to BLOCK is reserved for wrong-layer contamination —
+        # architectural drift where logic landed in the wrong layer. The
+        # synthetic-failover detector is heuristic and uncalibrated; it yields
+        # REVISE, not BLOCK. Activation / wrong-layer BLOCK requires
+        # calibrated or unambiguous evidence.
         hard = any(
-            ("wrong layer" in g.lower() or "contamination" in g.lower()
-             or "failover claim" in g.lower() or "synthetic-only" in g.lower())
+            ("wrong layer" in g.lower() or "contamination" in g.lower())
             for g in blocking_gaps
         )
-        # Promote layer/activation issues to BLOCK.
         if hard:
             return "BLOCK", False, (
-                "Hard failure detected (wrong-layer or synthetic-only). "
+                "Hard failure detected (wrong-layer contamination). "
                 "Revise before commit/push."
             )
         return "REVISE", False, (
@@ -873,7 +961,10 @@ def run_review(
     layer_findings, evidence = _detect_wrong_layer_stop_hook_edits(changed_files, worktree, diff_base, evidence)
     blocking_gaps.extend(layer_findings)
 
-    caller_findings, evidence = _detect_helper_without_caller(changed_files, worktree, diff_base, evidence)
+    caller_findings, evidence = _detect_helper_without_caller(
+        changed_files, worktree, diff_base, evidence,
+        declared_files=sorted(declared) if declared else None,
+    )
     blocking_gaps.extend(caller_findings)
 
     writer_findings, evidence = _detect_missing_writer_for_reader(changed_files, worktree, diff_base, evidence)
@@ -896,10 +987,13 @@ def run_review(
     )
     overclaim_list.extend(report_overclaims)
 
-    # The synthetic-only signal is an overclaim even when the worker did not
-    # explicitly mention those terms; promote that row's verdict to overclaim.
-    if synth_findings:
-        overclaim_list.extend(synth_findings)
+    # Synthetic-failover findings are NOT auto-promoted to overclaims. The
+    # detector is heuristic; it surfaces as blocking_gaps and yields REVISE
+    # via _assemble_verdict. To upgrade to BLOCK or overclaim, combine with
+    # activation-claim evidence (live_claim_without_artifacts) or require
+    # calibrated corpus evidence.
+    # if synth_findings:
+    #     overclaim_list.extend(synth_findings)
 
     verdict, safe, action = _assemble_verdict(
         blocking_gaps, overclaim_list, evidence, triggered, worker_report_present
@@ -965,7 +1059,11 @@ def main(argv: list[str] | None = None) -> int:
     if result.verdict in _BLOCKING_VERDICTS:
         return 2
     if result.verdict == "INCOMPLETE":
-        return 0  # missing inputs is not a hard gate failure
+        # Missing worker report is a hard gate: the review cannot authorize
+        # completion without inputs to review, and .pr-ready must not be
+        # touchable in that state. verify-task (Step 1) does NOT guarantee a
+        # worker report exists, so INCOMPLETE is reachable and must block.
+        return 2
     return 0
 
 

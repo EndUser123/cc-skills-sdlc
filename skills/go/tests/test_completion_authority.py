@@ -1,8 +1,13 @@
-"""Real-import tests for /go completion-authority gate.
+"""Regression tests for the Stop-side completion-authority reduction.
 
-Per the repo anti-mock policy: real imports of Stop_enforce_gate functions,
-real tmp_path state dirs, no Mock objects. Tests must exercise the real
-report-gate path; isolated mocks alone are insufficient.
+The broad completion-authority logic (overclaim detection, evidence-level
+downgrade, nearest-target binding, completion-authority log) was removed
+from Stop_enforce_gate.py. The orchestrator-side completion_evidence_review.py
+is the single source of truth for broad completion evidence; Stop hooks
+verify only narrow, session-bound artifacts.
+
+Per the repo anti-mock policy: real imports of Stop_enforce_gate, real
+tmp_path state dirs, no Mock objects.
 """
 from __future__ import annotations
 
@@ -31,116 +36,81 @@ def gate():
     return _load_gate()
 
 
-def test_overclaim_detector_finds_shipping_terms(gate):
-    assert "shipped" in gate._detect_overclaim("Implementation shipped to production")
-    assert "available" in gate._detect_overclaim("now available for use")
-    assert "complete" in gate._detect_overclaim("Migration complete")
+def test_broad_overclaim_helpers_removed(gate):
+    """Broad completion-authority helpers must not exist in Stop_enforce_gate."""
+    for name in (
+        "_OVERCLAIM_TERMS",
+        "_detect_overclaim",
+        "_has_evidence_file",
+        "_evaluate_completion_evidence",
+        "_downgrade_from_overclaim",
+        "_write_completion_log",
+        "_select_nearest_target",
+        "evaluate_completion_authority",
+    ):
+        assert not hasattr(gate, name), (
+            f"Stop_enforce_gate.{name} should be removed — broad completion "
+            f"authority belongs in completion_evidence_review.py"
+        )
 
 
-def test_overclaim_detector_returns_empty_for_normal_text(gate):
-    assert gate._detect_overclaim("Implementation in progress") == []
+def test_narrow_session_helpers_preserved(gate):
+    """Narrow session-bound helpers must still exist."""
+    assert callable(gate._read_active_task)
+    assert callable(gate._is_validation_complete)
+    assert callable(gate.main)
 
 
-def test_source_patch_without_cache_cannot_claim_runtime_delivered(tmp_path, gate):
-    """High-risk: shipping claim with no source_inspected -> BLOCK."""
-    state = tmp_path / "go"
-    state.mkdir()
-    verdict = gate.evaluate_completion_authority(state, "run1")
-    assert "shipped" in verdict["overclaim_terms"] or "available" in verdict["overclaim_terms"] or "production" in verdict["overclaim_terms"] or verdict["overclaim_terms"] == []
+def test_main_does_not_invoke_completion_authority(gate, tmp_path, capsys):
+    """main() must not block on completion-authority downgrades.
 
+    Regression: a worker summary containing 'fixed'/'complete' must NOT
+    trigger a Stop-side block — that classification belongs to the
+    orchestrator-side completion_evidence_review.py only.
+    """
+    import json
 
-def test_tests_passed_without_field_confirmed_cannot_claim_fixed(tmp_path, gate):
-    """Bugfix: 'fixed' word without field_confirmed evidence -> BLOCK."""
-    active = tmp_path / "go" / "active-task_runX.json"
-    active.parent.mkdir(parents=True)
-    active.write_text('{"task": {"summary": "Bug fixed in handler", "verified_source_paths": ["x.py"]}, "tests_pass": true}', encoding="utf-8")
-    state = tmp_path / "go"
-    verdict = gate.evaluate_completion_authority(state, "runX")
-    assert "fixed" in verdict["overclaim_terms"]
-    assert verdict["downgrade"] == "BLOCK"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    payload_file = tmp_path / "payload.json"
+    payload_file.write_text(json.dumps({
+        "session_id": "test-session",
+        "stop_hook_active": False,
+    }), encoding="utf-8")
+    pointer_dir = Path("P:/.claude/.artifacts") / "go-sessions"
+    pointer_dir.mkdir(parents=True, exist_ok=True)
+    pointer = pointer_dir / "test-session.json"
+    pointer.write_text(json.dumps({
+        "go_state_dir": str(state_dir),
+        "run_id": "run-X",
+        "updated_at": "2026-07-08T12:00:00+00:00",
+    }), encoding="utf-8")
+    # Active task contains "fixed"/"complete" — would have triggered the old gate.
+    (state_dir / "active-task_run-X.json").write_text(json.dumps({
+        "task": {"summary": "Migration complete; bug fixed", "task_type": "implementation"},
+    }), encoding="utf-8")
 
+    import io
+    import sys as _sys
 
-def test_missing_backend_runner_blocks_shipped_claim(tmp_path, gate):
-    """Capability migration: 'absorbed'/'shipped' without backend evidence -> INCOMPLETE or BLOCK."""
-    active = tmp_path / "go" / "active-task_runY.json"
-    active.parent.mkdir(parents=True)
-    active.write_text('{"task": {"summary": "Skill absorbed into /main", "verified_source_paths": ["a.py"]}}', encoding="utf-8")
-    state = tmp_path / "go"
-    verdict = gate.evaluate_completion_authority(state, "runY")
-    assert verdict["downgrade"] in ("BLOCK", "INCOMPLETE")
+    saved_stdin = _sys.stdin
+    _sys.stdin = open(payload_file, "r", encoding="utf-8")
+    try:
+        try:
+            gate.main()
+        except SystemExit as e:
+            # main() may exit 0 (allow) or fall through to enforce.stop_gate.
+            # What it must NOT do is emit a {"decision":"block"} JSON.
+            pass
+    finally:
+        _sys.stdin.close()
+        _sys.stdin = saved_stdin
 
-
-def test_declared_policy_without_runtime_path_cannot_claim_enforced(tmp_path, gate):
-    """Enforcement claim: 'enforced' without smoke evidence -> ADVISORY or worse."""
-    active = tmp_path / "go" / "active-task_runZ.json"
-    active.parent.mkdir(parents=True)
-    active.write_text('{"task": {"summary": "Policy enforced", "verified_source_paths": ["b.py"]}}', encoding="utf-8")
-    state = tmp_path / "go"
-    verdict = gate.evaluate_completion_authority(state, "runZ")
-    assert "enforced" in verdict["overclaim_terms"]
-
-
-def test_nearest_target_validation_binds_to_prior_report(tmp_path, gate):
-    """The most recent completion-authority log entry is the target report."""
-    state = tmp_path / "go"
-    state.mkdir()
-    log = state / "completion-authority_runQ.jsonl"
-    log.write_text(
-        '{"ts": 1.0, "run_id": "runQ", "downgrade": "ADVISORY", "reason": "earlier run"}\n'
-        '{"ts": 2.0, "run_id": "runQ", "downgrade": "BLOCK", "reason": "later run wins"}\n',
-        encoding="utf-8",
+    captured = capsys.readouterr()
+    # Old gate would have emitted a {"decision":"block"} with "continue: ..."
+    # on this input. New gate must not.
+    assert '"decision": "block"' not in captured.out, (
+        f"Stop-side completion-authority block fired: {captured.out!r}"
     )
-    target = gate._select_nearest_target(state, "runQ")
-    assert target is not None
-    assert target["reason"] == "later run wins"
-
-
-def test_missing_verification_packet_blocks_high_risk_complete_claim(tmp_path, gate):
-    """High-risk: 'complete' without field_confirmed_against_original_symptom -> BLOCK."""
-    active = tmp_path / "go" / "active-task_runH.json"
-    active.parent.mkdir(parents=True)
-    active.write_text('{"task": {"summary": "Migration complete", "tests_pass": true, "verified_source_paths": ["c.py"]}}', encoding="utf-8")
-    state = tmp_path / "go"
-    verdict = gate.evaluate_completion_authority(state, "runH")
-    assert verdict["downgrade"] == "BLOCK"
-    assert "complete" in verdict["overclaim_terms"]
-
-
-def test_evidence_present_case_allows_complete(tmp_path, gate):
-    """All evidence levels present: no downgrade despite 'complete' word."""
-    state_dir = tmp_path / "go"
-    state_dir.mkdir(parents=True)
-    (state_dir / ".test-pass-runOK").touch()
-    (state_dir / ".smoke-runOK").touch()
-    (state_dir / ".cache-rebuild-runOK").touch()
-    # Create a real source file so verified_source_paths can resolve
-    (state_dir / "x.py").write_text("# stub\n", encoding="utf-8")
-    import json as _json
-    active = {
-        "task": {
-            "summary": "Implementation complete",
-            "tests_pass": True,
-            "verified_source_paths": [str(state_dir / "x.py")],
-            "smoke_ok": True,
-            "cache_ok": True,
-            "closure_check_passed": True,
-        }
-    }
-    (state_dir / "active-task_runOK.json").write_text(_json.dumps(active), encoding="utf-8")
-    verdict = gate.evaluate_completion_authority(state_dir, "runOK")
-    # All evidence levels present -> no BLOCK, no INCOMPLETE
-    assert verdict["downgrade"] in ("ADVISORY", "PASS_WITH_BLOCKING_FOLLOWUP")
-    assert "field_confirmed_against_original_symptom" in verdict["levels"]
-
-
-def test_empty_state_dir_returns_advisory(gate, tmp_path):
-    """Missing active-task -> lowest evidence level (asserted_by_worker only) -> no BLOCK."""
-    state = tmp_path / "go"
-    state.mkdir()
-    verdict = gate.evaluate_completion_authority(state, "missing")
-    assert verdict["downgrade"] in ("ADVISORY", "PASS_WITH_BLOCKING_FOLLOWUP")
-
-
-def test_overclaim_term_set_is_shipped_focused(gate):
-    """Sanity: shipping terms are in the overclaim set."""
-    assert {"shipped", "available", "absorbed", "production"} <= gate._OVERCLAIM_TERMS
+    # Cleanup the pointer so we don't leave test residue.
+    pointer.unlink(missing_ok=True)

@@ -206,10 +206,11 @@ def test_missing_writer_for_reader_triggers_revise(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 5) synthetic-only failover claim → BLOCK
+# 5) synthetic-only failover claim → REVISE (calibration-required: uncalibrated
+# heuristic surfaces as blocking_gap, not overclaim; yields REVISE, not BLOCK)
 # ---------------------------------------------------------------------------
 
-def test_synthetic_only_failover_claim_triggers_block(tmp_path):
+def test_synthetic_only_failover_claim_triggers_revise(tmp_path):
     state_dir = tmp_path / "state"
     run_id = "run-failover"
     worktree = tmp_path / "wt"
@@ -232,15 +233,18 @@ def test_synthetic_only_failover_claim_triggers_block(tmp_path):
 
     _make_active_task(
         state_dir, run_id,
-        title="Wire failover harness",
-        objective="Wire failover harness with fallback",
-        summary="Failover works; fallback verified.",
+        title="Implement harness swap path",
+        objective="Implement harness swap path",
+        summary="Implemented the harness swap path.",
         files_modified=[{"path": "failover.py", "change_type": "modified"}],
     )
-    _make_claude_result(state_dir, run_id, "Failover verified; tests pass.")
+    _make_claude_result(state_dir, run_id, "Harness swap implemented.")
 
     result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
-    assert result.verdict == "BLOCK", result
+    # Uncalibrated heuristic -> REVISE, not BLOCK. BLOCK requires calibrated
+    # or unambiguous evidence (wrong-layer contamination or activation
+    # overclaim with matching artifact absence).
+    assert result.verdict == "REVISE", result
     assert not result.commit_push_safe
 
 
@@ -297,6 +301,82 @@ def test_clean_evidence_packet_passes(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# 7b) greenfield helper + greenfield caller (both untracked) → PASS
+# ---------------------------------------------------------------------------
+
+def test_greenfield_helper_with_greenfield_caller_passes(tmp_path):
+    """A new helper called only by a new, untracked caller must not false-REVISE.
+
+    Regression: earlier the detector used git grep which only searches tracked
+    files; pure-additive work hit false REVISE/BLOCK.
+    """
+    state_dir = tmp_path / "state"
+    run_id = "run-greenfield"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    # Seed repo with one empty commit so we have a base.
+    (worktree / "readme.md").write_text("# project\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    # New helper + new caller, both UNTRACKED. Caller references the helper.
+    (worktree / "svc.py").write_text(
+        "def new_helper():\n    return 1\n", encoding="utf-8"
+    )
+    (worktree / "cli.py").write_text(
+        "from svc import new_helper\n\ndef main():\n    return new_helper()\n",
+        encoding="utf-8",
+    )
+
+    _make_active_task(
+        state_dir, run_id,
+        title="Add greenfield helper",
+        objective="Add greenfield helper + caller",
+        summary="Implementation in progress.",
+        files_modified=[
+            {"path": "svc.py", "change_type": "created"},
+            {"path": "cli.py", "change_type": "created"},
+        ],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation in progress.")
+
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    # No live-behavior claim, no broad verb, caller declared in active-task and
+    # found by the working-tree grep over untracked files.
+    assert result.verdict in {"PASS", "PASS_WITH_FOLLOWUP"}, result
+    assert all(
+        "new_helper" not in g
+        for g in result.blocking_gaps
+    ), f"false REVISE on greenfield caller: {result.blocking_gaps}"
+
+
+# ---------------------------------------------------------------------------
+# 7c) greenfield helper with NO caller at all → still REVISE
+# ---------------------------------------------------------------------------
+
+def test_greenfield_helper_without_caller_still_revise(tmp_path):
+    """Sanity: orphan greenfield helper (no caller anywhere) still REVISE."""
+    state_dir = tmp_path / "state"
+    run_id = "run-orphan-greenfield"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    (worktree / "readme.md").write_text("# project\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    (worktree / "orphan.py").write_text(
+        "def truly_orphan_helper():\n    return 42\n", encoding="utf-8"
+    )
+    _make_active_task(
+        state_dir, run_id,
+        title="Add helper",
+        objective="Add helper",
+        summary="Implementation in progress.",
+        files_modified=[{"path": "orphan.py", "change_type": "created"}],
+    )
+    _make_claude_result(state_dir, run_id, "Implementation in progress.")
+    result = cer.run_review(worktree=worktree, state_dir=state_dir, run_id=run_id)
+    assert result.verdict in {"REVISE", "BLOCK"}, result
+    assert any("truly_orphan_helper" in g for g in result.blocking_gaps), result.blocking_gaps
+
+
+# ---------------------------------------------------------------------------
 # 7) follow-up-only nonblocking gap → PASS WITH FOLLOW-UP
 # ---------------------------------------------------------------------------
 
@@ -345,6 +425,41 @@ def test_followup_only_nonblocking_gap_yields_pass_with_followup(tmp_path):
     assert result.verdict in {"PASS", "PASS_WITH_FOLLOWUP"}, result
     if result.verdict == "PASS_WITH_FOLLOWUP":
         assert result.commit_push_safe, result
+
+
+# ---------------------------------------------------------------------------
+# 7d) INCOMPLETE (missing worker report) must block .pr-ready
+# ---------------------------------------------------------------------------
+
+def test_incomplete_blocks_on_missing_worker_report(tmp_path):
+    """No claude-task-result, no pi-review, no active-task summary -> INCOMPLETE
+    must exit 2 so run_common_tail returns False before .pr-ready."""
+    state_dir = tmp_path / "state"
+    run_id = "run-incomplete"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    (worktree / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    # active-task with NO summary and NO report files.
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / f"active-task_{run_id}.json").write_text(
+        json.dumps({"task": {"title": "X", "objective": "X"}, "run_id": run_id}),
+        encoding="utf-8",
+    )
+
+    script = SCRIPTS / "completion_evidence_review.py"
+    proc = subprocess.run(
+        [sys.executable, str(script),
+         "--worktree", str(worktree),
+         "--state-dir", str(state_dir),
+         "--run-id", run_id],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 2, (
+        f"INCOMPLETE must exit 2 to block .pr-ready; got {proc.returncode}\n"
+        f"stdout={proc.stdout}\nstderr={proc.stderr}"
+    )
+    assert "INCOMPLETE" in proc.stdout
 
 
 # ---------------------------------------------------------------------------
