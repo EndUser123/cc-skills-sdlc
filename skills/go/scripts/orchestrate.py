@@ -1584,7 +1584,7 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     # Stop_enforce_gate.py. Triggers are documented in the reviewer's SKILL.md
     # section and in completion_evidence_review.py:task_should_trigger().
     review_script = script_path("scripts", "completion_evidence_review.py")
-    review_args = [str(worktree), "--state-dir", str(state_dir), "--run-id", run_id]
+    review_args = ["--worktree", str(worktree), "--state-dir", str(state_dir), "--run-id", run_id]
     if os.environ.get("GO_COMPLETION_REVIEW_SKIP", "").strip() == "1":
         review_args.append("--skip-on-low-risk")
     rc = run_script(review_script, review_args, state_dir, run_id, cwd=worktree)

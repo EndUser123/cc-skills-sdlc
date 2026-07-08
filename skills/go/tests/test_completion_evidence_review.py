@@ -345,3 +345,36 @@ def test_followup_only_nonblocking_gap_yields_pass_with_followup(tmp_path):
     assert result.verdict in {"PASS", "PASS_WITH_FOLLOWUP"}, result
     if result.verdict == "PASS_WITH_FOLLOWUP":
         assert result.commit_push_safe, result
+
+
+# ---------------------------------------------------------------------------
+# 8) CLI boundary: orchestrator arg shape must not trip argparse
+# ---------------------------------------------------------------------------
+
+def test_cli_accepts_orchestrator_arg_shape(tmp_path):
+    """The orchestrator calls: completion_evidence_review.py --worktree WT
+    --state-dir SD --run-id RID. Argparse must accept this (regression:
+    positional worktree previously exit-2'd every /go run at Step 9.5)."""
+    state_dir = tmp_path / "state"
+    run_id = "run-cli"
+    worktree = tmp_path / "wt"
+    _init_repo(worktree)
+    (worktree / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    _commit_all(worktree, "init")
+    _make_active_task(state_dir, run_id, title="Calc", objective="Calc",
+                      summary="Implementation in progress.")
+    _make_claude_result(state_dir, run_id, "Implementation in progress.")
+
+    script = SCRIPTS / "completion_evidence_review.py"
+    # Exact shape used by orchestrate.py:run_common_tail Step 9.5.
+    proc = subprocess.run(
+        [sys.executable, str(script),
+         "--worktree", str(worktree),
+         "--state-dir", str(state_dir),
+         "--run-id", run_id],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode != 2 or "unrecognized arguments" not in proc.stderr, proc.stderr
+    assert "usage:" not in proc.stderr, proc.stderr
+    out = state_dir / f"completion-evidence-review_{run_id}.json"
+    assert out.is_file(), "reviewer must emit its artifact on the orchestrator arg shape"
