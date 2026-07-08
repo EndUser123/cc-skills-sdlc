@@ -53,21 +53,22 @@ class TestConfigTasks:
 
     def test_config_with_no_verification(self):
         result = classify(_make_task(task_type="config", verification_commands=[]))
-        assert result["tier"] == "T1"
+        assert result["tier"] == "T0"  # T0: local-eligible (simple config, no verification)
+        assert result["model"] == "LOCAL_ORNITH"
 
 
 class TestImplementationTasks:
     """Implementation tasks use full signal set."""
 
-    def test_simple_implementation_t1(self):
+    def test_simple_implementation_t0(self):
         result = classify(_make_task(
             task_type="implementation",
             scope_in=["src/main.py"],
             acceptance_criteria=["Works"],
             verification_commands=["pytest -q"],
         ))
-        assert result["tier"] == "T1"
-        assert result["model"] == "M3"
+        assert result["tier"] == "T0"  # T0: local-eligible (1 file, 1 criterion, 1 verification)
+        assert result["model"] == "LOCAL_ORNITH"
 
     def test_complex_implementation_t3(self):
         result = classify(_make_task(

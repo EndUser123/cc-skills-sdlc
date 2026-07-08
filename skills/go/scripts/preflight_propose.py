@@ -2716,8 +2716,7 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
     try:
         tel_path = state_dir / f"telemetry-discovery-evidence_{run_id}.jsonl"
         with tel_path.open("a", encoding="utf-8") as f:
-            f.write(_json.dumps(record) + "
-")
+            f.write(_json.dumps(record) + "\n")
     except OSError:
         pass  # telemetry is best-effort; never block
     return record
@@ -2861,8 +2860,7 @@ def record_pi_outcome(state_dir, run_id, dispatch_route: str = "", task_class: s
     try:
         tel_path = state_dir / f"pi-outcome_{run_id}.jsonl"
         with tel_path.open("a", encoding="utf-8") as f:
-            f.write(_json.dumps(record) + "
-")
+            f.write(_json.dumps(record) + "\n")
     except OSError:
         pass
     return record
@@ -2924,8 +2922,7 @@ def record_failover_telemetry(state_dir, run_id: str, candidate_chain: list,
     try:
         tel_path = state_dir / f"failover-telemetry_{run_id}.jsonl"
         with tel_path.open("a", encoding="utf-8") as f:
-            f.write(_json.dumps(record) + "
-")
+            f.write(_json.dumps(record) + "\n")
     except OSError:
         pass
     return record
