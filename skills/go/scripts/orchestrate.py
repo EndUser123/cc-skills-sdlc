@@ -54,6 +54,7 @@ from run_context import resolve as _resolve_run_context, canonical_terminal_id a
 from preflight_propose import run_preflight as _run_preflight  # noqa: E402
 from preflight_propose import apply_discovery_evidence_merge as _apply_discovery_merge  # noqa: E402
 from preflight_propose import emit_discovery_evidence_telemetry as _emit_discovery_telemetry  # noqa: E402
+from preflight_propose import record_pi_outcome as _record_pi_outcome  # noqa: E402
 
 
 @dataclass
@@ -1491,6 +1492,15 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         _emit_discovery_telemetry(state_dir, run_id)
     except Exception:
         pass  # telemetry is best-effort; must never block the run
+
+    # Step 13: PI outcome metrics (advisory, run-local, multi-terminal safe).
+    # Records dispatch route, risk class, review verdict, and PI advisory
+    # classification to pi-outcome_{run_id}.jsonl. Never blocks.
+    try:
+        _record_pi_outcome(state_dir, run_id, dispatch_route="",
+                           review_verdict="", rescue_escalation_needed=False)
+    except Exception:
+        pass  # metrics are best-effort; must never block the run
     return True
 
 

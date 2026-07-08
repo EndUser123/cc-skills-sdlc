@@ -2721,6 +2721,150 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
         pass  # telemetry is best-effort; never block
     return record
 
+
+# ---------------------------------------------------------------------------
+# PI Outcome Metrics -- advisory, run-local, multi-terminal safe.
+# ---------------------------------------------------------------------------
+_TASK_CLASSES_WITHOUT_PI = frozenset({"hook", "gate", "cache", "state", "migration"})
+_RISK_CLASSES_AVOID_PI = frozenset({"high", "critical"})
+
+
+def classify_pi_advisory(metrics: dict) -> str:
+    """Classify PI suitability from run-local outcome metrics. Advisory only."""
+    dispatch = metrics.get("dispatch_route", "")
+    risk = metrics.get("risk_class", "")
+    task_class = metrics.get("task_class", "")
+    review = metrics.get("review_verdict", "")
+    rescue = metrics.get("rescue_escalation_needed", False)
+    writer_error = metrics.get("writer_error", False)
+
+    if any(tc in task_class.lower() for tc in _TASK_CLASSES_WITHOUT_PI):
+        return "avoid_pi"
+    if risk in _RISK_CLASSES_AVOID_PI:
+        return "avoid_pi"
+    if rescue:
+        return "pi_evidence_collector"
+    if dispatch == "pi" and not writer_error:
+        if review in ("clean", "clean_with_minor_warnings", ""):
+            return "pi_strong_candidate"
+        return "pi_ok_with_review"
+    if dispatch == "pi" and writer_error:
+        return "pi_evidence_collector"
+    return "avoid_pi"
+
+
+def record_pi_outcome(state_dir, run_id, dispatch_route: str = "", task_class: str = "",
+                      risk_class: str = "", review_verdict: str = "",
+                      rescue_escalation_needed: bool = False,
+                      failure_shape: str = "", final_disposition: str = "",
+                      writer_error: bool = False) -> dict:
+    """Record PI outcome metrics to a run-local JSONL file.
+
+    Writer: run_common_tail (Step 13).
+    Storage: state_dir/pi-outcome_{run_id}.jsonl (run-local, run_id-scoped).
+    Reader: manual inspection or future aggregate script (advisory-only).
+    Authority: run-scoped; missing/corrupt metrics do not promote PI.
+    Freshness: per-run; one record per invocation.
+    Failure direction: never blocks the run.
+    """
+    import json as _json, time as _time
+
+    proposal_file = state_dir / f"task-proposal_{run_id}.json"
+    proposal = {}
+    if proposal_file.exists():
+        try:
+            proposal = _json.loads(proposal_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+
+    if not dispatch_route:
+        dispatch_route = proposal.get("dispatch", proposal.get("suggestedDispatch", ""))
+    if not task_class:
+        task_class = proposal.get("task_type", proposal.get("task_intent", ""))
+    if not risk_class:
+        risk_class = proposal.get("risk", proposal.get("execution_tier", ""))
+
+    de_tel_file = state_dir / f"telemetry-discovery-evidence_{run_id}.jsonl"
+    de_record = {}
+    if de_tel_file.exists():
+        try:
+            lines = de_tel_file.read_text(encoding="utf-8").strip().splitlines()
+            if lines:
+                de_record = _json.loads(lines[-1])
+        except (OSError, ValueError):
+            pass
+    discovery_emitted = de_record.get("exists", False)
+    writer_error = writer_error or de_record.get("writer_error", False)
+
+    files_touched = proposal.get("files_touched", [])
+    pi_review_file = state_dir / f"pi-review_{run_id}.json"
+    if not files_touched and pi_review_file.exists():
+        try:
+            pr = _json.loads(pi_review_file.read_text(encoding="utf-8"))
+            files_touched = pr.get("files_read", []) + pr.get("files_written", [])
+        except (OSError, ValueError):
+            pass
+
+    git_head = ""
+    try:
+        # Read .git/HEAD directly to avoid subprocess monkeypatch issues.
+        head_file = Path.cwd() / ".git" / "HEAD"
+        if head_file.exists():
+            raw = head_file.read_text(encoding="utf-8").strip()
+            if not raw.startswith("ref:"):
+                git_head = raw[:12]
+            else:
+                ref = head_file.parent / raw.split()[1]
+                if ref.exists():
+                    git_head = ref.read_text(encoding="utf-8").strip()[:12]
+    except Exception:
+        pass
+
+    plugin_version = ""
+    pv_file = Path(__file__).resolve().parent.parent / "plugin.json"
+    try:
+        plugin_version = _json.loads(pv_file.read_text(encoding="utf-8")).get("version", "")
+    except (OSError, ValueError):
+        pass
+
+    advisory = classify_pi_advisory({
+        "dispatch_route": dispatch_route,
+        "risk_class": risk_class,
+        "task_class": task_class,
+        "review_verdict": review_verdict,
+        "rescue_escalation_needed": rescue_escalation_needed,
+        "writer_error": writer_error,
+        "discovery_emitted": discovery_emitted,
+    })
+
+    record = {
+        "event": "pi_outcome",
+        "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "run_id": run_id,
+        "state_dir": str(state_dir),
+        "git_head": git_head,
+        "plugin_version": plugin_version,
+        "dispatch_route": dispatch_route,
+        "task_class": task_class,
+        "risk_class": risk_class,
+        "files_touched": files_touched[:20],
+        "discovery_emitted": discovery_emitted,
+        "writer_error": writer_error,
+        "review_verdict": review_verdict,
+        "rescue_escalation_needed": rescue_escalation_needed,
+        "failure_shape": failure_shape,
+        "final_disposition": final_disposition,
+        "pi_advisory": advisory,
+    }
+
+    try:
+        tel_path = state_dir / f"pi-outcome_{run_id}.jsonl"
+        with tel_path.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(record) + "\n")
+    except OSError:
+        pass
+    return record
+
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 
