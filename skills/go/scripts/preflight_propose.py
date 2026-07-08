@@ -2018,6 +2018,7 @@ def build_plain_english_report(proposal: dict) -> dict:
             "what_i_did",
             "what_i_recommend",
             "what_is_blocked",
+            "omission_audit",
             "what_i_need_from_you",
         ],
         "what_i_did": what_i_did,
@@ -2028,6 +2029,7 @@ def build_plain_english_report(proposal: dict) -> dict:
         "no_mutation_evidence_required": True,
         "discovery_incomplete": discovery_incomplete,
         "recommendation_is_advisory": recommendation_is_advisory,
+        "completion_authority_level": gate.get("completion_authority_level", "L0_asserted_by_worker"),
     }
 
     # Closure report (reqs. 4, 6, 10): scaffolds the five required content
@@ -2065,6 +2067,27 @@ def build_plain_english_report(proposal: dict) -> dict:
             "lifecycle_resources": disc.get("lifecycle_resources", []),
             "worktree_prune_predicate": disc.get("worktree_prune_predicate", []),
             "cleanup_requires_approval": disc.get("cleanup_requires_approval", True),
+        }
+
+    # Omission audit (reqs. 2, 3, 4): mandatory final section for high-risk
+    # reports. Scaffolded here; the post-impl gate (scripts/omission_audit.py)
+    # derives the completion-authority level (L0..L5) from observed artifacts
+    # and fills the 10 fields. Until filled, the report may NOT claim a higher
+    # authority than L0 (asserted_by_worker).
+    if gate.get("omission_audit_required"):
+        report["omission_audit"] = {
+            "section_order_position": "after what_is_blocked",
+            "completion_authority_level": gate.get("completion_authority_level", "L0_asserted_by_worker"),
+            "what_was_proven": None,
+            "what_was_not_proven": None,
+            "what_was_inferred": None,
+            "stale_state_risks": None,
+            "commit_boundary_risks": None,
+            "cache_runtime_risks": None,
+            "writer_reader_wiring_risks": None,
+            "synthetic_vs_live_evidence": None,
+            "what_would_falsify_pass": None,
+            "recommended_next_verification": None,
         }
 
     return report
@@ -2707,6 +2730,7 @@ def generate_proposal(
         "repro_policy": repro_policy,
         "operational_discovery": operational_discovery,
         "mechanism_change": mechanism_change,
+        "high_risk_report": high_risk_report,
         "layer_placement": layer_placement,
         "refactor_escalation": refactor_escalation,
         "dry_run_trigger": dry_run_trigger,
