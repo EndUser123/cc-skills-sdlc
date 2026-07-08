@@ -970,6 +970,27 @@ primary result or evidence block. Canonical contract + worked examples at
 `debrief/references/thought-partner-addendum.md` (canonical owner: `/improve`).
 The TPA is prompt-advisory only.
 
+## Report-Contract Vocabularies
+
+`/go` emits claims under the cross-command report contracts. The canonical
+field definitions live at
+`debrief/references/report-contract-vocabularies.md`:
+
+- **Coverage Authority** — name `sampled | targeted | whole_repo_static |
+  runtime_surface | live_behavior` on any audit claim (no bare "full coverage").
+- **Activation Truth Model** — name one of `source_changed | cache_rebuilt |
+  plugin_loaded | command_resolves | behavior_observed` on any "live / wired"
+  claim. Do not claim live behavior from a source/cache evidence alone.
+- **Bounded Action Continuation** — when the goal is authorized and the next
+  action is bounded + reversible + directly implied, complete it directly
+  instead of ending with "say the word."
+- **Manifest generator** — before claiming `whole_repo_static` evidence breadth,
+  run `cc-skills-architect/skills/ask/lib/abstraction_audit_manifest.py` and
+  cite the produced `manifest.json`.
+
+Advisory status: prompt-advisory. Static-invariant-tested at most. No runtime
+hook enforces these fields.
+
 ## Partner Posture
 
 `/go`'s posture is **Execution Partner** (see the Partner Posture Map in

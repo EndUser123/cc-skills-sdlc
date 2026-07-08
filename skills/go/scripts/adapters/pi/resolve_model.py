@@ -19,22 +19,31 @@ import sys
 from typing import Any
 
 # Classifier model name -> pi CLI --model flag
+# Classifier model name -> pi CLI --model flag
+# Verified from PI models.json (opencode-go provider, model id "deepseek-v4-flash").
 MODEL_MAP: dict[str, str] = {
     "M3": "minimax/MiniMax-M3",
     "GLM-5.2": "zai/glm-5.2",
     "LOCAL_ORNITH": "llama-cpp/ornith-1.0-9b",
+    "OPENCODE_DEEPSEEK": "deepseek-v4-flash",  # opencode-go provider
 }
 
-# Candidate chains per tier: ordered list of model names to try.
-# LOCAL_ORNITH is tried first only for T0/T1 safe-deterministic tasks.
-# On failure (timeout, thinking-only, empty output), the next candidate is tried.
+# Candidate chains per tier: ordered list of aliases to try.
+# T0/T1: local-first, then OPENCODE_DEEPSEEK (the configured remote fallback).
+# T2/T3: OPENCODE_DEEPSEEK only (local reserved for deterministic T0/T1).
+# T4: GLM-5.2 with OPENCODE_DEEPSEEK fallback (architecture/design policy).
+# M3 is opt-in via GO_PI_ALLOW_M3_FALLBACK=1 env var, not default.
 CANDIDATE_CHAINS: dict[str, list[str]] = {
-    "T0": ["LOCAL_ORNITH", "M3"],
-    "T1": ["LOCAL_ORNITH", "M3"],
-    "T2": ["M3"],
-    "T3": ["M3"],
-    "T4": ["GLM-5.2", "M3"],
+    "T0": ["LOCAL_ORNITH", "OPENCODE_DEEPSEEK"],
+    "T1": ["LOCAL_ORNITH", "OPENCODE_DEEPSEEK"],
+    "T2": ["OPENCODE_DEEPSEEK"],
+    "T3": ["OPENCODE_DEEPSEEK"],
+    "T4": ["GLM-5.2", "OPENCODE_DEEPSEEK"],
 }
+
+def _allow_m3_fallback() -> bool:
+    import os as _os
+    return _os.environ.get("GO_PI_ALLOW_M3_FALLBACK", "").strip() in ("1", "true", "yes")
 
 
 def resolve(model_name: str) -> str | None:

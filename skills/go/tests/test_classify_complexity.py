@@ -33,10 +33,10 @@ class TestPresetComplexity:
         assert result["tier"] == "T4"
         assert result["model"] == "GLM-5.2"
 
-    def test_low_preset_returns_t1_m3(self):
+    def test_low_preset_returns_t1_opencode(self):
         result = classify(_make_task(estimated_complexity="low"))
         assert result["tier"] == "T1"
-        assert result["model"] == "M3"
+        assert result["model"] == "OPENCODE_DEEPSEEK"
 
 
 class TestConfigTasks:
@@ -49,7 +49,7 @@ class TestConfigTasks:
             verification_commands=["pytest -q"],
         ))
         assert result["tier"] == "T1"
-        assert result["model"] == "M3"
+        assert result["model"] == "OPENCODE_DEEPSEEK"
 
     def test_config_with_no_verification(self):
         result = classify(_make_task(task_type="config", verification_commands=[]))

@@ -23,9 +23,9 @@ from typing import Any
 
 TIER_MODEL_MAP: dict[str, str] = {
     "T0": "LOCAL_ORNITH",
-    "T1": "M3",
-    "T2": "M3",
-    "T3": "M3",
+    "T1": "OPENCODE_DEEPSEEK",
+    "T2": "OPENCODE_DEEPSEEK",
+    "T3": "OPENCODE_DEEPSEEK",
     "T4": "GLM-5.2",
 }
 

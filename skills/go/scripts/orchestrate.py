@@ -55,6 +55,7 @@ from preflight_propose import run_preflight as _run_preflight  # noqa: E402
 from preflight_propose import apply_discovery_evidence_merge as _apply_discovery_merge  # noqa: E402
 from preflight_propose import emit_discovery_evidence_telemetry as _emit_discovery_telemetry  # noqa: E402
 from preflight_propose import record_pi_outcome as _record_pi_outcome  # noqa: E402
+from preflight_propose import record_failover_telemetry as _record_failover_telemetry  # noqa: E402
 
 
 @dataclass
@@ -1167,20 +1168,122 @@ def task_prompt(task_file: Path) -> str:
     return "\n".join(parts)
 
 
+
+
+
+def _resolve_chain_from_selection(state_dir, run_id) -> list:
+    """Read candidate chain from model-selection JSON if present, else default.
+
+    Run-local read; no cross-terminal aggregation.
+    """
+    chain: list[str] = []
+    try:
+        selection_file = state_dir / f"model-selection_{run_id}.json"
+        if selection_file.exists():
+            data = json.loads(selection_file.read_text(encoding="utf-8"))
+            chain = data.get("candidate_chain", []) or []
+    except (OSError, ValueError):
+        chain = []
+    if not chain:
+        chain = ["OPENCODE_DEEPSEEK", "M3"]
+    return [c for c in chain if c]
+
+
+def _candidate_chain_failover(harness, worktree, state_dir, run_id, prompt,
+                               candidate_chain, task_file) -> tuple:
+    """Try each candidate in order; stop at first accepted attempt.
+
+    Returns (result, final_model, failed_models). result may be None if all
+    candidates raised exceptions. Acceptance rejects:
+      - nonzero exit
+      - thinking-only output (no final assistant text)
+      - malformed/empty output
+    """
+    failed_models = []
+    result = None
+    for model in candidate_chain:
+        try:
+            result = harness.run_pi_harness(
+                worktree=worktree, state_dir=state_dir, run_id=run_id,
+                pi_model=model, prompt=prompt,
+            )
+        except Exception as exc:
+            failed_models.append({"model": model, "reason": f"exception: {exc}"})
+            continue
+
+        if result is None or result.exit_code != 0:
+            failed_models.append({"model": model, "reason": f"exit_code={getattr(result, 'exit_code', 'None')}"})
+            continue
+
+        # Acceptance: detect thinking-only or no-text output
+        transcript_path = getattr(result, "transcript_path", None)
+        output_text = ""
+        if transcript_path and Path(str(transcript_path)).exists():
+            try:
+                output_text = Path(str(transcript_path)).read_text(encoding="utf-8")
+            except OSError:
+                pass
+
+        has_text = False
+        if output_text:
+            for line in output_text.splitlines():
+                try:
+                    ev = json.loads(line.strip())
+                    if ev.get("type") in ("message_update", "message"):
+                        msg = ev.get("message", {})
+                        content = msg.get("content", [])
+                        if isinstance(content, list):
+                            for c_item in content:
+                                if c_item.get("type") == "text" and c_item.get("text", "").strip():
+                                    has_text = True
+                                    break
+                except json.JSONDecodeError:
+                    continue
+                if has_text:
+                    break
+
+        if not has_text:
+            failed_models.append({"model": model, "reason": "thinking_only_or_no_text"})
+            continue
+
+        # Success
+        return result, model, failed_models
+
+    last_model = candidate_chain[-1] if candidate_chain else "unknown"
+    return result, last_model, failed_models
+
+
 def dispatch_pi(worktree: Path, state_dir: Path, run_id: str, pi_info: PiModelInfo) -> bool:
     task_file = state_dir / f"active-task_{run_id}.json"
     harness = load_script_module(
         "go_pi_harness_runtime",
         script_path("scripts", "adapters", "pi", "harness.py"),
     )
-    result = harness.run_pi_harness(
-        worktree=worktree,
-        state_dir=state_dir,
-        run_id=run_id,
-        pi_model=pi_info.pi_model,
-        prompt=task_prompt(task_file),
+    prompt = task_prompt(task_file)
+
+    # Resolve candidate chain from model-selection; default to OPENCODE_DEEPSEEK first.
+    candidate_chain = _resolve_chain_from_selection(state_dir, run_id)
+    if not candidate_chain:
+        candidate_chain = [pi_info.pi_model]
+
+    result, final_model, failed_models = _candidate_chain_failover(
+        harness, worktree, state_dir, run_id, prompt, candidate_chain, task_file,
     )
-    if result.exit_code != 0:
+
+    # Record failover telemetry (run-local, non-blocking).
+    _record_failover_telemetry(
+        state_dir, run_id,
+        candidate_chain=candidate_chain,
+        attempted_model=final_model,
+        provider="",
+        outcome="failed" if (result is None or getattr(result, "exit_code", -1) != 0) else "success",
+        failure_reason="; ".join(f.get("reason", "") for f in failed_models),
+        fallback_selected=candidate_chain[1] if len(candidate_chain) > 1 else "",
+        final_model=final_model,
+        final_status="failed" if (result is None or getattr(result, "exit_code", -1) != 0) else "success",
+    )
+
+    if result is None or getattr(result, "exit_code", -1) != 0:
         return False
     phase_marker(state_dir, "dispatched", run_id)
     set_delegation_mode(state_dir, "worker", run_id)
