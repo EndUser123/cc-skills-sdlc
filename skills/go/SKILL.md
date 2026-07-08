@@ -627,6 +627,19 @@ Never auto-delete unverified work. SessionStart may surface the reclaimable coun
 
 **No silent cleanup (req. 9):** `operational_discovery.cleanup_requires_approval = true`. No cleanup action runs without explicit approval.
 
+### Mechanism-change resolution (`mechanism_change`)
+
+When `operational_discovery.required` is already true (the existing source-anchored discovery contract), the proposal also carries a `mechanism_change` block so a meta-change task resolves the change against existing machinery **before editing**:
+
+- `closest_existing_mechanisms` — the worker names the nearest existing mechanism(s) after reading source (anti-duplication).
+- `extension_path` — the worker resolves the change as exactly one of `NO_CHANGE | CLARIFY_EXISTING | EXTEND_EXISTING | SIMPLIFY_EXISTING | NEW_MECHANISM_JUSTIFIED | BLOCKED`.
+
+**No-edit enforcement:** if `extension_path` resolves to `NO_CHANGE` or `BLOCKED`, the report gate sets `mechanism_change_report_only = true` and `allow_implementation_completion_claim = false` — `/go` reports only and does **not** edit. The plain-English report surfaces this in `what_is_blocked`.
+
+**New gate/classifier discipline:** `NEW_MECHANISM_JUSTIFIED` for a new *blocking* gate/classifier requires real corpus/eval evidence (expected TP + acceptable FP). If `closest_existing_mechanisms` is empty under `NEW_MECHANISM_JUSTIFIED`, the gate flags `mechanism_change_new_unjustified` (advisory) — the director decides; it is never silently accepted as completion.
+
+**Activation boundary (intentional):** there is **no prompt keyword classifier** for meta-change. Real `/go` prompts are dominated by plan-handoff resumptions ("continue", "proceed", "implement the plan"); meta-change intent lives upstream in `/design` or `/planning` artifacts, not in `/go` prompt text. Activation rides the existing `operational_discovery.required` signal, or an `upstream_signal` passed through by the orchestrator when a plan/design handoff declares a mechanism-change task (a future extension point — today the worker fills `extension_path` via the discovery-evidence merge from `discovery-evidence_{run_id}.json` or `claude-task-result_{run_id}.json`).
+
 ### Mixed-work status (`mixed_work_status`)
 
 The single old `pause_for_authorization` bucket conflated four different situations. The proposal now carries `mixed_work_status` so the report can say *why* `/go` paused:
