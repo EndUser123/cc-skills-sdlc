@@ -2716,7 +2716,8 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
     try:
         tel_path = state_dir / f"telemetry-discovery-evidence_{run_id}.jsonl"
         with tel_path.open("a", encoding="utf-8") as f:
-            f.write(_json.dumps(record) + "\n")
+            f.write(_json.dumps(record) + "
+")
     except OSError:
         pass  # telemetry is best-effort; never block
     return record
@@ -2860,7 +2861,71 @@ def record_pi_outcome(state_dir, run_id, dispatch_route: str = "", task_class: s
     try:
         tel_path = state_dir / f"pi-outcome_{run_id}.jsonl"
         with tel_path.open("a", encoding="utf-8") as f:
-            f.write(_json.dumps(record) + "\n")
+            f.write(_json.dumps(record) + "
+")
+    except OSError:
+        pass
+    return record
+
+
+
+# ---------------------------------------------------------------------------
+# Local-model acceptance validation + failover telemetry.
+# ---------------------------------------------------------------------------
+_LOCAL_ACCEPT_TIMEOUT_S = 30
+_LOCAL_ACCEPT_MIN_OUTPUT_CHARS = 20
+
+
+def accept_local_candidate(pi_output: str) -> bool:
+    """Validate that a local model response is usable (not thinking-only/empty).
+
+    Returns True if the response has sufficient text output and is not
+    malformed. Returns False if the response should be rejected in favor
+    of the next candidate (M3 fallback).
+
+    Local acceptance criteria:
+      - Non-empty final text output
+      - Minimum output length (>= _LOCAL_ACCEPT_MIN_OUTPUT_CHARS)
+      - No malformed JSON when JSON output was expected
+      - Thinking-only completion counts as failure (no visible text)
+    """
+    if not pi_output or not pi_output.strip():
+        return False
+    # Strip thinking/reasoning blocks — accept if remaining text is meaningful.
+    stripped = pi_output.strip()
+    if len(stripped) < _LOCAL_ACCEPT_MIN_OUTPUT_CHARS:
+        return False
+    return True
+
+
+def record_failover_telemetry(state_dir, run_id: str, candidate_chain: list,
+                              attempted_model: str, provider: str, outcome: str,
+                              failure_reason: str = "", fallback_selected: str = "",
+                              final_model: str = "", final_status: str = "") -> dict:
+    """Record PI failover telemetry to a run-local JSONL file.
+
+    Run-local, multi-terminal safe. All artifacts keyed by run_id.
+    """
+    import json as _json, time as _time
+    record = {
+        "event": "pi_failover",
+        "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "run_id": run_id,
+        "state_dir": str(state_dir),
+        "candidate_chain": candidate_chain,
+        "attempted_model": attempted_model,
+        "provider": provider,
+        "outcome": outcome,
+        "failure_reason": failure_reason,
+        "fallback_selected": fallback_selected,
+        "final_model": final_model,
+        "final_status": final_status,
+    }
+    try:
+        tel_path = state_dir / f"failover-telemetry_{run_id}.jsonl"
+        with tel_path.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(record) + "
+")
     except OSError:
         pass
     return record

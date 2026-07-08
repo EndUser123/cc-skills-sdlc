@@ -22,6 +22,7 @@ from typing import Any
 
 
 TIER_MODEL_MAP: dict[str, str] = {
+    "T0": "LOCAL_ORNITH",
     "T1": "M3",
     "T2": "M3",
     "T3": "M3",
@@ -87,6 +88,38 @@ def _has_concrete_code_target(prompt: str) -> bool:
         return True
     return False
 
+
+
+
+# T0 local-eligibility: tasks safe enough to try the local model first.
+# Conservative: only read-only deterministic tasks with small scope.
+_LOCAL_INELIGIBLE_TASK_TYPES = frozenset({"hook", "gate", "cache", "state", "migration"})
+_LOCAL_INELIGIBLE_INTENTS = frozenset({"decide", "investigate", "validate", "design", "mixed"})
+_LOCAL_MAX_SCOPE = 3  # files
+_LOCAL_MAX_CRITERIA = 3
+_LOCAL_MAX_VERIFICATION = 2
+_LOCAL_MAX_PROMPT = 3000  # chars
+
+
+def _is_local_eligible(task: dict[str, Any], task_type: str, prompt: str = "") -> bool:
+    """True only for safe deterministic tasks suitable for local-model trial.
+
+    Conservative by design — when in doubt, return False (M3 is the safe default).
+    The local model gets tried only when ALL conditions hold.
+    """
+    if task_type in _LOCAL_INELIGIBLE_TASK_TYPES:
+        return False
+    if len(task.get("scope_in", [])) > _LOCAL_MAX_SCOPE:
+        return False
+    if len(task.get("acceptance_criteria", [])) > _LOCAL_MAX_CRITERIA:
+        return False
+    if len(task.get("verification_commands", [])) > _LOCAL_MAX_VERIFICATION:
+        return False
+    if task.get("forbidden_files"):
+        return False
+    if prompt and len(prompt) > _LOCAL_MAX_PROMPT:
+        return False
+    return True
 
 def classify_model_affinity(
     task_intent: str,
@@ -204,6 +237,10 @@ def classify(task: dict[str, Any]) -> dict[str, Any]:
     score = sum(signals.values())
     max_possible = len(signals) * 3
     tier = _score_to_tier(score, max_possible)
+
+    # T0 check: if this is a simple deterministic task, try local model first.
+    if tier in ("T1", "T2") and _is_local_eligible(task, task_type):
+        tier = "T0"
 
     # Only design/planning tasks can reach T4 (GLM-5.2).
     # Implementation/refactor/config cap at T3 (M3).

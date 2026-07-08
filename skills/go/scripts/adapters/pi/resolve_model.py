@@ -22,6 +22,18 @@ from typing import Any
 MODEL_MAP: dict[str, str] = {
     "M3": "minimax/MiniMax-M3",
     "GLM-5.2": "zai/glm-5.2",
+    "LOCAL_ORNITH": "llama-cpp/ornith-1.0-9b",
+}
+
+# Candidate chains per tier: ordered list of model names to try.
+# LOCAL_ORNITH is tried first only for T0/T1 safe-deterministic tasks.
+# On failure (timeout, thinking-only, empty output), the next candidate is tried.
+CANDIDATE_CHAINS: dict[str, list[str]] = {
+    "T0": ["LOCAL_ORNITH", "M3"],
+    "T1": ["LOCAL_ORNITH", "M3"],
+    "T2": ["M3"],
+    "T3": ["M3"],
+    "T4": ["GLM-5.2", "M3"],
 }
 
 
@@ -31,6 +43,20 @@ def resolve(model_name: str) -> str | None:
     Returns None if the model is not in the map.
     """
     return MODEL_MAP.get(model_name)
+
+
+def resolve_chain(tier: str) -> list[str]:
+    """Return ordered pi model flags for a complexity tier.
+
+    T0/T1 safe-deterministic tasks get [LOCAL_ORNITH, M3] — local model
+    is tried first; on failure M3 is the fallback.
+    T2/T3 get [M3] only. T4 gets [GLM-5.2, M3].
+    Unknown tiers default to [M3].
+    """
+    names = CANDIDATE_CHAINS.get(tier, ["M3"])
+    resolved = [resolve(n) for n in names]
+    # Drop None entries (missing model config) — fail soft to available models.
+    return [r for r in resolved if r is not None]
 
 
 def main() -> None:
@@ -59,10 +85,16 @@ def main() -> None:
         print(f"ERROR: no pi mapping for model '{model_name}'", file=sys.stderr)
         sys.exit(1)
 
+    # Build candidate chain for the tier
+    tier = selection.get("tier", "unknown")
+    chain = resolve_chain(tier) if tier != "override" else [pi_model]
+
     result: dict[str, Any] = {
         "classifier_model": model_name,
-        "tier": selection.get("tier", "unknown"),
+        "tier": tier,
         "pi_model": pi_model,
+        "candidate_chain": chain,
+        "candidate_models": [resolve(n) for n in CANDIDATE_CHAINS.get(tier, ["M3"]) if resolve(n)],
     }
 
     out = state_dir / f"pi-model_{run_id}.json"
