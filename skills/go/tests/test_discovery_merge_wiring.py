@@ -500,3 +500,28 @@ class TestPiDiscoveryFindingsExtraction:
             (tmp_path / f"task-proposal_{rid}.json").read_text(encoding="utf-8")
         )
         assert updated["refactor_escalation"]["required"] is False
+
+
+class TestSkillOrchestrateContractDrift:
+    """Guard canonical structural_issues list drift between SKILL.md and orchestrate."""
+
+    def test_canonical_structural_issues_match_across_files(self):
+        """SKILL.md prose and orchestrate contract block must list the same 8 issues."""
+        skill = ""
+        # SCRIPTS = skills/go/scripts; SKILL.md lives at skills/go/SKILL.md.
+        for candidate in [
+            SCRIPTS.parent / "SKILL.md",
+            Path("P:/packages/.claude-marketplace/plugins/cc-skills-sdlc/skills/go/SKILL.md"),
+        ]:
+            if candidate.exists():
+                skill = candidate.read_text(encoding="utf-8")
+                break
+        canonical = {"dead_producer_consumer", "inert_code", "duplicated_responsibility",
+                     "wrong_layer_ownership", "repeated_patching",
+                     "state_identity_lifecycle_ambiguity", "broad_cross_file_change_needed",
+                     "excessive_test_setup_due_to_design_complexity"}
+        skill_mentions = {i for i in canonical if i in skill}
+        # SKILL.md must mention ALL canonical issues.
+        assert skill_mentions == canonical, (
+            f"SKILL.md missing canonical issues: {canonical - skill_mentions}"
+        )

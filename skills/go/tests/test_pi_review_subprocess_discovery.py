@@ -101,3 +101,97 @@ def test_review_main_no_warnings_no_discovery_file(tmp_path: Path) -> None:
     subprocess.run([sys.executable, str(_REVIEW_SCRIPT)], env=env,
                    capture_output=True, text=True, timeout=30)
     assert not (state_dir / f"discovery-evidence_{run_id}.json").exists()
+
+
+# --- Multi-terminal safe: run_id-scoped paths; no shared state ---
+class TestPiDiscoveryWriterFailure:
+    """Verify PI review continues even if discovery-evidence writer fails."""
+
+    def test_review_does_not_crash_on_writer_error(self, tmp_path):
+        """PI review completes even when discovery-evidence writer fails."""
+        rid = "no-crash-001"
+        state_dir = tmp_path
+        transcript = state_dir / f"pi-transcript_{rid}.jsonl"
+        with transcript.open("w", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "type": "message", "message": {"role": "assistant", "content": [
+                    {"type": "toolCall", "name": "write", "arguments": {"path": "x.py"}, "id": "w1"}]}}))
+        (state_dir / f"active-task_{rid}.json").write_text(
+            json.dumps({"task": {"title": "T", "scope_in": [], "forbidden_files": []}}),
+            encoding="utf-8",
+        )
+        # Force the writer to fail by sabotaging the target module: rename it
+        # so importlib.import_module raises ModuleNotFoundError inside main().
+        src = SCRIPTS / "preflight_propose.py"
+        backup = src.read_text(encoding="utf-8")
+        try:
+            # Move the real file aside, drop a broken stub in its place.
+            real = src.with_suffix(".py.bak")
+            src.rename(real)
+            try:
+                src.write_text("raise RuntimeError('simulated writer failure')\n", encoding="utf-8")
+                env = {**os.environ, "GO_STATE_DIR": str(state_dir), "RUN_ID": rid}
+                result = subprocess.run(
+                    [sys.executable, str(_REVIEW_SCRIPT)],
+                    env=env, capture_output=True, text=True, timeout=30,
+                )
+                # Review must complete (no crash); pi-review must be written.
+                assert result.returncode == 0, f"review crashed: {result.stderr}"
+                assert (state_dir / f"pi-review_{rid}.json").exists()
+                # Error telemetry must be written.
+                err_tel = state_dir / f"telemetry-discovery-evidence-error_{rid}.jsonl"
+                assert err_tel.exists(), (
+                    f"error telemetry not written. stderr: {result.stderr}"
+                )
+                lines = [json.loads(l) for l in
+                         err_tel.read_text(encoding="utf-8").strip().splitlines()]
+                assert any(l.get("error_type") in ("import_error", "unexpected_error")
+                           for l in lines), f"unexpected error_type: {lines}"
+            finally:
+                # Restore: drop stub, rename real back.
+                if src.exists():
+                    src.unlink()
+                real.rename(src)
+        except Exception:
+            # Belt-and-suspenders: if anything blew up mid-test, restore.
+            if real.exists() and not src.exists():
+                real.rename(src)
+            raise
+
+
+class TestTelemetryErrorDetection:
+    """Verify emit_discovery_evidence_telemetry detects writer-error artifacts."""
+
+    def test_telemetry_detects_writer_error_file(self, tmp_path):
+        """If telemetry-discovery-evidence-error_{run_id}.jsonl exists,
+        telemetry reports writer_error=True and source='writer_error'."""
+        import importlib.util
+        pp_spec = importlib.util.spec_from_file_location("pp", SCRIPTS / "preflight_propose.py")
+        pp = importlib.util.module_from_spec(pp_spec)
+        pp_spec.loader.exec_module(pp)
+        rid = "tel-err-001"
+        # Seed the error artifact (simulating a prior PI writer failure).
+        err_path = tmp_path / f"telemetry-discovery-evidence-error_{rid}.jsonl"
+        err_path.write_text(json.dumps({
+            "event": "discovery_evidence_writer_error",
+            "run_id": rid, "error_type": "import_error",
+        }) + "\n", encoding="utf-8")
+        record = pp.emit_discovery_evidence_telemetry(tmp_path, rid)
+        assert record["writer_error"] is True
+        assert record["source"] == "writer_error"
+
+    def test_telemetry_distinguishes_dropped_all(self, tmp_path):
+        """Discovery file present but no findings -> writer_dropped_all=True."""
+        import importlib.util
+        pp_spec = importlib.util.spec_from_file_location("pp", SCRIPTS / "preflight_propose.py")
+        pp = importlib.util.module_from_spec(pp_spec)
+        pp_spec.loader.exec_module(pp)
+        rid = "tel-drop-001"
+        # Discovery file present but empty findings list.
+        (tmp_path / f"discovery-evidence_{rid}.json").write_text(
+            json.dumps({"findings": []}), encoding="utf-8",
+        )
+        record = pp.emit_discovery_evidence_telemetry(tmp_path, rid)
+        assert record["writer_dropped_all"] is True
+        assert record["exists"] is False
+        assert record["source"] == "absent"

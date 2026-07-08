@@ -269,6 +269,9 @@ def main() -> None:
     # apply_discovery_evidence_merge reader (called in orchestrate.py after
     # dispatch_pi) can escalate. Soft-fail: if no findings or the writer is
     # unavailable, nothing is written and the reader preserves preflight.
+    # Multi-terminal safe: uses run_id-scoped paths.
+    _DE_IMPORT_ERR = (ImportError, ModuleNotFoundError, AttributeError, TypeError, ValueError)
+    _DE_WRITE_ERR = (OSError, IOError)
     try:
         _scripts_dir = str(pathlib.Path(__file__).resolve().parents[2])
         if _scripts_dir not in sys.path:
@@ -280,14 +283,43 @@ def main() -> None:
             written = _pf.write_discovery_evidence(state_dir, run_id, findings)
             if written is not None:
                 print(f"  discovery-evidence: {written} ({len(findings)} finding(s))")
-    except Exception:
-        pass  # discovery emission is best-effort; never block the review
+    except _DE_IMPORT_ERR as exc:
+        _record_writer_error(state_dir, run_id, "import_error", exc)
+    except _DE_WRITE_ERR as exc:
+        _record_writer_error(state_dir, run_id, "write_error", exc)
+    except Exception as exc:
+        _record_writer_error(state_dir, run_id, "unexpected_error", exc)
 
     print(f"SUMMARY: {out}")
     if result["warnings"]:
         print(f"  {len(result['warnings'])} signals: {result['warnings']}")
     else:
         print("  no signals detected")
+
+
+def _record_writer_error(state_dir: pathlib.Path, run_id: str, error_type: str, exc: Exception) -> None:
+    """Run-local, non-blocking telemetry for discovery-evidence write failures.
+
+    Writes a single JSONL record to state_dir/telemetry-discovery-evidence-error_{run_id}.jsonl.
+    The run is never blocked by a telemetry write failure.
+    """
+    import json as _json, time as _time
+    record = {
+        "event": "discovery_evidence_writer_error",
+        "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "run_id": run_id,
+        "state_dir": str(state_dir),
+        "dispatch_source": "pi_review_transcript",
+        "error_type": error_type,
+        "error_message": str(exc)[:500],
+        "failure_direction": "non-blocking",
+    }
+    try:
+        err_path = state_dir / f"telemetry-discovery-evidence-error_{run_id}.jsonl"
+        with err_path.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(record) + "\n")
+    except Exception:
+        pass  # telemetry failure never blocks the run
 
 
 if __name__ == "__main__":

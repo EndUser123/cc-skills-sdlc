@@ -1538,6 +1538,10 @@ def orchestrate(args: argparse.Namespace) -> str:
         return finish("blocked")
 
     if args.dispatch == "local":
+        # No worker exists in local dispatch (verification/review/artifact gates only),
+        # so discovery_evidence is never produced. _apply_discovery_merge is
+        # intentionally not called here; it is wired in claude_resume (L1531) and
+        # the pi path (below at the call site) where workers run.
         inject_route_decision(state_dir, run_id, "local")
         if not run_local_verification(state_dir, run_id):
             return finish("blocked")

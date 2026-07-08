@@ -2661,7 +2661,11 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
         "event": "discovery_evidence_status",
         "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
         "run_id": run_id,
+        "state_dir": str(state_dir),
         "exists": False,
+        "writer_attempted": "unknown",
+        "writer_error": False,
+        "writer_dropped_all": "unknown",
         "findings_count": 0,
         "structural_issue_count": 0,
         "source": "absent",
@@ -2670,6 +2674,12 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
     }
     de_path = state_dir / f"discovery-evidence_{run_id}.json"
     ct_path = state_dir / f"claude-task-result_{run_id}.json"
+    # Check for PI writer-error telemetry (multi-terminal safe: run_id-scoped).
+    err_path = state_dir / f"telemetry-discovery-evidence-error_{run_id}.jsonl"
+    if err_path.exists():
+        record["writer_error"] = True
+        record["source"] = "writer_error"
+        record["failure_direction"] = "writer failure detected -- non-blocking"
     chosen = None
     chosen_path = None
     if de_path.exists():
@@ -2699,6 +2709,7 @@ def emit_discovery_evidence_telemetry(state_dir: Path, run_id: str) -> dict:
                 )
                 record["artifact_path"] = chosen_path
             else:
+                record["writer_dropped_all"] = True
                 record["source"] = "absent"
                 record["failure_direction"] = "artifact present, no findings -- non-blocking"
     # Run-local: one JSONL record per run, no cross-session state.
