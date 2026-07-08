@@ -57,9 +57,10 @@ def resolve(model_name: str) -> str | None:
 def resolve_chain(tier: str) -> list[str]:
     """Return ordered pi model flags for a complexity tier.
 
-    T0/T1 safe-deterministic tasks get [LOCAL_ORNITH, M3] — local model
-    is tried first; on failure M3 is the fallback.
-    T2/T3 get [M3] only. T4 gets [GLM-5.2, M3].
+    T0/T1 get [LOCAL_ORNITH, OPENCODE_DEEPSEEK] — local model first,
+    opencode-go/deepseek-v4-flash fallback.
+    T2/T3 get [OPENCODE_DEEPSEEK] only. T4 gets [GLM-5.2, OPENCODE_DEEPSEEK].
+    M3 is opt-in via GO_PI_ALLOW_M3_FALLBACK=1, not a default chain member.
     Unknown tiers default to [M3].
     """
     names = CANDIDATE_CHAINS.get(tier, ["M3"])

@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1189,6 +1190,78 @@ def _resolve_chain_from_selection(state_dir, run_id) -> list:
     return [c for c in chain if c]
 
 
+def _read_run_scope(state_dir, run_id) -> tuple:
+    """Read tier + task_class for telemetry scoping (run-local, best-effort)."""
+    tier, task_class = "", ""
+    try:
+        sel = state_dir / f"model-selection_{run_id}.json"
+        if sel.exists():
+            sd = json.loads(sel.read_text(encoding="utf-8"))
+            tier = sd.get("tier", "") or ""
+        prop = state_dir / f"task-proposal_{run_id}.json"
+        if prop.exists():
+            pd = json.loads(prop.read_text(encoding="utf-8"))
+            task_class = pd.get("task_type", "") or pd.get("task_intent", "") or ""
+    except (OSError, ValueError):
+        pass
+    return tier, task_class
+
+
+def _alias_reverse_map() -> dict:
+    """resolved provider/model -> alias (e.g. 'llama-cpp/ornith-1.0-9b' -> 'LOCAL_ORNITH')."""
+    try:
+        rm_path = Path(__file__).resolve().parent / "adapters" / "pi" / "resolve_model.py"
+        spec = importlib.util.spec_from_file_location("go_resolve_model_tel", rm_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return {v: k for k, v in mod.MODEL_MAP.items()}
+    except Exception:
+        return {}
+
+
+def _record_candidate_attempt(state_dir, run_id, tier, task_class,
+                              candidate_chain, attempt_index, model_alias,
+                              provider_model, started_at, latency_ms,
+                              outcome, reject_reason, final_model_used,
+                              fallback_used, validator_reason) -> dict:
+    """Append one advisory per-candidate-attempt record (run_id-scoped).
+
+    Advisory-only: not read by routing policy. Complements failover-telemetry
+    (one summary per dispatch) with per-attempt granularity + timing, so
+    future aggregate analysis can expand/contract local scope from real
+    dispatch outcomes rather than model preference.
+    Storage: state_dir/pi-candidate-attempts_{run_id}.jsonl (append-only).
+    """
+    ended_at = datetime.now(timezone.utc).isoformat()
+    record = {
+        "event": "pi_candidate_attempt",
+        "ts": ended_at,
+        "run_id": run_id,
+        "state_dir": str(state_dir),
+        "task_class": task_class,
+        "tier": tier,
+        "candidate_chain": candidate_chain,
+        "attempt_index": attempt_index,
+        "model_alias": model_alias,
+        "provider_model": provider_model,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "latency_ms": round(latency_ms, 1),
+        "outcome": outcome,  # success|reject|error
+        "reject_reason": reject_reason,
+        "final_model_used": final_model_used,
+        "fallback_used": fallback_used,
+        "validator_reason": validator_reason,
+    }
+    try:
+        tel_path = state_dir / f"pi-candidate-attempts_{run_id}.jsonl"
+        with tel_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError:
+        pass
+    return record
+
+
 def _candidate_chain_failover(harness, worktree, state_dir, run_id, prompt,
                                candidate_chain, task_file) -> tuple:
     """Try each candidate in order; stop at first accepted attempt.
@@ -1198,21 +1271,39 @@ def _candidate_chain_failover(harness, worktree, state_dir, run_id, prompt,
       - nonzero exit
       - thinking-only output (no final assistant text)
       - malformed/empty output
+
+    Emits one advisory pi_candidate_attempt record per candidate tried
+    (run_id-scoped, append-only) for future scope expand/contract analysis.
     """
     failed_models = []
     result = None
-    for model in candidate_chain:
+    tier, task_class = _read_run_scope(state_dir, run_id)
+    alias_map = _alias_reverse_map()
+    for idx, model in enumerate(candidate_chain):
+        alias = alias_map.get(model, model)
+        started_at = datetime.now(timezone.utc).isoformat()
+        t0 = time.monotonic()
         try:
             result = harness.run_pi_harness(
                 worktree=worktree, state_dir=state_dir, run_id=run_id,
                 pi_model=model, prompt=prompt,
             )
         except Exception as exc:
-            failed_models.append({"model": model, "reason": f"exception: {exc}"})
+            reason = f"exception: {exc}"
+            failed_models.append({"model": model, "reason": reason})
+            _record_candidate_attempt(
+                state_dir, run_id, tier, task_class, candidate_chain, idx,
+                alias, model, started_at, (time.monotonic() - t0) * 1000.0,
+                "error", reason, "", idx > 0, "harness_exception")
             continue
 
         if result is None or result.exit_code != 0:
-            failed_models.append({"model": model, "reason": f"exit_code={getattr(result, 'exit_code', 'None')}"})
+            reason = f"exit_code={getattr(result, 'exit_code', 'None')}"
+            failed_models.append({"model": model, "reason": reason})
+            _record_candidate_attempt(
+                state_dir, run_id, tier, task_class, candidate_chain, idx,
+                alias, model, started_at, (time.monotonic() - t0) * 1000.0,
+                "error", reason, "", idx > 0, "nonzero_exit")
             continue
 
         # Acceptance: detect thinking-only or no-text output
@@ -1244,9 +1335,18 @@ def _candidate_chain_failover(harness, worktree, state_dir, run_id, prompt,
 
         if not has_text:
             failed_models.append({"model": model, "reason": "thinking_only_or_no_text"})
+            _record_candidate_attempt(
+                state_dir, run_id, tier, task_class, candidate_chain, idx,
+                alias, model, started_at, (time.monotonic() - t0) * 1000.0,
+                "reject", "thinking_only_or_no_text", "", idx > 0,
+                "no_acceptable_text")
             continue
 
         # Success
+        _record_candidate_attempt(
+            state_dir, run_id, tier, task_class, candidate_chain, idx,
+            alias, model, started_at, (time.monotonic() - t0) * 1000.0,
+            "success", "", model, idx > 0, "accepted")
         return result, model, failed_models
 
     last_model = candidate_chain[-1] if candidate_chain else "unknown"

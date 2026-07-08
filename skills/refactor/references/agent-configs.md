@@ -8,20 +8,26 @@ Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), w
 
 ### Agent Assignments
 
-| Agent | Type | Focus | Specialty Dimensions |
-|-------|------|-------|---------------------|
-| 1 | `adversarial-security` | Security/I/O | Auth, injection, data exposure, path traversal |
-| 2 | `adversarial-logic` | Logic/Concurrency | Conditionals, operators, flow, TOCTOU, race conditions |
-| 3 | `adversarial-performance` | Performance | Leaks, bottlenecks, N+1, algorithmic complexity |
-| 4 | `adversarial-quality` | Code Quality | Tech debt, maintainability, conventions, type system |
-| 5 | `adversarial-io-validation` | I/O Safety | File operations, external assumptions, path validation |
-| 6 | `adversarial-testing` | Test Quality | Test coverage gaps, brittle tests, missing scenarios |
-| 7 | `python-simplifier` | Python Modernization | Python 3.14+ patterns, type hints, modern idioms |
-| 8 | `taint-propagation` | Cross-File Security | Taint analysis for path traversal, input sanitization across modules |
-| 9 | `circular-dependency` | Architecture | Circular import detection, layering violations, abstraction leaks |
-| 10 | `duplicate-detection` | Code Duplication | AST-based duplicate function/class detection across files |
-| 11 | `async-concurrency` | Async Safety | Shared state mutation in async, module-level mutable state |
-| 12 | `domain-correctness` | Business Logic | Requirements alignment, domain rules, edge cases, mental execution |
+All 12 are dedicated `refactor-discovery-*` agent files (in `cc-skills-sdlc/agents/`), fail-closed: `tools: Read, Grep, Glob, Write` — **no Bash, no Edit**. A discovery agent that cannot mutate cannot silently change the code under review (#1120: the `tools:` field is hard enforcement, not advisory). They are distinct from the shared `adversarial-*` family (which carries `Bash` and serves `/red-team` / `/code-review`); `/refactor` dispatches the fail-closed variants.
+
+**Dispatch contract:** every agent's system prompt points at `references/discovery-agent-contract.md`, which encodes the three non-negotiable invariants — multi-terminal isolation, stale-data immunity, and cross-directory scope. The orchestrator binds the absolute findings path into each dispatch prompt; agents never resolve scoping keys themselves.
+
+| # | Agent file | Focus | Specialty Dimensions |
+|---|-----------|-------|---------------------|
+| 1 | `refactor-discovery-security` | Security | Auth, injection, data exposure, path traversal, trust boundaries |
+| 2 | `refactor-discovery-logic` | Logic | Conditionals, operators, flow, precedence, copy-paste var errors |
+| 3 | `refactor-discovery-performance` | Performance | Leaks, bottlenecks, N+1, TOCTOU, unbounded growth |
+| 4 | `refactor-discovery-quality` | Code Quality | Tech debt, maintainability, redundant state, dead code, type gaps |
+| 5 | `refactor-discovery-io` | I/O Safety | File ops, external assumptions, path validation, encoding, platform paths |
+| 6 | `refactor-discovery-testing` | Test Quality | Coverage gaps around changed code, brittle tests, wrong-reason passes |
+| 7 | `refactor-discovery-modernize` | Python Modernization | Deprecated stdlib/API, type hints, modern idioms (match, generics) |
+| 8 | `refactor-discovery-taint` | Cross-File Security | Taint source→sink across modules, sanitization-context mismatches |
+| 9 | `refactor-discovery-circular` | Architecture | Circular imports, layering violations, abstraction leaks (transitive cycles) |
+| 10 | `refactor-discovery-duplicates` | Code Duplication | DRY violations — same/near-same logic copied across files |
+| 11 | `refactor-discovery-async` | Async/Concurrency | Shared mutable state, missing await, module-level mutable state, races |
+| 12 | `refactor-discovery-domain` | Business Logic | Requirements alignment, domain invariants, edge cases, mental execution |
+
+**Cross-directory mandate (constraint 3):** agents 8–11 are cross-file by definition, but EVERY agent traces symbols across the whole repo/module, not just the target path — `Grep` with no path restriction is the default. Duplication, circular imports, taint, and shared-state defects live at file/layer boundaries the target path alone never reveals.
 
 ### What Changed (Comprehensive Integration)
 
@@ -46,13 +52,13 @@ Each agent scores findings on the 10-dimension analysis rubric (see SKILL.md), w
 
 ## Output Paths
 
-- Artifacts dir: `P://.claude/.artifacts/{terminal_id}/refactor/`
-- Output path: `{artifacts_dir}/{target}/refactor/findings-{agent-name}.json`
-- terminal_id resolution: `CLAUDE_TERMINAL_ID` → `WT_SESSION` → `ConEmuServerPID` → `console_unknown`
+- Artifacts dir: `P:/.claude/.artifacts/{session_id}/refactor/{target_slug}/`
+- Findings path: `{artifacts_dir}/findings-{agent-name}.json`
+- **Scoping key: `session_id`** (the full runtime session UUID from `$CLAUDE_SESSION_ID` or the transcript filename stem) — **NOT** `terminal_id` / `$WT_SESSION`. Those are shared across concurrent Claude sessions inside one Windows Terminal, so two `/refactor` runs in the same terminal would collide and corrupt each other's findings. The orchestrator resolves `session_id` once and binds the absolute findings path into every agent dispatch; agents never resolve scoping keys themselves (see `discovery-agent-contract.md`).
 
 ### Findings Reuse
 
-If `{artifacts_dir}/{target}/refactor/findings-*.json` files exist from a prior `--dry-run`, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified.
+If `{artifacts_dir}/findings-*.json` files exist from a prior `--dry-run` **in the same session**, skip DISCOVER and go directly to DEDUPLICATE unless `--rediscover` is specified. Cross-session reuse is forbidden — a different session's findings are stale data (constraint 2); re-discover fresh every run so every finding cites `file:line` evidence read this run.
 
 ## Context7 Integration
 
