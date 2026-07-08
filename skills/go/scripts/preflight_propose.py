@@ -1419,7 +1419,7 @@ def build_decision_advisory(rewritten, task_intent, execution_tier) -> dict:
 
 def derive_report_gate(task_intent, execution_tier, closure_check=None,
                        operational_discovery=None, discovery_evidence=None,
-                       capability_claims=None) -> dict:
+                       capability_claims=None, mechanism_change=None) -> dict:
     """Completion-claim eligibility (goal reqs. 4, 8, 9).
 
     investigate/validate/decide never enable implementation-completion claims.
@@ -1460,6 +1460,23 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
     cap_claims = capability_claims or []
     cap_audit_required = bool(cap_claims)
 
+    # Mechanism-change resolution: NO_CHANGE/BLOCKED => report-only, no edit.
+    mc = mechanism_change or {}
+    mc_required = bool(mc.get("required"))
+    mc_path = mc.get("extension_path")
+    mc_report_only = mc_required and mc_path in _MECHANISM_REPORT_ONLY_PATHS
+    # NEW_MECHANISM_JUSTIFIED for a new gate/classifier but no closest existing
+    # mechanism named => advisory flag (director decides), never silently accepted
+    # as completion. Matches "without corpus evidence, keep advisory".
+    mc_new_unjustified = (
+        mc_required
+        and mc_path == "NEW_MECHANISM_JUSTIFIED"
+        and not (mc.get("closest_existing_mechanisms") or [])
+    )
+    if mc_report_only:
+        allow_completion = False
+        allow_targeted_fix_only = False
+
     return {
         "allow_implementation_completion_claim": allow_completion,
         "allow_targeted_fix_claim_only": allow_targeted_fix_only,
@@ -1474,6 +1491,10 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
         "allow_recommendation_as_verified": allow_recommendation_as_verified,
         "capability_claim_audit_required": cap_audit_required,
         "capability_claim_audit_passed": False,  # worker fills after audit
+        "mechanism_change_required": mc_required,
+        "mechanism_change_extension_path": mc_path,
+        "mechanism_change_report_only": mc_report_only,
+        "mechanism_change_new_unjustified": mc_new_unjustified,
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim. "
@@ -1490,6 +1511,12 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
                "consolidation complete | routing complete | backend implementation complete | "
                "pending capability intentionally deferred. "
                if cap_audit_required else "")
+            + ("mechanism_change.required: resolve as NO_CHANGE | CLARIFY_EXISTING | "
+               "EXTEND_EXISTING | SIMPLIFY_EXISTING | NEW_MECHANISM_JUSTIFIED | BLOCKED. "
+               "NO_CHANGE/BLOCKED => report-only, do NOT edit. "
+               "NEW_MECHANISM_JUSTIFIED for a blocking gate/classifier requires corpus/eval "
+               "evidence; without it the proposal stays advisory. "
+               if mc_required else "")
         ),
     }
 
@@ -1850,6 +1877,21 @@ def build_plain_english_report(proposal: dict) -> dict:
     if discovery_incomplete:
         what_is_blocked.append(
             "discovery_incomplete — recommendation demoted to advisory; cannot be presented as verified."
+        )
+    mc = proposal.get("mechanism_change") or {}
+    mc_path = mc.get("extension_path")
+    if mc.get("required") and mc_path in _MECHANISM_REPORT_ONLY_PATHS:
+        what_is_blocked.append(
+            f"mechanism_change extension_path={mc_path} — report-only; /go must NOT edit. "
+            "Either existing machinery already covers it (NO_CHANGE) or the change "
+            "is blocked pending director decision (BLOCKED)."
+        )
+    elif mc.get("required") and mc.get("report_only") is False and mc_path in (
+        "CLARIFY_EXISTING", "EXTEND_EXISTING", "SIMPLIFY_EXISTING", "NEW_MECHANISM_JUSTIFIED"
+    ):
+        what_i_recommend.append(
+            f"mechanism_change extension_path={mc_path}: proceed through normal "
+            "implementation + verification, with the closest existing mechanism(s) named."
         )
 
     if status == "pause_for_authorization":
@@ -2437,12 +2479,15 @@ def generate_proposal(
     closure_check = classify_closure_check(rewritten, task_intent)
     repro_policy = derive_repro_policy(rewritten, task_intent, closure_check)
     operational_discovery = classify_operational_discovery(rewritten, task_intent)
+    mechanism_change = classify_mechanism_change(rewritten, task_intent, operational_discovery)
     report_gate = derive_report_gate(
         task_intent, execution_tier, closure_check,
         operational_discovery=operational_discovery,
         discovery_evidence=None,  # scaffold — worker fills findings during the run
         capability_claims=capability_claims_raw,
+        mechanism_change=mechanism_change,
     )
+    mechanism_change["report_only"] = bool(report_gate.get("mechanism_change_report_only"))
     decision_advisory = build_decision_advisory(rewritten, task_intent, execution_tier)
     delegation_policy = derive_delegation_policy(
         rewritten, task_intent, execution_tier, risk, dispatch
@@ -2522,6 +2567,13 @@ def generate_proposal(
             "distinguish: visible consolidation complete | routing complete | "
             "backend implementation complete | pending capability intentionally deferred."
         )
+    if mechanism_change["required"]:
+        notes.append(
+            "MECHANISM_CHANGE required: resolve the change as exactly one of "
+            "NO_CHANGE | CLARIFY_EXISTING | EXTEND_EXISTING | SIMPLIFY_EXISTING | "
+            "NEW_MECHANISM_JUSTIFIED | BLOCKED, and name the closest existing "
+            "mechanism(s). NO_CHANGE/BLOCKED => report-only, do NOT edit."
+        )
     proposal = {
         "runid": run_id,
         "run_id": run_id,
@@ -2546,6 +2598,7 @@ def generate_proposal(
         "closure_check": closure_check,
         "repro_policy": repro_policy,
         "operational_discovery": operational_discovery,
+        "mechanism_change": mechanism_change,
         "layer_placement": layer_placement,
         "refactor_escalation": refactor_escalation,
         "dry_run_trigger": dry_run_trigger,
@@ -2625,6 +2678,7 @@ def apply_discovery_evidence_merge(state_dir: Path, run_id: str) -> bool:
 
     # Try standard discovery file first, then worker result file as fallback.
     discovery_evidence = None
+    mechanism_change_override = None
     for candidate in (
         state_dir / f"discovery-evidence_{run_id}.json",
         state_dir / f"claude-task-result_{run_id}.json",
@@ -2633,19 +2687,51 @@ def apply_discovery_evidence_merge(state_dir: Path, run_id: str) -> bool:
             continue
         try:
             data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if discovery_evidence is None:
             # Standard discovery file: {findings: [...]}. Worker result may wrap: {discovery_evidence: {findings: [...]}}.
             findings = data.get("findings") or (data.get("discovery_evidence") or data.get("discoveryEvidence", {})).get("findings")
             if findings:
                 discovery_evidence = {"findings": findings}
-                break
-        except (OSError, ValueError):
-            continue
+        # Worker may also resolve mechanism_change.extension_path after source read.
+        mc = data.get("mechanism_change") if isinstance(data, dict) else None
+        if isinstance(mc, dict) and mc.get("extension_path") in _MECHANISM_EXTENSION_PATHS:
+            mechanism_change_override = {
+                "extension_path": mc["extension_path"],
+                "closest_existing_mechanisms": [
+                    str(x) for x in (mc.get("closest_existing_mechanisms") or [])
+                ],
+            }
+        if discovery_evidence is not None and mechanism_change_override is not None:
+            break
 
-    if not discovery_evidence:
-        return True  # no discovery findings; preflight-only result is correct
+    if not discovery_evidence and not mechanism_change_override:
+        return True  # nothing to merge; preflight-only result is correct
 
     try:
-        proposal = rebuild_with_discovery_evidence(proposal, discovery_evidence)
+        if discovery_evidence:
+            proposal = rebuild_with_discovery_evidence(proposal, discovery_evidence)
+        if mechanism_change_override is not None:
+            mc = dict(proposal.get("mechanism_change") or {})
+            mc.update({
+                "required": True,
+                "extension_path": mechanism_change_override["extension_path"],
+                "closest_existing_mechanisms": mechanism_change_override["closest_existing_mechanisms"],
+            })
+            proposal["mechanism_change"] = mc
+            # Recompute report_gate so NO_CHANGE/BLOCKED => report-only holds.
+            proposal["report_gate"] = derive_report_gate(
+                proposal.get("task_intent", "implement"),
+                proposal.get("execution_tier", "local_surgical"),
+                proposal.get("closure_check"),
+                operational_discovery=proposal.get("operational_discovery"),
+                discovery_evidence=discovery_evidence,
+                capability_claims=proposal.get("capability_claims"),
+                mechanism_change=proposal["mechanism_change"],
+            )
+            proposal["mechanism_change"]["report_only"] = bool(
+                proposal["report_gate"].get("mechanism_change_report_only"))
         proposal["plain_english_report"] = build_plain_english_report(proposal)
         _atomic_write_json(proposal_file, proposal)
         return True
@@ -3080,6 +3166,34 @@ if __name__ == "__main__":
     assert "worktree" in wt["operational_discovery"]["surfaces"]
     assert wt["operational_discovery"]["worktree_prune_predicate"]
     assert "explicit director approval" in " ".join(wt["operational_discovery"]["worktree_prune_predicate"]).lower()
+    # mechanism_change: only required when operational discovery fires; never a
+    # new keyword classifier. Ordinary fix prompt => not required; hook
+    # investigate (discovery fires) => required, scaffold, worker resolves path.
+    assert out["mechanism_change"]["required"] is False, "ordinary fix must not require mechanism_change"
+    assert out["mechanism_change"]["extension_path"] is None
+    mc_inv = inv["mechanism_change"]
+    assert mc_inv["required"] is True, "discovery-firing prompt must scaffold mechanism_change"
+    assert mc_inv["extension_path"] is None  # worker resolves after source read
+    assert mc_inv["closest_existing_mechanisms"] == []
+    # NO_CHANGE / BLOCKED => report-only, no completion claim.
+    g_nc = derive_report_gate("implement", "full_go", mechanism_change={
+        "required": True, "extension_path": "NO_CHANGE"})
+    assert g_nc["mechanism_change_report_only"] is True
+    assert g_nc["allow_implementation_completion_claim"] is False
+    g_bl = derive_report_gate("implement", "full_go", mechanism_change={
+        "required": True, "extension_path": "BLOCKED"})
+    assert g_bl["allow_implementation_completion_claim"] is False
+    # EXTEND_EXISTING with a closest mechanism named => may proceed.
+    g_ex = derive_report_gate("implement", "full_go", mechanism_change={
+        "required": True, "extension_path": "EXTEND_EXISTING",
+        "closest_existing_mechanisms": ["preflight_propose.classify_operational_discovery"]})
+    assert g_ex["mechanism_change_report_only"] is False
+    assert g_ex["allow_implementation_completion_claim"] is True
+    # NEW_MECHANISM_JUSTIFIED with no closest existing named => advisory flag.
+    g_new = derive_report_gate("implement", "full_go", mechanism_change={
+        "required": True, "extension_path": "NEW_MECHANISM_JUSTIFIED",
+        "closest_existing_mechanisms": []})
+    assert g_new["mechanism_change_new_unjustified"] is True
     print(
         f"preflight_propose: self-check OK (dispatch={out['suggestedDispatch']}, "
         f"intent={out['task_intent']}, tier={out['execution_tier']}, "
