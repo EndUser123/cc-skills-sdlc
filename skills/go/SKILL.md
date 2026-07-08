@@ -899,6 +899,69 @@ touch "$GO_STATE_DIR/.capability-audit-passed_$RUN_ID"
 
 ---
 
+## STEP 6.7: Completion Evidence Review (Post-Implementation Review Gate)
+
+After tests pass and coverage gates verify, but **before** `.pr-ready` is touched and `.pr_ready` is emitted, the orchestrator runs the read-only **Completion Evidence Review** over the worker's completion report.
+
+This gate exists because the user catches gaps after target LLMs report "PASS": helpers with no runtime caller, synthetic-only tests, wrong-layer hook logic, missing writers/readers, stale git/cache evidence, silent failures, and overclaimed live behavior. Without this gate, /go would happily mark done on a worker report that checks structural boxes but leaves dead features and unbacked claims in the tree.
+
+**Trigger policy** (`completion_evidence_review.task_should_trigger`):
+
+| Condition | Runs review? |
+|-----------|--------------|
+| Always for hook/gate/cache/plugin/routing/model/dispatch/state/session/telemetry tasks | Yes |
+| Always when worker claims PASS on live/wired/registered/failover/activation behavior | Yes |
+| Optional for small low-risk local edits (use `GO_COMPLETION_REVIEW_SKIP=1`) | No |
+
+The reviewer is **read-only by default**: it inspects source, artifacts, tests, and git/cache state via fresh current-terminal `git` invocations (no latest-file reads; no stale cross-terminal pointers). It may run safe validation commands (`git grep`, `git diff`, `git log`). It does NOT modify files unless explicitly authorized by a separate task.
+
+**Verdict schema** (`completion-evidence-review_{RUN_ID}.json`):
+
+| Verdict | Meaning | commit_push_safe |
+|---------|---------|-------------------|
+| `PASS` | Clean evidence packet, no gaps, no overclaim | True |
+| `PASS WITH FOLLOW-UP` | Non-blocking gaps; safe to mark done, log follow-ups | True |
+| `REVISE` | Blocking gap (revise before next review) | False |
+| `BLOCK` | Overclaim, wrong layer, or hard failure | False |
+| `INCOMPLETE` | Missing required inputs (worker report missing/corrupt) | False |
+
+**Reviewer output fields** (per `completion-evidence-review.v1`):
+
+- `evidence[]` — table of `claim / required_evidence / observed_evidence / verdict (OK|WEAK|MISSING|OVERCLAIM) / note`
+- `blocking_gaps[]` — list of strings naming each gap the worker must address
+- `overclaims[]` — list of unbacked live-behavior terms
+- `recommended_next_action` — plain-English next step
+- `commit_push_safe` — boolean
+- `generated_at` — ISO timestamp
+
+**Detectors:**
+
+| Failure class | Detector | Verdict on hit |
+|---------------|----------|----------------|
+| Helper exists, no runtime caller | `git grep -w -F` across the worktree | REVISE |
+| Worker claimed live/wired/registered behavior without smoke/cache-rebuild/registration artifact | Evidence artifact scan + claim term scan | REVISE / BLOCK |
+| Stop hook or `router.py` was edited with broad-analysis verbs (pattern detection, dry-run, refactor analysis) | Per-file diff for `_BROAD_ANALYSIS_VERBS` | BLOCK |
+| New tracking path (telemetry, metrics, stop_block, anomaly, completion-authority, completion_evidence, review_passes) is read but no `write_text`/`write_json`/`json.dump`/`.touch()` writer emits it | `git grep -E` for writers | REVISE |
+| Synthetic-only failover/fallback claim (`@patch`, `MagicMock`, `Mock(` without `subprocess.run`/`run_script`) | Diff density scan | BLOCK |
+| Layer-placement violation (broad-verb in prompt + Stop/router edits) | Prompt + file-edit cross-check | BLOCK |
+| Plugin/hook file changes without cache-rebuild artifact | File pattern + artifact scan | REVISE |
+| Multi-terminal pollution risk (top-level `state.json`, `latest` paths) | File-path pattern scan | WEAK (PASS WITH FOLLOW-UP) |
+| Report overclaim: unbacked live-behavior terms | Per-term OK-row check | BLOCK |
+
+**Multi-terminal requirements (codified):**
+
+- All git/cache/log/artifact claims use fresh current-terminal evidence (`git diff`/`git grep` invoked at review time, not latest-file reads)
+- `run_id`-scoped artifact paths preferred
+- Stale / missing / corrupt data fails toward no claim, never toward PASS
+
+**Artifact:** `completion-evidence-review_{RUN_ID}.json` (verdict + evidence table) and `completion-evidence-review_{RUN_ID}.jsonl` (append-only ledger). Touches `.completion-reviewed_{RUN_ID}` on success.
+
+**Scope:** the reviewer does NOT add logic to `Stop_enforce_gate.py` (per requirements). It runs in the orchestrator's process between coverage-gate and pr-artifacts. Reviewer logic does not propagate to the Stop hook; the existing `completion-authority` overclaim gate (in `Stop_enforce_gate.py`) is the Stop-side check and remains unchanged.
+
+**Tests:** `skills/go/tests/test_completion_evidence_review.py` — 7 cases covering helper-no-caller, source-only-live, wrong-layer-Stop-hook, missing-writer-for-reader, synthetic-only-failover, clean-packet-pass, follow-up-only.
+
+---
+
 ## STEP 7: Local PR Artifacts
 
 Generate commit message, PR title, PR body, PR-ready report.

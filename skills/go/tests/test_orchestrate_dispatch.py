@@ -91,6 +91,7 @@ def test_common_tail_records_skipped_simplify_before_review_and_qa(monkeypatch, 
         "run-qa-verification.py",
         "mutation-gate.py",
         "coverage-gate.py",
+        "completion_evidence_review.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]
@@ -127,6 +128,7 @@ def test_common_tail_runs_configured_simplify_command(monkeypatch, tmp_path):
         "run-qa-verification.py",
         "mutation-gate.py",
         "coverage-gate.py",
+        "completion_evidence_review.py",
         "pr-artifacts.py",
         "loop-check.py",
     ]

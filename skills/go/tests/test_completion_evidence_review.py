@@ -308,12 +308,20 @@ def test_followup_only_nonblocking_gap_yields_pass_with_followup(tmp_path):
     (worktree / "svc.py").write_text(
         "def serve():\n    return 'ok'\n", encoding="utf-8"
     )
+    (worktree / "cli.py").write_text(
+        "from svc import serve\n\ndef main():\n    return serve()\n",
+        encoding="utf-8",
+    )
     _commit_all(worktree, "init svc")
     _git(worktree, "checkout", "-q", "-b", "feature")
-    # Write a top-level `state.json` -- multi-terminal risk (WEAK only).
+    # New helper IS called from cli.py; only the top-level `state.json` is weak.
     (worktree / "svc.py").write_text(
         "def serve():\n    return 'ok'\n\n"
         "def new_helper():\n    return serve()\n",
+        encoding="utf-8",
+    )
+    (worktree / "cli.py").write_text(
+        "from svc import serve, new_helper\n\ndef main():\n    return new_helper() or serve()\n",
         encoding="utf-8",
     )
     (worktree / "state.json").write_text("{}\n", encoding="utf-8")
@@ -326,6 +334,7 @@ def test_followup_only_nonblocking_gap_yields_pass_with_followup(tmp_path):
         summary="Implementation in progress.",
         files_modified=[
             {"path": "svc.py", "change_type": "modified"},
+            {"path": "cli.py", "change_type": "modified"},
             {"path": "state.json", "change_type": "created"},
         ],
     )

@@ -224,32 +224,122 @@ def _has_real_subprocess_evidence(state_dir: Path, run_id: str) -> bool:
     return any((state_dir / name).exists() for name in real_markers)
 
 
+def _resolve_diff_base(worktree: Path) -> str:
+    """Return the SHA (or ref) to use as the diff base for the worktree.
+
+    Preference order:
+      1) merge-base(HEAD, main) when the worktree is on a non-main branch
+      2) merge-base(HEAD, master) as a fallback
+      3) "HEAD" — same as the working tree (no committed history diff)
+    """
+    try:
+        head_proc = subprocess.run(
+            ["git", "-C", str(worktree), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        head_branch = head_proc.stdout.strip() if head_proc.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        head_branch = ""
+    if head_branch and head_branch not in ("main", "master"):
+        for upstream in ("main", "master"):
+            try:
+                mb = subprocess.run(
+                    ["git", "-C", str(worktree), "merge-base", "HEAD", upstream],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if mb.returncode == 0 and mb.stdout.strip():
+                return mb.stdout.strip()
+    return "HEAD"
+
+
 def _git_diff_files(worktree: Path) -> tuple[list[str], str]:
     """Return (changed_paths, diff_stat_or_empty) for the worktree.
 
-    Uses current-terminal `git diff HEAD` evidence (no latest-file reads).
+    Uses current-terminal git evidence (no latest-file reads). The diff is
+    the union of:
+      - working-tree vs index (`git diff`),
+      - index vs HEAD (`git diff --cached`),
+      - HEAD vs the merge-base with the upstream branch (when the worktree
+        is on a non-main branch — the orchestrator's worktree shape).
     Empty list is benign when there is no diff; empty stat is returned when
     git is unavailable — callers must fail toward no claim.
     """
+    all_files: set[str] = set()
+    stat_chunks: list[str] = []
+    # 1) working tree vs index
+    for kind, name_flag in (("diff", "--name-only"), ("diff", "--stat")):
+        try:
+            proc = subprocess.run(
+                ["git", "-C", str(worktree), kind, name_flag],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return [], ""
+        if proc.returncode != 0:
+            return [], ""
+        if name_flag == "--name-only":
+            all_files.update(line.strip() for line in proc.stdout.splitlines() if line.strip())
+        else:
+            stat_chunks.append(proc.stdout)
+    # 2) index vs HEAD
+    for kind, extra, name_flag in (("diff", "--cached", "--name-only"), ("diff", "--cached", "--stat")):
+        try:
+            proc = subprocess.run(
+                ["git", "-C", str(worktree), kind, extra, name_flag],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if proc.returncode != 0:
+            continue
+        if name_flag == "--name-only":
+            all_files.update(line.strip() for line in proc.stdout.splitlines() if line.strip())
+        else:
+            stat_chunks.append(proc.stdout)
+    # 3) merge-base with upstream — but only when the upstream exists in this repo.
+    base = _resolve_diff_base(worktree)
+    if base != "HEAD":
+        for kind, name_flag in (("diff", "--name-only"), ("diff", "--stat")):
+            try:
+                proc = subprocess.run(
+                    ["git", "-C", str(worktree), kind, base, "HEAD", name_flag],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if proc.returncode != 0:
+                continue
+            if name_flag == "--name-only":
+                all_files.update(line.strip() for line in proc.stdout.splitlines() if line.strip())
+            else:
+                stat_chunks.append(proc.stdout)
+    return sorted(all_files), "\n".join(stat_chunks)
+
+
+def _file_diff(worktree: Path, rel: str, base: str) -> str:
+    """Return the diff text for one file (vs base) or empty string on error."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(worktree), "diff", "--name-only", "HEAD"],
+            ["git", "-C", str(worktree), "diff", base, "HEAD", "--", rel],
             capture_output=True,
             text=True,
             timeout=15,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return [], ""
-    if proc.returncode != 0:
-        return [], ""
-    files = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    stat_proc = subprocess.run(
-        ["git", "-C", str(worktree), "diff", "--stat", "HEAD"],
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    return files, (stat_proc.stdout if stat_proc.returncode == 0 else "")
+        return ""
+    return proc.stdout if proc.returncode == 0 else ""
 
 
 def _declared_files_in_active_task(active: dict[str, Any]) -> list[str]:
@@ -306,7 +396,7 @@ def _detect_live_claim_without_artifacts(
 
 
 def _detect_wrong_layer_stop_hook_edits(
-    changed_files: list[str], evidence: list[EvidenceRow]
+    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow]
 ) -> tuple[list[str], list[EvidenceRow]]:
     """Stop hook files were modified AND broad analysis verbs were introduced."""
     stop_hooks_touched = [
@@ -317,24 +407,12 @@ def _detect_wrong_layer_stop_hook_edits(
     if not stop_hooks_touched:
         return [], evidence
 
-    # For each touched Stop-area file, grep the diff content for broad-verbs.
     broad_violations: list[str] = []
-    try:
-        for path in stop_hooks_touched:
-            proc = subprocess.run(
-                ["git", "-C", str(pathlib_parent(path)), "diff", "HEAD", "--", path],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            if proc.returncode != 0:
-                continue
-            text = proc.stdout.lower()
-            for verb in _BROAD_ANALYSIS_VERBS:
-                if verb in text:
-                    broad_violations.append(f"{path}: +{verb}")
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+    for path in stop_hooks_touched:
+        text = _file_diff(worktree, path, base).lower()
+        for verb in _BROAD_ANALYSIS_VERBS:
+            if verb in text:
+                broad_violations.append(f"{path}: +{verb}")
 
     if not broad_violations:
         evidence.append(EvidenceRow(
@@ -355,23 +433,13 @@ def _detect_wrong_layer_stop_hook_edits(
     return ["Stop hook contaminated with broad-analysis verbs: " + "; ".join(broad_violations)], evidence
 
 
-def pathlib_parent(path: str) -> str:
-    """Return the longest existing parent for a relative-or-absolute path.
-
-    Used so the diff-invocation above can run from any cwd without losing
-    the file. Falls back to '.' when nothing is left.
-    """
-    p = Path(path)
-    if p.is_absolute():
-        return str(p.parent)
-    # No cwd to anchor against; treat the path as relative to repo root.
-    return "."
-
-
 def _detect_helper_without_caller(
-    changed_files: list[str], worktree: Path, evidence: list[EvidenceRow]
+    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow]
 ) -> tuple[list[str], list[EvidenceRow]]:
-    """A new function/class was added to a changed file but no caller exists."""
+    """A new function/class was added to a changed file but no caller exists.
+
+    Test files are excluded — their new test functions ARE the entry point.
+    """
     if not changed_files:
         return [], evidence
     findings: list[str] = []
@@ -379,24 +447,19 @@ def _detect_helper_without_caller(
         full = worktree / rel
         if not full.is_file() or not full.suffix == ".py":
             continue
-        try:
-            content = full.read_text(encoding="utf-8")
-        except OSError:
+        # Skip test files: their `def test_*` is the call site.
+        if (
+            "/test_" in rel.lower()
+            or rel.lower().startswith("test_")
+            or "/tests/" in rel
+            or rel.endswith("_test.py")
+        ):
             continue
-        # New top-level def or async def lines added by the change.
-        try:
-            diff_proc = subprocess.run(
-                ["git", "-C", str(worktree), "diff", "HEAD", "--", rel],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        if diff_proc.returncode != 0:
+        diff_text = _file_diff(worktree, rel, base)
+        if not diff_text:
             continue
         new_defs: list[str] = []
-        for line in diff_proc.stdout.splitlines():
+        for line in diff_text.splitlines():
             stripped = line[1:] if line.startswith("+") else ""
             for prefix in ("def ", "async def "):
                 if stripped.startswith(prefix):
@@ -408,7 +471,6 @@ def _detect_helper_without_caller(
         if not new_defs:
             continue
         for name in new_defs:
-            # Caller search: project-wide fixed-string grep across the worktree.
             try:
                 grep = subprocess.run(
                     ["git", "-C", str(worktree), "grep", "-l", "-w", "-F", "--", name],
@@ -416,10 +478,9 @@ def _detect_helper_without_caller(
                     text=True,
                     timeout=15,
                 )
-                hits = [line.strip() for line in grep.stdout.splitlines() if line.strip()]
+                hits = [h.strip() for h in grep.stdout.splitlines() if h.strip()]
             except (OSError, subprocess.TimeoutExpired):
                 hits = []
-            # The file that defines the symbol counts; remove it from hits.
             hits = [h for h in hits if h != rel and not h.endswith("/" + rel)]
             if not hits:
                 findings.append(f"{rel}::{name} (no caller)")
@@ -443,9 +504,14 @@ def _detect_helper_without_caller(
 
 
 def _detect_missing_writer_for_reader(
-    changed_files: list[str], worktree: Path, evidence: list[EvidenceRow]
+    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow]
 ) -> tuple[list[str], list[EvidenceRow]]:
-    """A new reader path exists but no writer emits data to that path."""
+    """A new reader path exists but no writer emits data to that path.
+
+    Writer-pattern is the one that produces data: write_text, write_json,
+    json.dump, Path().write_text, or .touch(). A reader's own `open(...)` is
+    NOT a writer of that target.
+    """
     if not changed_files:
         return [], evidence
     findings: list[str] = []
@@ -453,44 +519,27 @@ def _detect_missing_writer_for_reader(
         full = worktree / rel
         if not full.is_file() or not full.suffix == ".py":
             continue
-        try:
-            content = full.read_text(encoding="utf-8")
-        except OSError:
+        diff_text = _file_diff(worktree, rel, base)
+        if not diff_text:
             continue
-        # Detect added read_from/load/parse of any tracking path-hint.
-        try:
-            diff_proc = subprocess.run(
-                ["git", "-C", str(worktree), "diff", "HEAD", "--", rel],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        if diff_proc.returncode != 0:
-            continue
-        diff_text = diff_proc.stdout
-        added_lines = [line[1:] for line in diff_text.splitlines() if line.startswith("+") and not line.startswith("+++")]
+        added_lines = [
+            line[1:]
+            for line in diff_text.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        ]
         added_text = "\n".join(added_lines)
         for hint in _TRACKING_PATH_HINTS:
-            # Reader reads any path containing the hint; search worktree for any
-            # writer that emits that path in this commit.
             if hint not in added_text:
                 continue
-            if any(_writer_token in added_text for _writer_token in (
-                "open(", ".write(", "json.dump", "Path(...).write_text",
-                'touch(', "write_json(", "write_text(",
-            )):
-                continue  # this file is itself writing; nothing to flag.
             try:
                 grep = subprocess.run(
-                    ["git", "-C", str(worktree), "grep", "--extended-regexp",
-                     rf"(open\([^)]*{hint}|write_text\([^)]*{hint}|write_json\([^)]*{hint})"],
+                    ["git", "-C", str(worktree), "grep", "-E", "-l",
+                     rf"(write_text\([^)]*{hint}|write_json\([^)]*{hint}|json\.dump\([^)]*{hint}|\.touch\(\)|append_jsonl)"],
                     capture_output=True,
                     text=True,
                     timeout=15,
                 )
-                writers = [line for line in grep.stdout.splitlines() if line.strip()]
+                writers = [line.strip() for line in grep.stdout.splitlines() if line.strip()]
             except (OSError, subprocess.TimeoutExpired):
                 writers = []
             if not writers:
@@ -805,6 +854,7 @@ def run_review(
     # Pull data once.
     claim_text = _worker_claim_text(state_dir, run_id)
     changed_files, diff_stat = _git_diff_files(worktree)
+    diff_base = _resolve_diff_base(worktree)
     declared = set(_declared_files_in_active_task(active))
     if declared:
         changed_files = sorted(set(changed_files) | declared)
@@ -820,13 +870,13 @@ def run_review(
     overclaim_list.extend(overclaim_findings)
     blocking_gaps.extend(overclaim_findings)  # live without artifact = blocking
 
-    layer_findings, evidence = _detect_wrong_layer_stop_hook_edits(changed_files, evidence)
+    layer_findings, evidence = _detect_wrong_layer_stop_hook_edits(changed_files, worktree, diff_base, evidence)
     blocking_gaps.extend(layer_findings)
 
-    caller_findings, evidence = _detect_helper_without_caller(changed_files, worktree, evidence)
+    caller_findings, evidence = _detect_helper_without_caller(changed_files, worktree, diff_base, evidence)
     blocking_gaps.extend(caller_findings)
 
-    writer_findings, evidence = _detect_missing_writer_for_reader(changed_files, worktree, evidence)
+    writer_findings, evidence = _detect_missing_writer_for_reader(changed_files, worktree, diff_base, evidence)
     blocking_gaps.extend(writer_findings)
 
     synth_findings, evidence = _detect_synthetic_only_failover_claim(changed_files, claim_text, evidence)
