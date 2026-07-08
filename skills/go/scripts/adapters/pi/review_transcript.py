@@ -270,7 +270,7 @@ def main() -> None:
     # dispatch_pi) can escalate. Soft-fail: if no findings or the writer is
     # unavailable, nothing is written and the reader preserves preflight.
     try:
-        _scripts_dir = str(pathlib.Path(__file__).resolve().parents[3])
+        _scripts_dir = str(pathlib.Path(__file__).resolve().parents[2])
         if _scripts_dir not in sys.path:
             sys.path.insert(0, _scripts_dir)
         import importlib
