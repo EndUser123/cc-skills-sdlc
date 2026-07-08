@@ -81,7 +81,7 @@ class TestImplementationTasks:
             verification_commands=["pytest", "ruff check", "mypy", "bandit"],
             forbidden_files=["secrets.env"],
         ))
-        assert result["model"] == "M3"
+        assert result["model"] == "OPENCODE_DEEPSEEK"
 
 
 class TestDesignTasks:
@@ -128,11 +128,11 @@ class TestConfidence:
 class TestTierModelMap:
     """Verify tier -> model mapping."""
 
-    def test_t1_t2_t3_all_m3(self):
+    def test_t1_t2_t3_all_opencode(self):
         for tier in ("T1", "T2", "T3"):
-            assert TIER_MODEL_MAP[tier] == "M3"
+            assert TIER_MODEL_MAP[tier] == "OPENCODE_DEEPSEEK"
 
-    def test_t4_is_glm51(self):
+    def test_t4_is_glm52(self):
         assert TIER_MODEL_MAP["T4"] == "GLM-5.2"
 
 
