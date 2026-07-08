@@ -1186,15 +1186,123 @@ def _detect_claim_integrity_risk(claim_text, evidence):
     ], evidence
 
 
-# ---------------------------------------------------------------------------
-# Verdict assembly
-# ---------------------------------------------------------------------------
+# --- CLI-boundary detector ---------------------------------------------------
+# Reproduced failure class: an orchestrator adds/changes a subprocess
+# invocation of a script CLI (e.g. completion_evidence_review.py) with a wrong
+# arg shape; unit tests call the target function directly and pass; the real
+# orchestrator->CLI boundary is never exercised -> broken wiring ships PASS.
+#
+# This detector requires evidence that the real CLI boundary (a subprocess
+# invocation of the script, or a main()/argparse exercise) exists somewhere in
+# the worktree (tracked OR untracked tests). A direct function-call test alone
+# is insufficient. Yields REVISE (blocking_gap), not BLOCK.
 
-def _assemble_verdict(
-    blocking_gaps: list[str],
-    overclaims: list[str],
-    evidence_rows: list[EvidenceRow],
-    triggered: bool,
+_CLI_INVOCATION_RE = re.compile(
+    r"(?:subprocess\.(?:run|call|check_call|check_output|Popen)\s*\("
+    r"|run_script\s*\()"
+)
+_SCRIPT_LITERAL_RE = re.compile(r'["\']([^\s"\']*?\.py)["\']')
+
+
+def _added_lines(worktree: Path, rel: str, base: str) -> str:
+    """Return added-line text for a tracked diff, or full content if untracked."""
+    diff_text = _file_diff(worktree, rel, base)
+    if diff_text:
+        return "\n".join(
+            line[1:] for line in diff_text.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+    if _is_untracked(worktree, rel):
+        try:
+            return (worktree / rel).read_text(encoding="utf-8")
+        except OSError:
+            return ""
+    return ""
+
+
+def _detect_cli_boundary_untested(
+    changed_files: list[str], worktree: Path, base: str, evidence: list[EvidenceRow],
+) -> tuple[list[str], list[EvidenceRow]]:
+    """Flag an orchestration→CLI subprocess invocation without a boundary test.
+
+    Scans added lines in changed non-test .py files for a subprocess/run_script
+    invocation that names a `.py` script. For each such target script, searches
+    the whole worktree (tracked + untracked) for a boundary test: any
+    subprocess invocation of that script basename, or an argparse/main() exercise
+    of it. If none, yields a REVISE blocking gap. A direct function-call test
+    does NOT satisfy this.
+    """
+    if not changed_files:
+        return [], evidence
+    # Collect target scripts invoked via subprocess in added code.
+    targets: dict[str, list[str]] = {}  # script_basename -> [caller_rel]
+    for rel in changed_files:
+        if not rel.endswith(".py"):
+            continue
+        if ("/test_" in rel.lower() or rel.lower().startswith("test_")
+                or rel.endswith("_test.py")):
+            continue
+        added = _added_lines(worktree, rel, base)
+        if not added or not _CLI_INVOCATION_RE.search(added):
+            continue
+        for m in _SCRIPT_LITERAL_RE.finditer(added):
+            script_arg = m.group(1)
+            # Ignore self-referential argparse boilerplate (sys.argv[0]-ish).
+            basename = script_arg.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+            if not basename or basename == rel.rsplit("/", 1)[-1]:
+                continue
+            targets.setdefault(basename, []).append(rel)
+
+    if not targets:
+        return [], evidence
+
+    # Build a single worktree grep for boundary evidence: subprocess + script
+    # basename, OR an argparse/main() exercise of the script. Search all .py.
+    findings: list[str] = []
+    for basename, callers in targets.items():
+        callers = sorted(set(callers))
+        has_boundary = False
+        try:
+            proc = subprocess.run(
+                ["grep", "-rlE", "--include=*.py", "--",
+                 rf"(subprocess\.\w+\s*\([^)]*{re.escape(basename)}|{re.escape(basename)}[^\n]*main\(\)|{re.escape(basename)}[^\n]*argparse)",
+                 str(worktree)],
+                capture_output=True, text=True, timeout=20,
+            )
+            hits = [h.strip() for h in proc.stdout.splitlines() if h.strip()]
+        except (OSError, subprocess.TimeoutExpired):
+            hits = []
+        for h in hits:
+            try:
+                rel_h = str(Path(h).resolve().relative_to(worktree.resolve()))
+            except ValueError:
+                rel_h = h
+            # A boundary test lives in a test file OR exercises main()/argparse.
+            if ("/test_" in rel_h.lower() or rel_h.lower().startswith("test_")
+                    or rel_h.endswith("_test.py")):
+                has_boundary = True
+                break
+        if has_boundary:
+            evidence.append(EvidenceRow(
+                claim=f"orchestration→CLI boundary for {basename}",
+                required_evidence="subprocess or main()/argparse exercise of the script",
+                observed_evidence=f"boundary test found for {basename}",
+                verdict="OK",
+                note="real CLI boundary exercised",
+            ))
+            continue
+        msg = (f"CLI_BOUNDARY_UNTESTED: {callers} invoke {basename} via subprocess; "
+               f"no subprocess/main()/argparse test of {basename} found "
+               f"(direct function-call tests are insufficient)")
+        findings.append(msg)
+        evidence.append(EvidenceRow(
+            claim=f"orchestration→CLI boundary for {basename}",
+            required_evidence="a subprocess or main()/argparse exercise of the script",
+            observed_evidence="only direct function-call tests (or none); real boundary untested",
+            verdict="MISSING",
+            note="REVISE: reproduction class — broken arg shape ships PASS",
+        ))
+    return findings, evidence
     worker_report_present: bool,
 ) -> tuple[str, bool, str]:
     """Return (verdict, commit_push_safe, recommended_next_action)."""
