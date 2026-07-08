@@ -1692,6 +1692,19 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
         return False
     phase_marker(state_dir, "completion-reviewed", run_id)
 
+    # Step 9.6: Final Omission Audit (read-only; reuses CER verdict schema).
+    # Derives the completion-authority ladder (L0..L5), classifies the commit
+    # boundary, audits the mechanism-change contract, and downgrades verdict
+    # wording when a claim exceeds the derived authority. Opt out for low-risk
+    # local edits with GO_OMISSION_AUDIT_SKIP=1. Adds no Stop/G4/G5 logic.
+    if os.environ.get("GO_OMISSION_AUDIT_SKIP", "").strip() != "1":
+        oa_script = script_path("scripts", "omission_audit.py")
+        oa_args = ["--worktree", str(worktree), "--state-dir", str(state_dir), "--run-id", run_id]
+        rc = run_script(oa_script, oa_args, state_dir, run_id, cwd=worktree)
+        if rc != 0:
+            return False
+        phase_marker(state_dir, "omission-audited", run_id)
+
     # Step 10: Generate PR artifacts
     pr_script = script_path("scripts", "pr-artifacts.py")
     rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)

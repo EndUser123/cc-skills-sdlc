@@ -310,7 +310,7 @@ def _detect_overclaims(claim_text: str, level_idx: int) -> list[str]:
         return []
     lower = claim_text.lower()
     overclaims = []
-    for term, min_idx, wording in _DOWGRADE_RULES:
+    for term, min_idx, wording in _DOWNGRADE_RULES:
         if term in lower and level_idx < min_idx:
             overclaims.append("'" + term + "' claim - " + wording)
     return overclaims
@@ -321,7 +321,7 @@ def run_audit(
 ) -> AuditResult:
     worktree = worktree or Path.cwd()
     ts = _now()
-    proposal = _read_json(state_dir / "task-proposal_" + run_id + ".json")
+    proposal = _read_json(state_dir / ("task-proposal_" + run_id + ".json"))
     gate = proposal.get("report_gate") or {}
     triggered = bool(gate.get("omission_audit_required"))
     if not triggered:
