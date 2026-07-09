@@ -232,9 +232,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             diff_stat = dp.stdout.strip() if dp.returncode == 0 else ""
 
         if base and canonical:
-            mp = _git(repo, "merge-base", "--is-ancestor", base, canonical)
-            # rc 0 = base is ancestor of canonical (no move); 1 = moved
-            if mp.returncode == 1:
+            # Stale = canonical branch HEAD differs from base_commit (moved).
+            cp = _git(repo, "rev-parse", canonical)
+            if cp.returncode == 0 and cp.stdout.strip() != base:
                 stale_base = True
 
         results.append({
