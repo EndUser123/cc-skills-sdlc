@@ -418,6 +418,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "Runs the common tail (verify/review/artifacts) on the current checkout.",
     )
     parser.add_argument(
+        "--completion-verify-resume",
+        metavar="RUN_ID",
+        default="",
+        help="Phase 2 of the high-risk completion-verifier: re-enter after SKILL.md "
+        "spawned the read-only verifier Agent and wrote completion-verify-result_<run_id>.json. "
+        "Runs pr-artifacts + tail only (steps 1-9.6 already ran).",
+    )
+    parser.add_argument(
         "--validation",
         action="store_true",
         help="Mark this task as validation/audit type. G5 allows Stop when "
@@ -1591,6 +1599,154 @@ def run_simplify_gate(worktree: Path, state_dir: Path, run_id: str, diff_stat: s
         touch(state_dir / f".blocked_{run_id}")
         return False
     return True
+
+
+def _pr_artifacts_and_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
+    """Steps 10-13: PR artifacts + .pr-ready + loop/telemetry. Extracted so the
+    completion-verifier resume path can run ONLY this tail."""
+    pr_script = script_path("scripts", "pr-artifacts.py")
+    rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)
+    if rc != 0:
+        return False
+    touch(state_dir / f".pr-ready_{run_id}")
+    phase_marker(state_dir, "pr-ready", run_id)
+    loop_script = script_path("scripts", "loop-check.py")
+    run_script(loop_script, [], state_dir, run_id, cwd=worktree)
+    try:
+        _emit_discovery_telemetry(state_dir, run_id)
+    except Exception:
+        pass
+    try:
+        _record_pi_outcome(state_dir, run_id, dispatch_route="",
+                           review_verdict="", rescue_escalation_needed=False)
+    except Exception:
+        pass
+    return True
+
+
+def _completion_verify_request_payload(state_dir: Path, run_id: str) -> dict:
+    """Build the read-only verifier request payload from run-scoped artifacts."""
+    active = {}
+    at_path = state_dir / f"active-task_{run_id}.json"
+    if at_path.is_file():
+        try:
+            active = json.loads(at_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            active = {}
+    task = active.get("task", active) if isinstance(active, dict) else {}
+    cer_verdict = {}
+    cer_path = state_dir / f"completion-evidence-review_{run_id}.json"
+    if cer_path.is_file():
+        try:
+            cer_verdict = json.loads(cer_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            cer_verdict = {}
+    return {
+        "schema": "completion-verify-request.v1",
+        "run_id": run_id,
+        "title": task.get("title", ""),
+        "objective": task.get("objective", ""),
+        "acceptance_criteria": task.get("acceptance_criteria", []),
+        "scope_in": task.get("scope_in", []),
+        "scope_out": task.get("scope_out", []),
+        "constraints": {
+            "forbidden_files": task.get("forbidden_files", []),
+            "done_when": task.get("done_when", ""),
+        },
+        "worker_summary": task.get("summary", ""),
+        "mechanical_review_verdict": cer_verdict.get("verdict"),
+        "mechanical_review_evidence": cer_verdict.get("evidence", []),
+        "calibration_mode": "advisory",
+        "agent_contract": {
+            "tools": ["Read", "Grep", "Glob", "Bash"],
+            "read_only": True,
+            "output_artifact": f"completion-verify-result_{run_id}.json",
+            "output_schema": "completion-verifier.v1",
+        },
+    }
+
+
+def _append_verify_ledger(state_dir: Path, run_id: str, entry: dict) -> None:
+    """Append-only run-scoped verifier ledger (not a persistent pattern DB)."""
+    try:
+        log_path = state_dir / "completion-verify-ledger.jsonl"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"ts": now_utc_z(), "run_id": run_id, **entry}
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload) + "\n")
+    except OSError:
+        pass
+
+
+def _apply_completion_verify_result(state_dir: Path, run_id: str) -> str:
+    """Read completion-verify-result_{run_id}.json and apply advisory semantics.
+    Returns: 'proceed' | 'advisory_revise' | 'fail'. ADVISORY_REVISE does NOT
+    block .pr-ready; only infrastructure failure (missing/malformed) is hard."""
+    res_path = state_dir / f"completion-verify-result_{run_id}.json"
+    if not res_path.is_file():
+        _append_verify_ledger(state_dir, run_id, {"phase": "resume", "outcome": "missing_result"})
+        return "fail"
+    try:
+        data = json.loads(res_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        _append_verify_ledger(state_dir, run_id, {"phase": "resume", "outcome": "malformed_result"})
+        return "fail"
+    verdict = str(data.get("verdict", "")).upper()
+    _append_verify_ledger(state_dir, run_id, {
+        "phase": "resume", "outcome": verdict,
+        "omitted": data.get("omitted", []),
+        "uncertain": data.get("uncertain", []),
+    })
+    if verdict == "PROCEED":
+        return "proceed"
+    # ADVISORY_REVISE + orphan/old non-PROCEED values are surfaced, not hard.
+    if verdict == "ADVISORY_REVISE":
+        try:
+            (state_dir / f".completion-verify-advisory_{run_id}").write_text(
+                json.dumps(data.get("omitted", [])), encoding="utf-8"
+            )
+        except OSError:
+            pass
+        return "advisory_revise"
+    return "advisory_revise"
+
+
+def _completion_verify_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
+    """Step 9.7 high-risk completion-verifier gate.
+    Returns: 'skip' (low-risk or SKIP env), 'pause' (high-risk; writes
+    request + pending marker; orchestrate emits SPAWN_COMPLETION_VERIFIER),
+    'fail' (infrastructure error)."""
+    if os.environ.get("GO_COMPLETION_VERIFY_SKIP", "").strip() == "1":
+        return "skip"
+    active = {}
+    at_path = state_dir / f"active-task_{run_id}.json"
+    if at_path.is_file():
+        try:
+            active = json.loads(at_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            active = {}
+    task = active.get("task", active) if isinstance(active, dict) else {}
+    try:
+        from completion_evidence_review import task_should_trigger
+    except ImportError:
+        return "skip"
+    triggered, _reason = task_should_trigger(task)
+    if not triggered:
+        phase_marker(state_dir, "completion-verify-skipped", run_id)
+        return "skip"
+    if (state_dir / f"completion-verify-result_{run_id}.json").is_file():
+        _apply_completion_verify_result(state_dir, run_id)
+        phase_marker(state_dir, "completion-verify-applied", run_id)
+        return "skip"
+    try:
+        payload = _completion_verify_request_payload(state_dir, run_id)
+        req_path = state_dir / f"completion-verify-request_{run_id}.json"
+        req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        touch(state_dir / f".completion-verify-pending_{run_id}")
+        phase_marker(state_dir, "completion-verify-requested", run_id)
+    except OSError:
+        return "fail"
+    return "pause"
 
 
 def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
