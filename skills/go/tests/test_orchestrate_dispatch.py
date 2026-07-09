@@ -565,6 +565,10 @@ def test_local_dispatch_outputs_satisfy_stop_gate(monkeypatch, tmp_path):
     monkeypatch.setenv("RUN_ID", run_id)
     monkeypatch.setenv("TERMINAL_ID", "test-local-stop")
     monkeypatch.setenv("CLAUDE_TERMINAL_ID", "test-local-stop")
+    # This test asserts the local-dispatch output/Stop-gate contract, not the
+    # completion-verifier spawn. Skip the verifier gate so common-tail reaches
+    # pr-artifacts directly.
+    monkeypatch.setenv("GO_COMPLETION_VERIFY_SKIP", "1")
 
     def fake_run_script(script, args, state_dir, current_run_id, **kwargs):
         name = pathlib.Path(script).name

@@ -1303,6 +1303,17 @@ def _detect_cli_boundary_untested(
             note="REVISE: reproduction class — broken arg shape ships PASS",
         ))
     return findings, evidence
+
+
+# ---------------------------------------------------------------------------
+# Verdict assembly
+# ---------------------------------------------------------------------------
+
+def _assemble_verdict(
+    blocking_gaps: list[str],
+    overclaims: list[str],
+    evidence_rows: list[EvidenceRow],
+    triggered: bool,
     worker_report_present: bool,
 ) -> tuple[str, bool, str]:
     """Return (verdict, commit_push_safe, recommended_next_action)."""

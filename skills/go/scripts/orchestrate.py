@@ -1999,6 +1999,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         _apply_discovery_merge(state_dir, run_id)
 
     if not run_common_tail(worktree, state_dir, run_id):
+        if (state_dir / f".completion-verify-pending_{run_id}").is_file():
+            return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
         return finish("blocked")
     return finish("pr_ready")
 
