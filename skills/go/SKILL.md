@@ -439,6 +439,94 @@ If no transcript path is found or the transcript cannot be read, fall back to `H
 
 ---
 
+## STEP 0.6: Worktree Safety (Concurrent Agent Isolation)
+
+When multiple AI agents work on related `/go` files concurrently, a shared
+working tree risks mid-session overwrites, stale validation, and clobbered
+tests. Git worktrees isolate each agent's work into its own checkout.
+
+### When to use a task worktree
+
+Use a task worktree when your work touches **integration-sensitive files**
+(listed below) or when another agent may be editing the same surface
+simultaneously. Skip for trivial single-file edits to non-sensitive paths.
+
+### Start / resume
+
+```bash
+python scripts/worktree_safety.py start \
+  --task-id wt-$(date +%Y%m%d-%H%M%S) \
+  --title "Fix CLI-boundary detector" \
+  --repo-root P:/packages/.claude-marketplace/plugins/cc-skills-sdlc \
+  --intended-files skills/go/scripts/orchestrate.py \
+  --worktree-root P:/worktrees
+```
+
+Use `--dry-run` to preview. Use `--resume` to re-enter an existing active task.
+The command creates a branch (`wt/<task-id>`), a worktree, and writes metadata
+to `{state_dir}/worktree-tasks/{task_id}.json`.
+
+### Check status
+
+```bash
+python scripts/worktree_safety.py status          # human-readable
+python scripts/worktree_safety.py status --json   # structured
+```
+
+Flags: `DIRTY` (uncommitted changes), `STALE-BASE` (canonical branch moved),
+`SENSITIVE` (integration-sensitive file touched).
+
+### Integration-sensitive files
+
+```
+skills/go/scripts/orchestrate.py
+skills/go/SKILL.md
+skills/go/scripts/completion_evidence_review.py
+skills/go/scripts/omission_audit.py
+skills/go/scripts/preflight_propose.py
+skills/go/hooks/Stop_enforce_gate.py
+skills/go/tests/test_orchestrate_dispatch.py
+.claude-plugin/plugin.json
+```
+
+### Precheck (before merge)
+
+```bash
+python scripts/worktree_safety.py precheck --task-id wt-...
+```
+
+Reports changed files, sensitive-file touches, upstream changes to intended
+files, and merge risk (`low`/`medium`/`high`). Writes a ready-for-integration
+packet. Does NOT merge.
+
+### Integration
+
+The integration owner merges in the canonical repo:
+```bash
+git merge --no-ff wt/<task-id>
+```
+Then update the task metadata status to `integrated` and run cleanup.
+
+### Cleanup (dry-run by default)
+
+```bash
+python scripts/worktree_safety.py cleanup          # list only
+python scripts/worktree_safety.py cleanup --remove  # remove non-dirty non-active
+```
+
+Refuses to remove dirty active worktrees. Recommends `git worktree prune`
+as a separate explicit action.
+
+### Optional PreToolUse guard
+
+`hooks/worktree_safety_PreToolUse.py` warns (stderr) when an Edit/Write
+targets an integration-sensitive file outside a registered task worktree.
+Set `GO_WORKTREE_SAFETY_BLOCK=1` to upgrade warnings to denies. Not
+auto-registered — add to SKILL.md frontmatter `hooks.PreToolUse` or
+`settings.json` if wanted.
+
+---
+
 ## STEP 1: Task Acquisition
 
 **From plan (GO_PLAN_FILE) — queue-pointer rule:** Before synthesizing, read the plan's
