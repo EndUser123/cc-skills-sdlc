@@ -50,10 +50,14 @@ def test_highrisk_task_writes_request_and_pauses(tmp_path):
     assert (state_dir / f".completion-verify-pending_{run_id}").is_file()
 
 
-def test_lowrisk_task_skips_verifier(tmp_path):
+def test_lowrisk_task_skips_verifier(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"
     run_id = "run-lr"
     _write_active(state_dir, run_id, title="Extend calc helpers")
+    # Make any title report low-risk (the marker set is expanded by other work).
+    monkeypatch.setattr(orch, "_completion_verify_gate", None)  # no-op, replaced below
+    monkeypatch.setattr("completion_evidence_review.task_should_trigger",
+                        lambda _t: (False, "test-stub-low-risk"))
     res = orch._completion_verify_gate(tmp_path, state_dir, run_id)
     assert res == "skip", res
     assert not (state_dir / f"completion-verify-request_{run_id}.json").exists()
