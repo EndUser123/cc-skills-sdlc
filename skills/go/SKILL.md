@@ -119,6 +119,7 @@ When dispatch is `pi`, the classifier output is resolved through `scripts/adapte
 - `<promise>ALL_TASKS_COMPLETE</promise>` — no eligible tasks remain
 - `<promise>PAUSED_FOR_APPROVAL</promise>` — run paused at a plan-declared gate: the only remaining tasks are `requires_approval: true` and not yet `approved`. Resume by flipping a gated task's `status` to `approved` and re-running `/go`.
 - `<promise>SPAWN_CLAUDE_SUBAGENT</promise>` — `--dispatch claude` phase 1 complete: `claude-task-request_{RUN_ID}.json` written. The main-loop Claude must spawn the in-session `Agent(...)` call with the request's `model`/`tools`/`prompt`/`subagent_type`, write `claude-task-result_{RUN_ID}.json`, then re-invoke the orchestrator with `--claude-resume <RUN_ID>` for phase 2 (verify/review/artifact tail).
+- `<promise>SPAWN_COMPLETION_VERIFIER</promise>` — Step 9.7 (high-risk only): `completion-verify-request_{RUN_ID}.json` written and `.completion-verify-pending_{RUN_ID}` set. The main-loop Claude must spawn a **read-only** verifier `Agent(...)` (`tools: [Read, Grep, Glob, Bash]`, no mutation), compare the task's `acceptance_criteria` against the diff/worker report, write `completion-verify-result_{RUN_ID}.json` (schema `completion-verifier.v1`: `verdict: PROCEED | ADVISORY_REVISE | BLOCK`, plus `addressed/omitted/uncertain/evidence`), then re-invoke the orchestrator with `--completion-verify-resume <RUN_ID>` to run pr-artifacts + tail. Advisory-first: `ADVISORY_REVISE` is surfaced but does **not** hard-block `.pr-ready`. Opt the whole gate out with `GO_COMPLETION_VERIFY_SKIP=1`. See STEP 6.7.
 
 ---
 
@@ -972,6 +973,83 @@ The reviewer is **read-only by default**: it inspects source, artifacts, tests, 
 **Scope:** the reviewer does NOT add logic to `Stop_enforce_gate.py` (per requirements). It runs in the orchestrator's process between coverage-gate and pr-artifacts. Reviewer logic does not propagate to the Stop hook; the existing `completion-authority` overclaim gate (in `Stop_enforce_gate.py`) is the Stop-side check and remains unchanged.
 
 **Tests:** `skills/go/tests/test_completion_evidence_review.py` — 7 cases covering helper-no-caller, source-only-live, wrong-layer-Stop-hook, missing-writer-for-reader, synthetic-only-failover, clean-packet-pass, follow-up-only.
+
+---
+
+## STEP 6.8: Completion Verifier — High-Risk Semantic Review (advisory-first)
+
+Immediately after the Completion Evidence Review (STEP 6.7) and the Omission
+Audit (STEP 9.6 of `run_common_tail`), for **high-risk tasks only**
+(`task_should_trigger` markers: hook/cache/plugin/router/model/dispatch/state/
+session/telemetry/identity), the orchestrator writes a read-only verifier
+request and pauses for an in-session semantic review. Low-risk tasks skip this
+gate entirely. Opt out with `GO_COMPLETION_VERIFY_SKIP=1`.
+
+**Why it exists:** mechanical gates catch overclaim and wrong-layer, but cannot
+detect a *dropped acceptance criterion* — "task asked for X/Y/Z, worker did X/Y
+and silently omitted Z." That requires reading the diff against intent, which is
+LLM-shaped. The verifier is **advisory-first**: it does NOT hard-block
+`.pr-ready` on ordinary semantic disagreement until corpus calibration proves
+acceptable TP/FP (gate-discrimination rule).
+
+### Two-phase spawn (mirrors `SPAWN_CLAUDE_SUBAGENT`)
+
+The orchestrator is a Bash-invoked Python script and cannot call the
+in-session `Agent(...)` tool itself, so the verifier is split around the spawn.
+
+**Phase 1 — request write (orchestrator, `_completion_verify_gate`):**
+- Reads `active-task` + the CER verdict, writes
+  `completion-verify-request_{RUN_ID}.json` (schema `completion-verify-request.v1`):
+  `{run_id, title, objective, acceptance_criteria, scope_in/out, constraints,
+  worker_summary, mechanical_review_verdict, mechanical_review_evidence,
+  calibration_mode: "advisory", agent_contract}`.
+- Sets `.completion-verify-pending_{RUN_ID}` and emits
+  `<promise>SPAWN_COMPLETION_VERIFIER</promise>`.
+
+**Phase 2 — spawn + resume (main-loop Claude):** when the orchestrator emits
+`SPAWN_COMPLETION_VERIFIER`, the main-loop Claude:
+
+1. Reads `$GO_STATE_DIR/completion-verify-request_$RUN_ID.json`.
+2. Spawns a **read-only** verifier `Agent(...)` with `tools: [Read, Grep, Glob,
+   Bash]` (no `Edit`/`Write`/`MultiEdit` — the capability layer then cannot
+   form a mutating call; memory #1120). The agent compares each
+   `acceptance_criteria` item against the actual diff and worker report, and
+   returns JSON.
+3. Writes the result to `$GO_STATE_DIR/completion-verify-result_$RUN_ID.json`
+   (schema `completion-verifier.v1`):
+   ```json
+   {"schema": "completion-verifier.v1", "run_id": "...",
+    "verdict": "PROCEED | ADVISORY_REVISE | BLOCK",
+    "addressed": [], "omitted": [], "uncertain": [], "evidence": [],
+    "recommended_next_action": "...", "calibration_mode": "advisory"}
+   ```
+4. Re-invokes the orchestrator:
+   ```bash
+   GO_RUN_ID="$RUN_ID" python ".claude/skills/go/scripts/orchestrate.py" --completion-verify-resume "$RUN_ID"
+   ```
+   This runs **only** pr-artifacts + tail (steps 1–9.6 already ran; resume does
+   not re-verify or re-dispatch).
+
+### Advisory semantics (resume)
+
+`_apply_completion_verify_result` reads the result and records the outcome to
+the run-scoped `completion-verify-ledger.jsonl` (not a persistent pattern DB):
+
+| Verdict | `.pr-ready`? | Notes |
+|---|---|---|
+| `PROCEED` | proceeds | clean |
+| `ADVISORY_REVISE` | **proceeds** (advisory) | omissions surfaced to `.completion-verify-advisory_{RUN_ID}` + ledger; **not** a hard block |
+| `BLOCK` | proceeds unless `infrastructure_failure: true` | in calibration mode, an LLM `BLOCK` is treated as advisory — only the verifier's own infrastructure failure hard-blocks |
+| missing/malformed result | **hard-blocks** (`.blocked_{RUN_ID}`) | fail-closed: the review machinery itself failed, not the work |
+
+**Calibration gate:** do **not** promote `ADVISORY_REVISE` to a hard `.pr-ready`
+block until a later task measures real-corpus TP/FP on `completion-verify-ledger.jsonl`.
+
+**Tests:** `skills/go/tests/test_completion_verify.py` — 8 cases covering
+high-risk-writes-request-and-pauses, low-risk-skips, SKIP-env,
+resume-PROCEED-runs-tail, resume-ADVISORY-REVISE-does-not-block,
+resume-missing-result-fails-closed, resume-malformed-records-ledger, and
+request-payload-carries-CER-verdict.
 
 ---
 

@@ -33,6 +33,7 @@ _pf_spec.loader.exec_module(pf)
 
 
 def _init_repo(d: Path) -> None:
+    d.mkdir(parents=True, exist_ok=True)
     for a in (["git", "init", "-q"], ["git", "config", "user.email", "t@t"],
               ["git", "config", "user.name", "t"]):
         subprocess.run(a, cwd=str(d), check=True)
