@@ -1,0 +1,13 @@
+{
+  "classifier_model": "LOCAL_ORNITH",
+  "tier": "T0",
+  "pi_model": "llama-cpp/ornith-1.0-9b",
+  "candidate_chain": [
+    "llama-cpp/ornith-1.0-9b",
+    "opencode-go/deepseek-v4-flash"
+  ],
+  "candidate_models": [
+    "llama-cpp/ornith-1.0-9b",
+    "opencode-go/deepseek-v4-flash"
+  ]
+}
