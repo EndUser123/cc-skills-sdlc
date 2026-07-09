@@ -1,0 +1,52 @@
+{
+  "id": "prompt-ornith-t",
+  "title": "Read skills/go/SKILL.md and reply with only the count of lin",
+  "objective": "Read skills/go/SKILL.md and reply with only the count of lines starting with '## STEP'. Just the number.",
+  "status": "selected",
+  "priority": "P1",
+  "scope_in": [],
+  "scope_out": [],
+  "acceptance_criteria": [],
+  "verification_commands": [
+    "python -m pytest -q"
+  ],
+  "forbidden_files": [],
+  "task_type": "implementation",
+  "verificationSuggestions": [
+    "python .claude/hooks/<hook>.py < sample.json  # direct-invocation smoke"
+  ],
+  "verificationPolicy": "orchestrator",
+  "verificationPolicySource": "fmm-derived",
+  "failureModeGuidance": {
+    "failure_modes": [
+      "Mutating active-task file during dry-run",
+      "Changing dispatch behavior without updating CLI smoke test",
+      "Breaking plan/planless branch split logic",
+      "Delegated agents writing partial work into shared tree",
+      "Reclassifying results from truncated authoritative output"
+    ],
+    "required_recon": [
+      "Read orchestrate.py CLI entry points before editing",
+      "Confirm which branch (prompt/plan/recon-bypass) is affected",
+      "For multi-phase tasks: delegation requires isolation/patch/disjoint plan before mutation",
+      "Phase mutation needs permitted-files + proposed-changes + verification + rollback plan"
+    ],
+    "search_evidence": [
+      "grep function call sites of any changed function",
+      "Read the test file for the affected code path"
+    ],
+    "negative_tests": [
+      "Active-task JSON must NOT be mutated by --recon-bypass or --preflight-only",
+      "orchestrate.py --help must exit 0 after change",
+      "If phase says run-once-defines-result, save full output to file before classification",
+      "If authoritative output truncated, mark phase FAILED or restart once -- do not silently reclassify"
+    ],
+    "claim_requirements": [
+      "Must show active-task diff (or no-diff assertion) between pre/post dry-run",
+      "If user requested strict report format, final output must match it exactly",
+      "No live Stop JSON validation failure may remain when declaring DONE"
+    ],
+    "secondary": []
+  },
+  "goalConditionSize": 104
+}

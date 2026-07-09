@@ -1,0 +1,14 @@
+{
+  "tier": "T0",
+  "model": "LOCAL_ORNITH",
+  "confidence": "high",
+  "score": 4,
+  "max_possible": 12,
+  "signals": {
+    "file_spread": 1,
+    "criteria": 1,
+    "verification": 1,
+    "sensitivity": 1
+  },
+  "task_type": "implementation"
+}
