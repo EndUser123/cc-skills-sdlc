@@ -9,7 +9,55 @@ Score is capped at 0-100 range.
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+# CRIT-6: discovery agents emit {category, confidence} without a `severity`
+# field. Without derivation, group_by_severity buckets them as LOW and
+# calculate_health_score drops them entirely — a CRITICAL security finding
+# silently vanishes from the Health Score. _derive_severity maps the producer
+# vocabulary onto the severity vocabulary the synthesizer speaks.
+_CATEGORY_SEVERITY: Dict[str, str] = {
+    "security": "CRITICAL",
+    "logic": "CRITICAL",
+    "async": "CRITICAL",
+    "concurrency": "CRITICAL",
+    "taint": "HIGH",
+    "domain": "HIGH",
+    "performance": "HIGH",
+    "io": "HIGH",
+    "quality": "MEDIUM",
+    "modernize": "MEDIUM",
+    "duplicates": "MEDIUM",
+    "circular": "MEDIUM",
+    "testing": "LOW",
+}
+_CONFIDENCE_DOWNGRADE: Dict[str, int] = {
+    "unverified": 2,
+    "low": 2,
+    "medium": 1,
+}
+_SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+
+
+def _derive_severity(finding: Dict[str, Any]) -> Optional[str]:
+    """Resolve a finding's severity, deriving from category+confidence when absent.
+
+    Returns the explicit ``severity`` if present. Otherwise derives one from
+    ``category`` (specialty tag) downgraded by ``confidence``. Returns None
+    when there is no category to derive from — callers treat None as uncounted,
+    preserving the "missing severity not counted" contract for truly empty
+    findings.
+    """
+    if finding.get("severity"):
+        return finding["severity"]
+    category = (finding.get("category") or "").lower()
+    if not category:
+        return None
+    base = _CATEGORY_SEVERITY.get(category, "MEDIUM")
+    confidence = (finding.get("confidence") or "").lower()
+    downgrade = _CONFIDENCE_DOWNGRADE.get(confidence, 0)
+    idx = min(_SEVERITY_ORDER.index(base) + downgrade, len(_SEVERITY_ORDER) - 1)
+    return _SEVERITY_ORDER[idx]
 
 
 def calculate_health_score(findings: List[Dict[str, Any]]) -> int:
@@ -30,10 +78,11 @@ def calculate_health_score(findings: List[Dict[str, Any]]) -> int:
         >>> calculate_health_score([])
         100
     """
-    critical = sum(1 for f in findings if f.get('severity') == 'CRITICAL')
-    high = sum(1 for f in findings if f.get('severity') == 'HIGH')
-    medium = sum(1 for f in findings if f.get('severity') == 'MEDIUM')
-    low = sum(1 for f in findings if f.get('severity') == 'LOW')
+    severities = [_derive_severity(f) for f in findings]
+    critical = sum(1 for s in severities if s == 'CRITICAL')
+    high = sum(1 for s in severities if s == 'HIGH')
+    medium = sum(1 for s in severities if s == 'MEDIUM')
+    low = sum(1 for s in severities if s == 'LOW')
 
     score = 100 - (critical * 20 + high * 10 + medium * 5 + low * 2)
     return max(0, min(100, score))
@@ -103,8 +152,8 @@ def group_by_severity(findings: List[Dict[str, Any]]) -> Dict[str, List[Dict[str
     }
 
     for finding in findings:
-        severity = finding.get('severity', 'LOW')
-        if severity in grouped:
+        severity = _derive_severity(finding)
+        if severity and severity in grouped:
             grouped[severity].append(finding)
 
     return grouped
