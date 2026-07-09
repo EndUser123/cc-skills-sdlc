@@ -1,6 +1,7 @@
 ---
 name: task
 description: Task orchestration - manage Claude Code task list
+workflow_steps: []
 ---
 # /task - Task Orchestration
 
@@ -82,7 +83,8 @@ Validation phase MUST NOT execute unless ALL of the following are true:
 /task start 123                           # Begin work
 /task done 123                            # Complete
 /task search "authentication"             # Search
-/task clean                               # Remove completed
+/task verify                              # Check completed tasks have real evidence
+/task clean                               # Remove completed (run verify first)
 ```
 
 ## Output Quick Reference
@@ -116,3 +118,26 @@ Prevents task list chaos:
 - Tasks accumulate without cleanup -> `/task clean`
 - Lost track of pending -> `/task list --status pending`
 - No quick way to create -> `/task add "subject"`
+- Completed tasks assumed done without evidence -> `/task verify` before `/task clean`
+
+## /task verify — Evidence Check Before Deletion
+
+**Purpose:** prove completed tasks have real evidence (file / commit / pickaxe / grep) before `/task clean` deletes them. Catches phantom completions where status says "completed" but no code/commit backs it.
+
+**Workflow:**
+1. Get completed tasks: `TaskList()` → filter `status == "completed"`
+2. Write to temp file: `#ID. [completed] subject` per line at `P:/tmp/completed_tasks.txt`
+3. Run: `python "$CLAUDE_PLUGIN_ROOT/skills/task/scripts/verify_completed.py" P:/tmp/completed_tasks.txt`
+4. Report the script's three buckets verbatim — do NOT collapse them
+
+**Output — three buckets (honesty contract):**
+
+| Bucket | Means | Deletion safe? |
+|--------|-------|----------------|
+| VERIFIED | Evidence found (file/commit/pickaxe/grep matched) | Yes |
+| UNVERIFIED | A signal was extracted and searched, no match | **No** — probably done but unproven; manual check |
+| NO_SIGNAL | Subject too vague to auto-extract | **No** — manual or LLM judgment |
+
+**Mandatory:** UNVERIFIED is NOT "done." Do not report "all completed tasks verified" when UNVERIFIED > 0. State the exact counts of all three buckets. The script exits non-zero if any UNVERIFIED/NO_SIGNAL remain — surface that, don't mask it.
+
+**Recommended next step after verify:** `/task clean` is safe for VERIFIED tasks. For UNVERIFIED/NO_SIGNAL, spot-check manually (or run targeted greps with hand-tuned signals) before deleting.

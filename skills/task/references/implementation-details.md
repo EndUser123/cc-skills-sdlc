@@ -4,7 +4,7 @@
 
 When you invoke `/task <command>`, the following occurs:
 1. **Skill tool loads this SKILL.md** - The markdown documentation IS the handler
-2. **Claude parses your sub-command** - Extracts the operation (list/add/done/start/search/clean/help)
+2. **Claude parses your sub-command** - Extracts the operation (list/add/done/start/search/clean/verify/help)
 3. **Claude executes the appropriate tool** - Calls TaskList/TaskCreate/TaskUpdate directly
 4. **Results are formatted and returned** - You see the output
 
@@ -67,6 +67,21 @@ cat P://__csf/data/semantic_daemon_discovery.json
 2. Claude: Reads this SKILL.md, identifies "done" command
 3. Claude: Calls TaskUpdate(taskId="123", status="completed")
 4. Claude: Returns confirmation
+```
+
+### Verify Completed Tasks (evidence check before deletion)
+
+```
+1. User: /task verify
+2. Claude: Calls TaskList(), filters status == "completed"
+3. Claude: Writes them to P:/tmp/completed_tasks.txt
+   (format: "#ID. [completed] subject" per line)
+4. Claude: Runs:
+   python "$CLAUDE_PLUGIN_ROOT/skills/task/scripts/verify_completed.py" P:/tmp/completed_tasks.txt
+5. Claude: Reports the script's THREE buckets verbatim — VERIFIED / UNVERIFIED / NO_SIGNAL
+   with exact counts. NEVER collapse UNVERIFIED into "done". The script exits non-zero
+   if any UNVERIFIED/NO_SIGNAL remain; surface that, don't mask it.
+6. Claude: Recommends /task clean for VERIFIED only; manual check for the rest.
 ```
 
 ## Tool Reference
