@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -182,7 +182,11 @@ class PiModelInfo:
     @classmethod
     def load(cls, path: Path) -> "PiModelInfo":
         data = json.loads(path.read_text(encoding="utf-8"))
-        return cls(**data)
+        # Filter to known dataclass fields — resolve_model.py writes additional
+        # keys (candidate_chain, candidate_models) consumed elsewhere by
+        # _resolve_chain_from_selection; PiModelInfo only carries the 3 it needs.
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: data[k] for k in known if k in data})
 
 
 @dataclass
