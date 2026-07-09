@@ -1861,34 +1861,17 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
             return False
         phase_marker(state_dir, "omission-audited", run_id)
 
-    # Step 10: Generate PR artifacts
-    pr_script = script_path("scripts", "pr-artifacts.py")
-    rc = run_script(pr_script, [], state_dir, run_id, cwd=worktree)
-    if rc != 0:
+    # Step 9.7: High-risk completion-verifier gate (advisory-first; opt-out
+    # GO_COMPLETION_VERIFY_SKIP=1). On pause, orchestrate emits
+    # SPAWN_COMPLETION_VERIFIER; SKILL.md spawns a read-only verifier Agent and
+    # re-invokes with --completion-verify-resume.
+    cv = _completion_verify_gate(worktree, state_dir, run_id)
+    if cv == "pause":
         return False
-    touch(state_dir / f".pr-ready_{run_id}")
-    phase_marker(state_dir, "pr-ready", run_id)
+    if cv == "fail":
+        return False
 
-    # Step 11: Run loop check (non-blocking)
-    loop_script = script_path("scripts", "loop-check.py")
-    run_script(loop_script, [], state_dir, run_id, cwd=worktree)
-
-    # Step 12: Discovery-evidence compliance telemetry (non-blocking, run-local).
-    # Measures whether the worker wrote discovery_evidence; never blocks.
-    try:
-        _emit_discovery_telemetry(state_dir, run_id)
-    except Exception:
-        pass  # telemetry is best-effort; must never block the run
-
-    # Step 13: PI outcome metrics (advisory, run-local, multi-terminal safe).
-    # Records dispatch route, risk class, review verdict, and PI advisory
-    # classification to pi-outcome_{run_id}.jsonl. Never blocks.
-    try:
-        _record_pi_outcome(state_dir, run_id, dispatch_route="",
-                           review_verdict="", rescue_escalation_needed=False)
-    except Exception:
-        pass  # metrics are best-effort; must never block the run
-    return True
+    return _pr_artifacts_and_tail(worktree, state_dir, run_id)
 
 
 def orchestrate(args: argparse.Namespace) -> str:
@@ -1905,6 +1888,30 @@ def orchestrate(args: argparse.Namespace) -> str:
     # so active-task-<runid>.json is never written. No dispatch / common-tail.
     if getattr(args, "preflight_only", False):
         return _orchestrate_preflight(args, state_dir, run_id)
+
+    # Completion-verifier phase 2: SKILL.md spawned the read-only verifier
+    # Agent and wrote completion-verify-result_<run_id>.json. Apply advisory
+    # semantics and run only the pr-artifacts tail (steps 1-9.6 already ran).
+    if getattr(args, "completion_verify_resume", ""):
+        resume_run_id = args.completion_verify_resume
+        pending = state_dir / f".completion-verify-pending_{resume_run_id}"
+        if pending.is_file():
+            try:
+                pending.unlink()
+            except OSError:
+                pass
+        outcome = _apply_completion_verify_result(state_dir, resume_run_id)
+        if outcome == "fail" and not (state_dir / f"completion-verify-result_{resume_run_id}.json").is_file():
+            write_json(
+                state_dir / f"blocked_{resume_run_id}.json",
+                {"reason_code": "completion_verify_missing", "run_id": resume_run_id, "ts": now_utc_z()},
+            )
+            touch(state_dir / f".blocked_{resume_run_id}")
+            return finish("blocked")
+        phase_marker(state_dir, "completion-verify-resumed", resume_run_id)
+        if not _pr_artifacts_and_tail(Path.cwd(), state_dir, resume_run_id):
+            return finish("blocked")
+        return finish("pr_ready")
 
     # Claude phase 2: SKILL.md spawned the Agent and wrote the result. Run the
     # common tail on the current checkout (no worktree — the subagent worked
@@ -1927,6 +1934,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         set_delegation_mode(state_dir, "advisory", resume_run_id)
         _apply_discovery_merge(state_dir, resume_run_id)
         if not run_common_tail(Path.cwd(), state_dir, resume_run_id):
+            if (state_dir / f".completion-verify-pending_{resume_run_id}").is_file():
+                return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
             return finish("blocked")
         return finish("pr_ready")
 
@@ -1943,6 +1952,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         if not run_local_verification(state_dir, run_id):
             return finish("blocked")
         if not run_common_tail(Path.cwd(), state_dir, run_id):
+            if (state_dir / f".completion-verify-pending_{run_id}").is_file():
+                return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
             return finish("blocked")
         return finish("pr_ready")
 
