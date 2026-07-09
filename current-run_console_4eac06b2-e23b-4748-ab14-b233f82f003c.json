@@ -1,9 +1,0 @@
-{
-  "schema_version": "go.current-run.v1",
-  "run_id": "ornith-t0-1783561459",
-  "terminal_id": "console_4eac06b2-e23b-4748-ab14-b233f82f003c",
-  "go_state_dir": "P:\\packages\\.claude-marketplace\\plugins\\cc-skills-sdlc",
-  "dispatch": "pi",
-  "status": "running",
-  "updated_at": "2026-07-08T19:51:34-06:00"
-}
