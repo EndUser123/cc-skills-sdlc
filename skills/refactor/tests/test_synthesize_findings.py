@@ -209,6 +209,71 @@ class TestGroupBySeverity:
         assert 'UNKNOWN' not in grouped  # Unknown not in groups
 
 
+class TestDerivedSeverity:
+    """CRIT-6 regression: discovery agents emit {category, confidence} with no
+    `severity` field. Without derivation these were bucketed LOW by
+    group_by_severity and dropped entirely by calculate_health_score — a
+    CRITICAL security finding vanished from the Health Score. _derive_severity
+    maps the producer vocabulary onto the severity vocabulary."""
+
+    def test_security_high_finding_counts_as_critical(self):
+        """A {category: security, confidence: high} discovery finding counts
+        as CRITICAL (-20), not dropped."""
+        score = calculate_health_score([
+            {'category': 'security', 'confidence': 'high'},
+        ])
+        assert score == 80  # 100 - 20 (CRITICAL)
+
+    def test_security_finding_grouped_under_critical(self):
+        """A discovery security finding lands in the CRITICAL bucket, not LOW."""
+        grouped = group_by_severity([
+            {'category': 'security', 'confidence': 'high'},
+        ])
+        assert len(grouped['CRITICAL']) == 1
+        assert len(grouped['LOW']) == 0
+
+    def test_explicit_severity_wins_over_derivation(self):
+        """An explicit `severity` is honored over the derived category mapping."""
+        score = calculate_health_score([
+            {'category': 'security', 'confidence': 'high', 'severity': 'LOW'},
+        ])
+        assert score == 98  # 100 - 2 (LOW), not 100 - 20 (CRITICAL)
+
+    def test_low_confidence_downgrades_two_steps(self):
+        """confidence: low downgrades a CRITICAL-category finding to MEDIUM."""
+        score = calculate_health_score([
+            {'category': 'security', 'confidence': 'low'},
+        ])
+        assert score == 95  # 100 - 5 (MEDIUM)
+
+    def test_medium_confidence_downgrades_one_step(self):
+        """confidence: medium downgrades a CRITICAL-category finding to HIGH."""
+        score = calculate_health_score([
+            {'category': 'security', 'confidence': 'medium'},
+        ])
+        assert score == 90  # 100 - 10 (HIGH)
+
+    def test_downgrade_floors_at_low(self):
+        """Downgrade never shifts past LOW (the last severity index)."""
+        score = calculate_health_score([
+            {'category': 'performance', 'confidence': 'low'},  # HIGH-2 -> LOW
+        ])
+        assert score == 98  # 100 - 2 (LOW)
+
+    def test_unknown_category_defaults_to_medium(self):
+        """An unrecognized category derives a MEDIUM baseline."""
+        score = calculate_health_score([
+            {'category': 'weird-unknown-category', 'confidence': 'high'},
+        ])
+        assert score == 95  # 100 - 5 (MEDIUM default)
+
+    def test_empty_finding_still_uncounted(self):
+        """A truly empty {} finding has no category to derive from -> uncounted.
+        Preserves the test_missing_severity_treated_as_low contract."""
+        score = calculate_health_score([{}, {}])
+        assert score == 100
+
+
 class TestSynthesizeReport:
     """Tests for synthesis report generation."""
 
