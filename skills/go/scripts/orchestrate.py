@@ -1185,15 +1185,17 @@ def task_prompt(task_file: Path) -> str:
 
 
 def _resolve_chain_from_selection(state_dir, run_id) -> list:
-    """Read candidate chain from model-selection JSON if present, else default.
+    """Read candidate chain from pi-model JSON if present, else default.
 
-    Run-local read; no cross-terminal aggregation.
+    Run-local read; no cross-terminal aggregation. The candidate_chain is
+    written by resolve_model.py into pi-model_{run_id}.json (not model-selection,
+    which only carries tier/model/confidence/signals).
     """
     chain: list[str] = []
     try:
-        selection_file = state_dir / f"model-selection_{run_id}.json"
-        if selection_file.exists():
-            data = json.loads(selection_file.read_text(encoding="utf-8"))
+        pi_model_file = state_dir / f"pi-model_{run_id}.json"
+        if pi_model_file.exists():
+            data = json.loads(pi_model_file.read_text(encoding="utf-8"))
             chain = data.get("candidate_chain", []) or []
     except (OSError, ValueError):
         chain = []
