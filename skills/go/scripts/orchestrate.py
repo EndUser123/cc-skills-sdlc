@@ -919,6 +919,33 @@ def create_worktree(
     return worktree
 
 
+def _check_parse_health(state_dir: Path, run_id: str,
+                           scripts: list[Path]) -> bool:
+    """Parse-health gate: ast.parse every script on the selected dispatch path.
+
+    Catches the class of failure where a concurrent-session mid-write leaves a
+    script syntactically broken (e.g. completion_evidence_review.py lost its
+    def _assemble_verdict header) and the import cascade blocks the entire
+    post-impl gate chain.  Writes parse-health_{run_id}.json; returns False if
+    any script fails to parse.
+    """
+    import ast as _ast
+    results: list[dict] = []
+    all_ok = True
+    for script in scripts:
+        entry = {"path": str(script), "ok": True, "error": ""}
+        try:
+            _ast.parse(Path(script).read_text(encoding="utf-8"))
+        except (OSError, SyntaxError) as exc:
+            entry["ok"] = False
+            entry["error"] = f"{type(exc).__name__}: {exc}"
+            all_ok = False
+        results.append(entry)
+    write_json(state_dir / (f"parse-health_{run_id}.json"),
+               {"run_id": run_id, "scripts": results, "all_ok": all_ok})
+    return all_ok
+
+
 def classify_and_resolve_pi(state_dir: Path, run_id: str) -> PiModelInfo | None:
     classify_script = script_path("scripts", "classify_complexity.py")
     rc = run_script(classify_script, [], state_dir, run_id)
@@ -1998,6 +2025,22 @@ def orchestrate(args: argparse.Namespace) -> str:
         touch(state_dir / f".blocked_{run_id}")
         return finish("blocked")
     if args.dispatch == "pi":
+        # Parse-health gate: verify all scripts on the PI dispatch path parse
+        # before making any live/runtime claims. Catches concurrent-session
+        # mid-write syntax errors that cascade through import dependencies.
+        _ph_scripts = [
+            script_path("scripts", "orchestrate.py"),
+            script_path("scripts", "completion_evidence_review.py"),
+            script_path("scripts", "omission_audit.py"),
+            script_path("scripts", "adapters", "pi", "resolve_model.py"),
+            script_path("scripts", "adapters", "pi", "harness.py"),
+        ]
+        if not _check_parse_health(state_dir, run_id, _ph_scripts):
+            write_json(state_dir / (f"blocked_{run_id}.json"),
+                       {"reason_code": "parse_health_failed",
+                        "run_id": run_id, "ts": now_utc_z()})
+            touch(state_dir / (f".blocked_{run_id}"))
+            return finish("blocked")
         pi_info = classify_and_resolve_pi(state_dir, run_id)
         inject_route_decision(state_dir, run_id, "pi", pi_info)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):

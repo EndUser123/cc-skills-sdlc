@@ -1536,6 +1536,8 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
         "commit_boundary_required": cb_required,
         "dry_run_simplification_required": drs_required,
         "completion_authority_level": _AUTHORITY_LEVELS[0],  # L0; post-impl gate raises
+        "parse_health_required": task_intent == "implement" and execution_tier in ("full_go", "local_rigorous"),
+        "artifact_contract_required": execution_tier == "full_go",
         "rule": (
             "investigate/validate/decide emit evidence/advisory only, no implementation-completion claim. "
             "mixed reports split + deferred items, no bundled completion claim. "
@@ -1573,6 +1575,10 @@ def derive_report_gate(task_intent, execution_tier, closure_check=None,
                "mechanism / new-artifact-format-necessary / writer-reader-connected / "
                "dead-or-inert-code / tests-at-real-entry-point. "
                if drs_required else "")
+            + ("parse_health_required: live/runtime claims require parse/import "
+               "health pass for the selected dispatch path. "
+               "artifact_contract_required: writer/reader mismatch downgrades to REVISE. "
+               if oa_required else "")
         ),
     }
 
