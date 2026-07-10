@@ -2166,6 +2166,27 @@ def orchestrate(args: argparse.Namespace) -> str:
             return finish("blocked")
         return finish("pr_ready")
 
+    # Falsification phase 2: SKILL.md spawned the attacker Agent in the
+    # disposable worktree and wrote falsification-result_<run_id>.json.
+    # Validate binding, apply verdict policy, clean up, resume tail.
+    if getattr(args, "falsification_resume", ""):
+        resume_run_id = args.falsification_resume
+        pending = state_dir / f".falsification-pending_{resume_run_id}"
+        if pending.is_file():
+            try:
+                pending.unlink()
+            except OSError:
+                pass
+        outcome = _apply_falsification_result(state_dir, resume_run_id)
+        if outcome == "fail":
+            return finish("blocked")
+        if outcome == "block":
+            return finish("blocked")
+        phase_marker(state_dir, "falsification-resumed", resume_run_id)
+        if not _pr_artifacts_and_tail(Path.cwd(), state_dir, resume_run_id):
+            return finish("blocked")
+        return finish("pr_ready")
+
     # Claude phase 2: SKILL.md spawned the Agent and wrote the result. Run the
     # common tail on the current checkout (no worktree — the subagent worked
     # in-place under the PreToolUse delegation gate).
@@ -2187,6 +2208,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         set_delegation_mode(state_dir, "advisory", resume_run_id)
         _apply_discovery_merge(state_dir, resume_run_id)
         if not run_common_tail(Path.cwd(), state_dir, resume_run_id):
+            if (state_dir / f".falsification-pending_{resume_run_id}").is_file():
+                return "<promise>SPAWN_FALSIFIER</promise>"
             if (state_dir / f".completion-verify-pending_{resume_run_id}").is_file():
                 return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
             return finish("blocked")
@@ -2205,6 +2228,8 @@ def orchestrate(args: argparse.Namespace) -> str:
         if not run_local_verification(state_dir, run_id):
             return finish("blocked")
         if not run_common_tail(Path.cwd(), state_dir, run_id):
+            if (state_dir / f".falsification-pending_{run_id}").is_file():
+                return "<promise>SPAWN_FALSIFIER</promise>"
             if (state_dir / f".completion-verify-pending_{run_id}").is_file():
                 return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
             return finish("blocked")
