@@ -61,7 +61,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         required_fields=("status", "exit_code"),
         optional_fields=("command", "session_id", "session_dir"),
         additive_field_policy="tolerated",
-        writer="orchestrate.py (Step 2 dispatch harness)",
+        writer="harness.py:_write_dispatch_result",
         readers=("orchestrate:run_common_tail"),
         failure_behavior="document",
     ),
