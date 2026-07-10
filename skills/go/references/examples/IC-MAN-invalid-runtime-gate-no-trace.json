@@ -1,0 +1,31 @@
+{
+  "candidate_id": "IC-MAN-runtime-gate-no-trace-2026-07-10",
+  "created_at": "2026-07-10T12:00:00Z",
+  "source_skill": "manual",
+  "source_session_or_run_id": null,
+  "observed_problem": "(intentionally invalid fixture: runtime_gate candidate missing the required mechanism_trace AND missing the runtime-gate promotion checklist.)",
+  "evidence": [
+    "see fixture filename: IC-MAN-invalid-runtime-gate-no-trace.json"
+  ],
+  "evidence_tier": "memory_or_unverified",
+  "frequency": "n/a (negative fixture)",
+  "affected_layer": "runtime_gate",
+  "target_skill_or_system": "go",
+  "candidate_type": "runtime_gate_candidate",
+  "proposed_change": "n/a — negative fixture; this candidate MUST fail validation and is intentionally invalid.",
+  "target_layer": "runtime_gate",
+  "mechanism_trace": null,
+  "confidence": "low",
+  "risk": "critical",
+  "expected_benefit": "Demonstrates that the validator rejects runtime_gate candidates lacking mechanism_trace and the promotion checklist.",
+  "failure_mode_prevented": "Silent acceptance of under-specified runtime_gate candidates.",
+  "falsification_condition": "If this file passes the validator, the validator's runtime_gate rule is broken.",
+  "promotion_requirements": {
+    "reviewer_acceptance": false,
+    "evidence_basis": "n/a (negative fixture)",
+    "items": []
+  },
+  "recommended_destination": "runtime_gate",
+  "review_status": "proposed",
+  "reviewer_notes": ""
+}

@@ -1,0 +1,35 @@
+{
+  "candidate_id": "IC-FRI-orchestrator-readme-2026-07-10",
+  "created_at": "2026-07-10T12:00:00Z",
+  "source_skill": "friction",
+  "source_session_or_run_id": null,
+  "observed_problem": "Repeated user correction: 'the /go sequence is too long to discover from the SKILL.md table of contents — new sessions ask the same set of orientation questions before they start a run.'",
+  "evidence": [
+    "transcript excerpt 2026-07-08: 'where do I find the done_when rule?'",
+    "transcript excerpt 2026-07-09: 'is there a quick reference for execution_tier?'",
+    "skills/go/SKILL.md lines 1-50 (table-of-contents coverage)"
+  ],
+  "evidence_tier": "user_report",
+  "frequency": "observed 4 times across the last 6 /go invocations",
+  "affected_layer": "docs",
+  "target_skill_or_system": "go",
+  "candidate_type": "documentation_gap",
+  "proposed_change": "Add a 'Quick reference' section near the top of SKILL.md with execution_tier table, done_when rule, and the completion-token list. Mirror the table that already exists in references/improvement-candidate-contract.md.",
+  "target_layer": "docs",
+  "mechanism_trace": null,
+  "confidence": "medium",
+  "risk": "low",
+  "expected_benefit": "Reduce orientation questions per session by an estimated 1-2 turns; surface /go's contract vocabulary earlier.",
+  "failure_mode_prevented": "New sessions re-discovering /go's contract from the bottom of a long SKILL.md.",
+  "falsification_condition": "If orientation-question frequency is unchanged over the next 20 /go invocations after the doc edit, the fix did not land.",
+  "promotion_requirements": {
+    "reviewer_acceptance": false,
+    "evidence_basis": "User-report frequency is the only evidence; needs corroboration from another session before /docs work.",
+    "items": [
+      {"key": "reviewer_signoff", "description": "Director confirms the doc change is in scope."}
+    ]
+  },
+  "recommended_destination": "docs",
+  "review_status": "proposed",
+  "reviewer_notes": ""
+}

@@ -1,0 +1,44 @@
+{
+  "candidate_id": "IC-BEH-empty-output-2026-07-10",
+  "created_at": "2026-07-10T12:00:00Z",
+  "source_skill": "behave",
+  "source_session_or_run_id": "run-2026-07-10-empty-output",
+  "observed_problem": "Lines 41-54 of /go's verify-task.py emitted an empty Python result for the same input that previously returned data; no exception, no stderr.",
+  "evidence": [
+    "skills/go/scripts/verify-task.py:41-54 (the lines that returned empty)",
+    "transcript excerpt run-2026-07-10-empty-output: '[no output, exit 0]'",
+    "transcript excerpt run-2026-07-09-same-input: '[normal output, exit 0]'"
+  ],
+  "evidence_tier": "execution_artifact",
+  "frequency": "once so far; same input, same script, no code change between runs",
+  "affected_layer": "validation_script",
+  "target_skill_or_system": "go",
+  "candidate_type": "llm_behavior_failure",
+  "proposed_change": "Add a 'no silent empty output' warning to the existing verify-task pre-check: if the runner returned exit 0 with empty stdout and no stderr, surface 'VERIFY_EMPTY_RESULT' as a non-blocking diagnostic in the verify-artifact, so the next iteration can re-run with diagnostics on instead of treating it as success.",
+  "target_layer": "validation_script",
+  "mechanism_trace": {
+    "producer": "scripts/verify-task.py:_run_verification",
+    "artifact_or_state": "verify-result_{RUN_ID}.json (.verification_status + .empty_result_warning)",
+    "consumer": "scripts/orchestrate.py (STEP 3, verify gate reader)",
+    "authority_or_verdict": "verify-task's own exit code stays authoritative; the warning is a non-blocking diagnostic",
+    "freshness_check": "assert_fresh(verify-result, run_id) — same per-run freshness invariant as the rest of /go state",
+    "failure_direction": "advisory-only — the warning is surfaced to plain_english_report; it does NOT block .verified_",
+    "real_boundary_test": "Spawn a synthetic run with the runner returning ('', '', 0) and confirm verify-result carries empty_result_warning=true and .verified_ is still touched; a unit test that mocks _run_verification is not sufficient"
+  },
+  "confidence": "medium",
+  "risk": "low",
+  "expected_benefit": "Reduce silent-success detection lag from 'next session catches it' to 'same session surfaces it as a diagnostic'.",
+  "failure_mode_prevented": "Silent empty-output success counted as a passing verification.",
+  "falsification_condition": "If the warning fires on runs with non-empty output (FP) or misses real empty-output runs (FN) at a measurable rate, the detector needs calibration before any non-advisory use.",
+  "promotion_requirements": {
+    "reviewer_acceptance": false,
+    "evidence_basis": "Single observation; needs a reproduce-first test before any validator change.",
+    "items": [
+      {"key": "reviewer_signoff", "description": "Director confirms the warning is worth adding as advisory."},
+      {"key": "reproduce_first", "description": "A regression test that reproduces the empty-output condition (real subprocess, not mock) must land before the warning ships."}
+    ]
+  },
+  "recommended_destination": "validation_script",
+  "review_status": "needs_evidence",
+  "reviewer_notes": ""
+}
