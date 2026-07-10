@@ -36,6 +36,7 @@ SDLC skills for Claude Code — architecture, planning, code quality, testing, r
 | uci | *DEPRECATED stub → /review full* (Unified Code Inspection engine) |
 | qmd-wiki | qmd-wiki |
 | rca | Debug RCA Skill — Root cause analysis with Iron Law |
+| risks | /risks — Fast pessimistic risk pass on the current proposal (lightweight alternative to /red-team) |
 | review_bundle | Review Bundle Creation |
 | ship | /ship — Deploy readiness and runtime snapshot |
 | snapshot | /snapshot — Session snapshot capture and restore (moved to snapshot package) |
