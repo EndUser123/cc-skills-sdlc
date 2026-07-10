@@ -227,7 +227,7 @@ class TestReview:
         transcript.write_text(
             json.dumps({"type": "session", "id": "sess"}) + "\n"
             + json.dumps({"type": "tool_execution_start", "toolName": "read", "input": {"path": "a.py"}}) + "\n"
-            + json.dumps({"type": "tool_execution_start", "toolName": "edit", "input": {"path": "a.py"}}) + "\n",
+            + json.dumps({"type": "tool_execution_start", "toolName": "edit", "input": {"path": "a.py", "old": "x", "new": "y"}}) + "\n",
             encoding="utf-8",
         )
 

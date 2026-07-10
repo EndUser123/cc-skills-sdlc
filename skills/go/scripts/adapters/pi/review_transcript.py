@@ -67,7 +67,7 @@ def _edits_target_path(args: dict[str, Any]) -> str | None:
     path = args.get("path")
     has_path = isinstance(path, str) and bool(path)
     has_payload = False
-    for key in ("edits", "content", "newText", "oldText"):
+    for key in ("edits", "content", "newText", "oldText", "old", "new"):
         value = args.get(key)
         if value:  # non-empty list / non-empty string
             has_payload = True
