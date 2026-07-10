@@ -19,20 +19,29 @@ suggest:
 # /risks — Fast Pessimistic Risk Pass
 
 A single-pass risks-and-mitigations read with a built-in critique of the
-findings themselves. Faster than `/red-team` (no specialist dispatch, no
-multi-agent critic). Use `/risks` when you want "what will bite us, how do
-we stop it, and what's the highest-leverage move" in roughly 30–90 seconds.
+findings themselves.
 
-This skill complements, not replaces, `/red-team` and the proposal-critique-gate
-Stop hook. `/risks` structures the pass; the hook enforces that a pass happens;
-`/red-team` adjudicates trust when stakes justify multi-perspective cost.
+**Positioning vs siblings** (each does a different job — pick the right one):
+`/skeptic` validates AI output; `/review` produces file:line findings; `/improve`
+improves a concrete artifact; `/red-team` adjudicates trust with multi-agent
+specialist dispatch. `/risks` is the fast **pre-commitment** pessimistic read —
+single-pass, no dispatch, structured risks + a meta-critique, in roughly
+30–90 seconds.
+
+This skill is independent of, but compatible with, the proposal-critique-gate
+Stop hook (any `/risks` output that recommends an action is still checked by
+that gate for a self-critique) and with `/red-team` (which takes over when a
+finding warrants a PROCEED/REVISE/BLOCK verdict). `/risks` does not rely on
+either.
 
 ## Lookback rule
 
-Risk-pass on the most recent un-actioned proposal in context — a design, plan,
-implementation approach, or code change that has **not yet been written or
-committed**. If several candidates exist, assess the most recent un-actioned
-one.
+Risk-pass on the most recent **un-actioned** proposal in context.
+
+**"Un-actioned" = proposed in prose this session, but not yet written or
+committed.** If the most recent thing the user raised is already implemented
+or already shipped, say so in the first line and ask what to assess. If
+several un-actioned candidates exist, assess the most recent one.
 
 **State what you're assessing in the first line** — `Assessing: <one-line
 summary>`. If that's not what the user meant, stop and ask. If no un-actioned
@@ -42,47 +51,57 @@ If `$0` is provided, weight that domain in every section.
 
 ## Always-consider lenses
 
-Fire these two lenses regardless of `$0`. They're your highest-frequency
-failure modes and shouldn't depend on the user remembering to ask.
+Fire these two lenses regardless of `$0`. They catch the failure modes users
+forget to ask about.
 
 | Lens | What it catches |
 |---|---|
 | **Reversibility** | What's the blast radius if this ships broken? Cheap to undo vs. entrenched? |
 | **Operational safety** | Does this touch hook wiring, plugin mutation, file deletion, permissions, state files, or cross-terminal scope? |
 
-Add lenses the user explicitly requested via `$0` (e.g., `state`, `concurrency`,
-`windows-io`, `security`).
+If a proposal touches none of a lens's surfaces, mark that lens **N/A** and
+move on — don't manufacture risks to fill it. Add lenses the user explicitly
+requested via `$0` (e.g., `state`, `concurrency`, `windows-io`, `security`).
 
 ## Anti-patterns to avoid
 
-- **Don't restate the proposal as a risk.** "This changes the auth flow" is not a risk; "the new auth flow races with the existing refresh on logout" is.
-- **Don't enumerate speculative risks without a failure mechanism.** If you can't name why it bites, cut the row.
-- **Don't recommend without grounding.** A mitigation you can't connect to a specific risk isn't a mitigation — it's a wish.
-- **Don't invent the synthesis.** The Action section is grounded by the Risks + Findings Review sections. If they don't support it, the Action isn't earned.
-- **Don't produce a bare inventory with no Action.** "Here are 6 risks, mitigate each" with no judgment of which to act on first is a dodge, not a pass.
+(The other failure modes — restating the proposal as a risk, recommending
+without grounding, bare inventories — are already enforced by the
+proposal-critique-gate and Stop unverified-stance hooks. These two are the
+ones the hooks *cannot* catch because they're internal to this pass.)
+
+- **Don't invent the synthesis.** The Bottom Line is grounded by the Risks + Findings Review sections beneath it. If they don't support it, the Bottom Line isn't earned — rewrite it, don't back-fill weak risks to match it.
 - **Don't re-derive the proposal.** Assess it. The user already wrote it.
 
 ## Output structure
 
-In this order. Each section is required; an empty section means the pass failed.
+Write the sections in order **except Bottom Line** — draft Bottom Line *after*
+Findings Review, then place it first in the output. The verdict is earned by
+the analysis beneath it, not the other way around.
+
+Each section is required; an empty section means the pass failed.
 
 ### Bottom Line
 
 One sentence. The single highest-leverage move — "ship X + Y together; skip
 Z" or "this is sound, no blockers found" or "escalate to `/red-team` because
-trust boundary." No preamble. Scannable in one second.
+trust boundary." No preamble. Scannable in one second. (Written last, placed
+first — see Output structure.)
 
 ### Risks
 
-Markdown table. **No row cap** — list every real risk, even if it's seven
-rows. "Why it bites" names the failure mechanism, not the symptom.
+Markdown table. List every real risk. "Why it bites" names the failure
+mechanism, not the symptom.
 
 | # | Risk | Why it bites |
 |---|------|--------------|
 
-Calibration: **≥7 risks usually means you're speculating** — cut the weakest
-two. **<3 risks on a non-trivial proposal usually means you're sandbagging** —
-push harder on the always-consider lenses.
+**Mechanism rule (not a count gate):** cut any row whose "Why it bites"
+cannot name a concrete failure mechanism; add a row whenever a named mechanism
+exists, regardless of count. Rule-of-thumb only: if you've listed seven,
+pressure-test the weakest two; if you've listed fewer than three on a
+non-trivial proposal, push harder on the always-consider lenses. These numbers
+are heuristics, not authority — no corpus backs them.
 
 ### Mitigations
 
@@ -93,8 +112,9 @@ a narrow code patch when the correct fix is a design change.
 
 ### Findings Review
 
-**Critically review the Risks and Mitigations above.** This is the most
-valuable section — do not skip it.
+**Critically review the Risks and Mitigations above.** High-leverage when
+present; best-effort if skipped — if you skip it, note the skip in Bottom Line
+so the user knows the meta-critique didn't run.
 
 - Which risks are real vs. theater? Mark the theater ones for removal.
 - Which mitigations actually address the failure mechanism vs. just look
@@ -107,8 +127,11 @@ valuable section — do not skip it.
 
 ### Falsification
 
-For the **top risk** only: the specific input, state, race, or environment
-condition that would bypass the mitigation. How do we prove the fix broke?
+**Design the verification the user would run** for the top risk only: the
+specific input, state, race, or environment condition that would bypass the
+mitigation, and how you'd prove the fix broke. This is verification *design* —
+running it is the user's responsibility (this skill has no tools and runs
+nothing).
 
 ### Skipped (escalate to `/red-team` if any of these matter)
 
@@ -117,7 +140,10 @@ condition that would bypass the mitigation. How do we prove the fix broke?
 - Deep failure-mode pre-mortem with web research
 - Trust verdict on a security boundary
 
-## Worked example (target shape)
+If the proposal touches any Skipped area at all, route to `/red-team` first
+rather than delivering a partial `/risks` result and asking for a re-launch.
+
+## Worked example (illustrative — the structure, not the domain, is the template)
 
 **Bottom Line**: Ship M1 (the hook) + M3 (single-source to CLAUDE.md
 Recommendation Rule). Skip M4 (vague reversibility threshold) — fold the
@@ -132,7 +158,7 @@ exemption list into M3 instead of a separate rule.
 
 **Mitigations** (excerpt):
 
-1. Convert the rule from prose-into-prompt to artifact-check-on-output: extend the Stop aggregator to require a `verifier:` line with three non-empty fields (model, corpus, threshold) on matches of "validated", "wire it", "no residuals", "verified". WARN first; promote to BLOCK after ≥3 non-discrimination cases measured per the gate-discrimination rule.
+1. Convert the rule from prose-into-prompt to artifact-check-on-output: extend the Stop aggregator to require a `verifier:` line with three non-empty fields (model, corpus, threshold) on matches of "validated", "wire it", "no residuals", "verified". Start WARN-only; promote to BLOCK only after measuring real non-zero discrimination on a held-out corpus (no fixed N — gate-discrimination requires measured TP/FP, not a magic count).
 2. Rotate the verifier model — the same model cannot be reused across N consecutive sessions for the same author.
 
 **Findings Review**: The "convert to artifact-check" mitigation (M1) collapses R1, R2, R4, R6 at the structural level. M2 (verifier rotation) is cheap and addresses R3. The narrative-form rule is itself the failure mode — shipping prose without the hook is exactly the trap the rule is meant to close.
