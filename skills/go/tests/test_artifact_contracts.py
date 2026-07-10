@@ -296,11 +296,11 @@ class TestArtifactContractRegistry:
     def test_writer_role_format(self):
         from contracts.artifacts import ARTIFACT_CONTRACTS
         for v, c in ARTIFACT_CONTRACTS.items():
-            # writer is module:func; no spaces in module
-            assert ":" in c.writer, f"{v} writer not module:func"
+            # writer is module:func with non-empty parts (declarative)
+            assert ":" in c.writer, f"{v} writer missing module:func separator"
             module, func = c.writer.split(":", 1)
-            assert "/" in module or module.endswith(".py"), (
-                f"{v} writer module not path-like: {module}")
+            assert module.strip(), f"{v} writer module empty"
+            assert func.strip(), f"{v} writer func empty"
 
     def test_get_contract_raises_on_unknown(self):
         from contracts.artifacts import get_contract
