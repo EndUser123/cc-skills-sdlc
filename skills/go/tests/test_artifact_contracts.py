@@ -335,3 +335,47 @@ class TestRegistryConsistencyWithTests:
         # status + exit_code are required; the test asserts these on the artifact.
         assert "status" in c.required_fields
         assert "exit_code" in c.required_fields
+
+
+class TestLiveMetadataValidation:
+    """Contract writer/reader references must resolve to real symbols."""
+
+    def test_all_writer_readers_validate(self):
+        from contracts.artifacts import validate_all_metadata
+        results = validate_all_metadata()
+        assert results == [], (
+            f"metadata validation failures: {results}")
+
+    def test_python_reference_resolves_live(self):
+        from contracts.artifacts import validate_metadata
+        # resolve_model:main exists
+        ok, msg = validate_metadata("python:adapters/pi/resolve_model.py:main")
+        assert ok, msg
+
+    def test_python_reference_unknown_func_fails(self):
+        from contracts.artifacts import validate_metadata
+        ok, msg = validate_metadata("python:orchestrate:nonexistent_func_xyz")
+        assert not ok
+        assert "not found" in msg
+
+    def test_external_prefix_passes(self):
+        from contracts.artifacts import validate_metadata
+        ok, msg = validate_metadata("external:telemetry-dashboard")
+        assert ok
+
+    def test_bare_text_fails(self):
+        from contracts.artifacts import validate_metadata
+        ok, msg = validate_metadata("some random text")
+        assert not ok
+        assert "bare text" in msg
+
+    def test_empty_reference_fails(self):
+        from contracts.artifacts import validate_metadata
+        ok, msg = validate_metadata("")
+        assert not ok
+
+    def test_dispatch_result_writer_is_real_symbol(self):
+        from contracts.artifacts import get_contract
+        c = get_contract("dispatch-result.v1")
+        assert c.writer.startswith("python:"), (
+            f"dispatch-result writer must be python: prefixed, got {c.writer!r}")
