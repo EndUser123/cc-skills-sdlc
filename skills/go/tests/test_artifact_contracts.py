@@ -14,8 +14,11 @@ import sys
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
+if str(SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(SKILL_ROOT))
 
 # Load orchestrate (register in sys.modules for @dataclass)
 _orch_spec = importlib.util.spec_from_file_location("orch_ac", SCRIPTS / "orchestrate.py")
@@ -255,3 +258,80 @@ class TestFallbackChainResolvesAliases:
         assert "llama-cpp/ornith-1.0-9b" in resolved
         # M3 dropped without opt-in.
         assert "minimax/MiniMax-M3" not in resolved
+
+
+class TestArtifactContractRegistry:
+    """Versioned contract registry declarative checks."""
+
+    def test_registry_has_six_required_artifacts(self):
+        from contracts.artifacts import ARTIFACT_CONTRACTS
+        assert set(ARTIFACT_CONTRACTS) == {
+            "model-selection.v1",
+            "pi-model.v1",
+            "dispatch-result.v1",
+            "pi-candidate-attempt.v1",
+            "failover-telemetry.v1",
+            "omission-audit.v1",
+        }
+
+    def test_each_contract_has_writer_and_readers(self):
+        from contracts.artifacts import ARTIFACT_CONTRACTS
+        for v, c in ARTIFACT_CONTRACTS.items():
+            assert c.writer, f"{v} missing writer"
+            assert c.readers, f"{v} missing readers"
+            # required fields non-empty
+            assert len(c.required_fields) > 0, f"{v} missing required_fields"
+
+    def test_additive_policy_consistent_with_readers(self):
+        from contracts.artifacts import ARTIFACT_CONTRACTS
+        # If a contract has a reader that filters (like PiModelInfo.load),
+        # additive must be tolerated; if strict, the reader must reject extras.
+        for v, c in ARTIFACT_CONTRACTS.items():
+            if c.additive_field_policy == "strict":
+                # No reader should silently drop extras.
+                for r in c.readers:
+                    assert "load" not in r or "filter" in r, (
+                        f"{v} strict additive but reader {r} drops extras")
+
+    def test_writer_role_format(self):
+        from contracts.artifacts import ARTIFACT_CONTRACTS
+        for v, c in ARTIFACT_CONTRACTS.items():
+            # writer is module:func; no spaces in module
+            assert ":" in c.writer, f"{v} writer not module:func"
+            module, func = c.writer.split(":", 1)
+            assert "/" in module or module.endswith(".py"), (
+                f"{v} writer module not path-like: {module}")
+
+    def test_get_contract_raises_on_unknown(self):
+        from contracts.artifacts import get_contract
+        import pytest
+        with pytest.raises(KeyError):
+            get_contract("nonexistent.v9")
+
+    def test_validate_missing_fields(self):
+        from contracts.artifacts import get_contract, validate
+        missing = validate(get_contract("pi-model.v1"), {"tier": "T0"})
+        assert "classifier_model" in missing
+        assert "pi_model" in missing
+        assert "tier" not in missing  # present
+        assert validate(get_contract("pi-model.v1"),
+                         {"classifier_model": "X", "tier": "T0", "pi_model": "x/x"}) == []
+
+
+class TestRegistryConsistencyWithTests:
+    """The contract registry must match the writer/reader pattern the tests assert."""
+
+    def test_pimodel_reader_tolerates_extras_matches_contract(self):
+        from contracts.artifacts import get_contract
+        c = get_contract("pi-model.v1")
+        # The contract says additive="tolerated"; the test asserts load() ignores
+        # unknown fields. Verify these match.
+        assert c.additive_field_policy == "tolerated"
+        assert "load" in c.readers[0].lower()
+
+    def test_dispatch_result_schema_matches_test_schema(self):
+        from contracts.artifacts import get_contract
+        c = get_contract("dispatch-result.v1")
+        # status + exit_code are required; the test asserts these on the artifact.
+        assert "status" in c.required_fields
+        assert "exit_code" in c.required_fields
