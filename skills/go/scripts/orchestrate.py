@@ -1211,6 +1211,32 @@ def task_prompt(task_file: Path) -> str:
 
 
 
+def _resolve_aliases_to_provider_model(aliases: list[str]) -> list[str]:
+    """Map bare aliases to provider/model strings via the resolver used for normal chains.
+
+    M3 is only included when GO_PI_ALLOW_M3_FALLBACK=1 (policy-gated). Bare aliases
+    that the resolver does not know (or that resolve to None) are dropped. This
+    prevents the historic "bare OPENCODE_DEEPSEEK" failure where pi fuzzy-matched
+    it to the wrong provider.
+    """
+    import os as _os
+    import importlib.util as _ilu
+    _rm_path = Path(__file__).resolve().parent / "adapters" / "pi" / "resolve_model.py"
+    _rm_spec = _ilu.spec_from_file_location("_fb_resolve_model", _rm_path)
+    _rm = _ilu.module_from_spec(_rm_spec)
+    _rm_spec.loader.exec_module(_rm)
+    _allow_m3 = _rm._allow_m3_fallback()
+    out: list[str] = []
+    for alias in aliases:
+        if alias == "M3" and not _allow_m3:
+            continue  # policy: M3 is opt-in only
+        resolved = _rm.resolve(alias)
+        if resolved is None:
+            continue  # unknown alias: do not emit bare name
+        out.append(resolved)
+    return out
+
+
 def _resolve_chain_from_selection(state_dir, run_id) -> list:
     """Read candidate chain from pi-model JSON if present, else default.
 
@@ -1227,7 +1253,13 @@ def _resolve_chain_from_selection(state_dir, run_id) -> list:
     except (OSError, ValueError):
         chain = []
     if not chain:
-        chain = ["OPENCODE_DEEPSEEK", "M3"]
+        # Fallback must use resolved provider/model strings (not bare aliases).
+        # M3 is policy-gated via _allow_m3_fallback.
+        chain = _resolve_aliases_to_provider_model(["OPENCODE_DEEPSEEK", "M3"])
+        if not chain:
+            # Last-resort: if even the resolver failed, use the documented
+            # OPENCODE_DEEPSEEK provider/model so the worker can still attempt it.
+            chain = ["opencode-go/deepseek-v4-flash"]
     return [c for c in chain if c]
 
 

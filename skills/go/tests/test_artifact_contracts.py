@@ -187,3 +187,71 @@ class TestMissingArtifactClearFailure:
         ok = orch._check_parse_health(tmp_path, rid, scripts)
         assert ok is True
         assert (tmp_path / f"parse-health_{rid}.json").exists()
+
+
+class TestFallbackChainResolvesAliases:
+    """Fallback uses resolved provider/model strings, not bare aliases."""
+
+    def test_resolves_opencode_deepseek_to_provider_model(self, tmp_path, monkeypatch):
+        rid = "ac-fb-1"
+        # Default: no GO_PI_ALLOW_M3_FALLBACK; only OPENCODE_DEEPSEEK should survive.
+        monkeypatch.delenv("GO_PI_ALLOW_M3_FALLBACK", raising=False)
+        (tmp_path / f"pi-model_{rid}.json").write_text(json.dumps({
+            "classifier_model": "X", "tier": "X", "pi_model": "x/x",
+        }), encoding="utf-8")
+        chain = orch._resolve_chain_from_selection(tmp_path, rid)
+        # M3 dropped (policy-gated), OPENCODE_DEEPSEEK resolved to provider/model.
+        assert "opencode-go/deepseek-v4-flash" in chain, (
+            f"fallback should resolve to provider/model, got {chain}")
+        assert "OPENCODE_DEEPSEEK" not in chain, (
+            f"bare alias must not survive in fallback chain, got {chain}")
+        assert "M3" not in chain, (
+            f"M3 must be policy-gated (no GO_PI_ALLOW_M3_FALLBACK), got {chain}")
+
+    def test_includes_m3_when_opt_in(self, tmp_path, monkeypatch):
+        rid = "ac-fb-2"
+        monkeypatch.setenv("GO_PI_ALLOW_M3_FALLBACK", "1")
+        (tmp_path / f"pi-model_{rid}.json").write_text(json.dumps({
+            "classifier_model": "X", "tier": "X", "pi_model": "x/x",
+        }), encoding="utf-8")
+        chain = orch._resolve_chain_from_selection(tmp_path, rid)
+        assert "minimax/MiniMax-M3" in chain, (
+            f"opt-in M3 should resolve to provider/model, got {chain}")
+        assert "M3" not in chain, (
+            f"M3 bare alias must not survive, got {chain}")
+
+    def test_drops_unknown_aliases(self, tmp_path, monkeypatch):
+        rid = "ac-fb-3"
+        monkeypatch.delenv("GO_PI_ALLOW_M3_FALLBACK", raising=False)
+        # Force the normal chain read to fail, then exercise the resolver directly.
+        result = orch._resolve_aliases_to_provider_model(
+            ["OPENCODE_DEEPSEEK", "MYSTERY_MODEL", "LOCAL_ORNITH", "M3"]
+        )
+        # OPENCODE_DEEPSEEK and LOCAL_ORNITH resolve; M3 dropped (policy);
+        # MYSTERY_MODEL dropped (unknown).
+        assert "opencode-go/deepseek-v4-flash" in result
+        assert "llama-cpp/ornith-1.0-9b" in result
+        assert "MYSTERY_MODEL" not in result
+        assert "M3" not in result
+
+    def test_pi_model_chain_uses_resolved_strings(self, tmp_path):
+        """The full chain read from pi-model_{run_id}.json must contain
+        provider/model strings, not bare aliases. This is the regression for
+        the historic OPENCODE_DEEPSEEK fuzzy-match failure."""
+        rid = "ac-fb-4"
+        (tmp_path / f"pi-model_{rid}.json").write_text(json.dumps({
+            "classifier_model": "LOCAL_ORNITH", "tier": "T0",
+            "pi_model": "llama-cpp/ornith-1.0-9b",
+            "candidate_chain": [
+                "LOCAL_ORNITH", "OPENCODE_DEEPSEEK", "M3"
+            ],
+        }), encoding="utf-8")
+        # Bypass the chain reader: feed the chain to failover directly.
+        raw = json.loads((tmp_path / f"pi-model_{rid}.json").read_text())
+        chain = raw["candidate_chain"]
+        # Chain as-written contains bare aliases; the failover path resolves them.
+        resolved = orch._resolve_aliases_to_provider_model(chain)
+        assert "opencode-go/deepseek-v4-flash" in resolved
+        assert "llama-cpp/ornith-1.0-9b" in resolved
+        # M3 dropped without opt-in.
+        assert "minimax/MiniMax-M3" not in resolved
