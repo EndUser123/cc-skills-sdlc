@@ -1823,6 +1823,174 @@ def _completion_verify_gate(worktree: Path, state_dir: Path, run_id: str) -> str
     return "pause"
 
 
+def _falsification_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
+    """Step 9.8 bounded falsification gate (conditional; opt-out
+    GO_FALSIFICATION_SKIP=1). For qualifying high-risk tasks, writes a
+    run-scoped request, creates a disposable attack worktree, and emits
+    SPAWN_FALSIFIER. SKILL.md spawns an attacker Agent in the attack worktree
+    and re-invokes with --falsification-resume.
+
+    Returns: 'skip' (low-risk or SKIP env or result already applied),
+    'pause' (high-risk; writes request + pending marker), 'fail' (infra error).
+    """
+    if os.environ.get("GO_FALSIFICATION_SKIP", "").strip() == "1":
+        return "skip"
+
+    # Load task + changed files for routing.
+    active = {}
+    at_path = state_dir / f"active-task_{run_id}.json"
+    if at_path.is_file():
+        try:
+            active = json.loads(at_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            active = {}
+    task = active.get("task", active) if isinstance(active, dict) else {}
+
+    # Get changed files from the worktree.
+    try:
+        diff_proc = subprocess.run(
+            ["git", "-C", str(worktree), "diff", "--name-only", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        changed_files = [l.strip() for l in diff_proc.stdout.splitlines() if l.strip()] if diff_proc.returncode == 0 else []
+    except (OSError, subprocess.SubprocessError):
+        changed_files = []
+
+    # Load proposal for risk classification.
+    proposal = {}
+    prop_path = state_dir / f"task-proposal_{run_id}.json"
+    if prop_path.is_file():
+        try:
+            proposal = json.loads(prop_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            proposal = {}
+
+    # Centralized routing decision.
+    try:
+        _scripts_dir = str(Path(__file__).resolve().parent)
+        if _scripts_dir not in sys.path:
+            sys.path.insert(0, _scripts_dir)
+        import falsification_gate as _fg
+    except ImportError:
+        return "skip"
+
+    required, routing_reasons = _fg.should_falsify(task, proposal, changed_files)
+
+    # Write routing artifact for inspectability.
+    write_json(
+        state_dir / f"falsification-routing_{run_id}.json",
+        {
+            "run_id": run_id,
+            "required": required,
+            "reasons": routing_reasons,
+            "ts": now_utc_z(),
+        },
+    )
+
+    if not required:
+        phase_marker(state_dir, "falsification-skipped", run_id)
+        return "skip"
+
+    # If a result already exists (resume path), apply it.
+    result_path = state_dir / f"falsification-result_{run_id}.json"
+    if result_path.is_file():
+        phase_marker(state_dir, "falsification-applied", run_id)
+        return "skip"
+
+    # Build + write the request.
+    try:
+        payload = _fg.build_falsification_request(
+            state_dir, run_id, worktree, task, changed_files, proposal, routing_reasons,
+        )
+    except Exception as exc:
+        write_json(state_dir / f"blocked_{run_id}.json",
+                   {"reason_code": "falsification_request_error", "error": str(exc)[:500]})
+        touch(state_dir / f".blocked_{run_id}")
+        return "fail"
+
+    req_path = state_dir / f"falsification-request_{run_id}.json"
+    req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    # Create the disposable attack worktree.
+    try:
+        attack_path = _fg.create_attack_worktree(
+            Path(payload["authoritative_worktree"]), run_id, payload["head_revision"],
+        )
+        # Record attack worktree path in the request for cleanup on resume.
+        payload["attack_worktree"] = str(attack_path)
+        req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        write_json(state_dir / f"blocked_{run_id}.json",
+                   {"reason_code": "falsification_worktree_error", "error": str(exc)[:500]})
+        touch(state_dir / f".blocked_{run_id}")
+        return "fail"
+
+    touch(state_dir / f".falsification-pending_{run_id}")
+    phase_marker(state_dir, "falsification-requested", run_id)
+    return "pause"
+
+
+def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
+    """Read falsification-result_{run_id}.json, validate binding, apply verdict.
+
+    Returns: 'proceed' | 'block' | 'fail'.
+    Missing/malformed/mismatched results fail closed.
+    """
+    _scripts_dir = str(Path(__file__).resolve().parent)
+    if _scripts_dir not in sys.path:
+        sys.path.insert(0, _scripts_dir)
+    import falsification_gate as _fg
+
+    req_path = state_dir / f"falsification-request_{run_id}.json"
+    res_path = state_dir / f"falsification-result_{run_id}.json"
+
+    if not res_path.is_file():
+        return "fail"  # missing → fail closed
+
+    try:
+        request = json.loads(req_path.read_text(encoding="utf-8")) if req_path.is_file() else {}
+        result = json.loads(res_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "fail"  # malformed → fail closed
+
+    ok, reason = _fg.validate_falsification_result(result, request, run_id)
+    if not ok:
+        write_json(state_dir / f"blocked_{run_id}.json",
+                   {"reason_code": "falsification_result_rejected", "detail": reason})
+        touch(state_dir / f".blocked_{run_id}")
+        return "fail"
+
+    verdict = result.get("verdict", "")
+    policy = _fg.apply_verdict_policy(verdict)
+
+    # Clean up the attack worktree regardless of verdict.
+    attack_path_str = request.get("attack_worktree", "")
+    if attack_path_str:
+        cleanup_report = _fg.cleanup_attack_worktree(Path(attack_path_str))
+        # Verify authoritative worktree unchanged.
+        if not _fg.verify_authoritative_unchanged(
+            Path(request["authoritative_worktree"]), request["head_revision"],
+        ):
+            write_json(state_dir / f"blocked_{run_id}.json", {
+                "reason_code": "falsification_authoritative_mutated",
+                "cleanup_report": cleanup_report,
+            })
+            touch(state_dir / f".blocked_{run_id}")
+            return "fail"
+
+    phase_marker(state_dir, "falsification-resolved", run_id)
+
+    if policy == "proceed":
+        return "proceed"
+    # block or advisory-block
+    write_json(state_dir / f"blocked_{run_id}.json", {
+        "reason_code": f"falsification_{verdict.lower()}",
+        "verdict": verdict,
+    })
+    touch(state_dir / f".blocked_{run_id}")
+    return "block"
+
+
 def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     # Step 1: Run verification (verify-task.py)
     verify_script = script_path("scripts", "verify-task.py")
@@ -1943,6 +2111,17 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
     if cv == "pause":
         return False
     if cv == "fail":
+        return False
+
+    # Step 9.8: Bounded falsification gate (conditional; opt-out
+    # GO_FALSIFICATION_SKIP=1). For qualifying high-risk tasks, writes a
+    # run-scoped request, creates a disposable attack worktree, emits
+    # SPAWN_FALSIFIER; SKILL.md spawns an attacker Agent in the attack
+    # worktree and re-invokes with --falsification-resume.
+    fv = _falsification_gate(worktree, state_dir, run_id)
+    if fv == "pause":
+        return False
+    if fv == "fail":
         return False
 
     return _pr_artifacts_and_tail(worktree, state_dir, run_id)
