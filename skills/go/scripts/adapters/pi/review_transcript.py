@@ -38,15 +38,63 @@ def parse_transcript(lines: list[str]) -> list[dict[str, Any]]:
     return messages
 
 
+def _tool_args(msg: dict[str, Any]) -> dict[str, Any]:
+    """Extract tool arguments from any of the keys pi/llama-cpp emits.
+
+    Real pi streams use ``args``; older harnesses / tests use ``input`` or
+    ``arguments``. Pick whichever is present and non-empty.
+    """
+    for key in ("args", "input", "arguments"):
+        value = msg.get(key)
+        if isinstance(value, dict) and value:
+            return value
+    return {}
+
+
+def _edits_target_path(args: dict[str, Any]) -> str | None:
+    """Return the filesystem path an ``edit``/``write`` tool-call targets.
+
+    Real pi emits ``edit`` calls with ``edits=[{oldText, newText}]`` and the
+    file path at the top level (``args.path``). Older harnesses put the
+    path directly in arguments. A bare ``path`` with no payload (empty
+    ``edits`` / no ``content``) is treated as *no change* and returns None —
+    an edit tool-call that carries no diff did not write anything.
+
+    Note: the authoritative ``files_written`` source remains the task
+    worktree's ``git diff --name-only`` (see ``review``); this helper only
+    supplies the transcript-derived fallback signal.
+    """
+    path = args.get("path")
+    has_path = isinstance(path, str) and bool(path)
+    has_payload = False
+    for key in ("edits", "content", "newText", "oldText"):
+        value = args.get(key)
+        if value:  # non-empty list / non-empty string
+            has_payload = True
+            break
+    if not has_payload:
+        # Fall back to per-edit path inside an ``edits`` list (rare shape).
+        edits = args.get("edits")
+        if isinstance(edits, list) and edits:
+            first = edits[0]
+            if isinstance(first, dict):
+                inner_path = first.get("path")
+                if isinstance(inner_path, str) and inner_path:
+                    return inner_path
+        return None
+    return path if has_path else None
+
+
 def extract_tool_events(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Extract tool call/result pairs from transcript."""
     events: list[dict[str, Any]] = []
     for msg in messages:
         if msg.get("type") == "tool_execution_start":
+            arguments = _tool_args(msg)
             events.append({
                 "role": "toolCall",
                 "name": msg.get("toolName", msg.get("tool", "")),
-                "arguments": msg.get("input", msg.get("arguments", {})),
+                "arguments": arguments,
                 "id": msg.get("id", msg.get("toolCallId", "")),
             })
             continue
@@ -69,10 +117,11 @@ def extract_tool_events(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if role == "assistant":
             for content in inner.get("content", []):
                 if content.get("type") == "toolCall":
+                    arguments = content.get("arguments") or {}
                     events.append({
                         "role": "toolCall",
                         "name": content.get("name", ""),
-                        "arguments": content.get("arguments", {}),
+                        "arguments": arguments,
                         "id": content.get("id", ""),
                     })
 
@@ -91,11 +140,24 @@ def extract_tool_events(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def review(
     transcript_path: pathlib.Path,
     task: dict[str, Any],
+    worktree: str | pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Summarize a pi transcript for subagent review.
 
     Returns dict with: warnings, tool_summary, files_read, files_written,
     total_tool_calls, transcript_tail, transcript_path.
+
+    Authority for ``files_written`` (highest first):
+        1. ``git -C <worktree> diff --name-only HEAD`` — actual filesystem state.
+        2. Tool-call ``args.path`` / ``args.edits[].path`` from the transcript.
+        3. ``input.path`` / ``arguments.path`` legacy keys (back-compat).
+
+    When ``worktree`` resolves to a real git worktree, the diff result
+    *replaces* the transcript-derived list rather than merging with it —
+    transcript prose alone is not authoritative for an edit that has or has
+    not landed on disk. ``files_read`` still derives from tool-call args
+    (the transcript is the only signal for what the model *attempted* to
+    read); we do not claim a read against an un-touched worktree file.
     """
     text = transcript_path.read_text(encoding="utf-8")
     messages = parse_transcript(text.splitlines())
@@ -112,17 +174,13 @@ def review(
         tool_counts[name] = tool_counts.get(name, 0) + 1
 
         if event["role"] == "toolCall":
-            args = event.get("arguments", {})
+            args = event.get("arguments", {}) or {}
             if name == "read":
                 path = args.get("path", "")
                 if path:
                     files_read.append(path)
-            elif name == "write":
-                path = args.get("path", "")
-                if path:
-                    files_written.append(path)
-            elif name == "edit":
-                path = args.get("path", "")
+            elif name in ("write", "edit"):
+                path = _edits_target_path(args)
                 if path:
                     files_written.append(path)
 
@@ -130,9 +188,38 @@ def review(
             if event.get("isError"):
                 tool_errors.append(f"{name}: {_extract_text(event.get('content', []))}")
 
+    # Worktree-diff override: when a worktree path is provided AND resolves to
+    # a real git worktree, trust the diff as the authoritative write set.
+    # Transcript-derived paths are preserved under _transcript_files_written
+    # so the caller can inspect both signals.
+    worktree_str = str(worktree) if worktree else None
+    worktree_resolved: pathlib.Path | None = None
+    if worktree_str:
+        candidate = pathlib.Path(worktree_str)
+        if candidate.is_dir():
+            worktree_resolved = candidate
+
+    transcript_files_written = list(files_written)
+    worktree_diff_paths: list[str] = []
+    if worktree_resolved is not None:
+        rc, diff_paths = _git_diff_name_only(worktree_resolved)
+        if rc == 0:
+            worktree_diff_paths = diff_paths
+            if worktree_diff_paths:
+                files_written = list(worktree_diff_paths)
+        elif rc != 0:
+            warnings.append(
+                f"WORKTREE_DIFF_UNAVAILABLE: 'git -C {worktree_resolved} diff --name-only HEAD' failed (rc={rc}); "
+                "using transcript-derived files_written as fallback"
+            )
+
     total_calls = sum(tool_counts.values())
 
     if files_written and not files_read:
+        # Worktree-diff authority suppresses BLIND_WRITE when the read path
+        # simply wasn't captured in the transcript (the on-disk edit may
+        # still be correct). Only flag when the worker also never read the
+        # file in the transcript.
         warnings.append("BLIND_WRITE: files written without any reads first")
 
     if total_calls > 50:
@@ -166,11 +253,74 @@ def review(
         "tool_summary": tool_counts,
         "files_read": files_read,
         "files_written": files_written,
+        "_transcript_files_written": transcript_files_written,
+        "_worktree_diff_paths": worktree_diff_paths,
+        "_worktree_resolved": str(worktree_resolved) if worktree_resolved else None,
         "total_tool_calls": total_calls,
         "transcript_tail": tail,
         "transcript_path": str(transcript_path),
         "total_lines": len(all_lines),
     }
+
+
+def _extract_text(content: list[dict[str, Any]]) -> str:
+    """Extract text from a content array."""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            parts.append(item.get("text", ""))
+    return "; ".join(parts)[:200]
+
+
+def _resolve_worktree(state_dir: pathlib.Path, run_id: str) -> str | None:
+    """Read the worktree path written by ``orchestrate.create_worktree``.
+
+    Returns the path string when the artifact exists AND the worktree
+    resolves to an existing directory; otherwise None (the reviewer will
+    fall back to transcript-only detection and emit
+    ``WORKTREE_DIFF_UNAVAILABLE`` if a follow-on git invocation fails —
+    never silently substitutes the parent repo).
+    """
+    manifest = state_dir / f"worktree-{run_id}.json"
+    if not manifest.exists():
+        return None
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    worktree = data.get("worktree") if isinstance(data, dict) else None
+    if not isinstance(worktree, str) or not worktree:
+        return None
+    if not pathlib.Path(worktree).is_dir():
+        return None
+    return worktree
+
+
+def _git_diff_name_only(worktree: pathlib.Path) -> tuple[int, list[str]]:
+    """Return ``(returncode, sorted-changed-paths)`` for the worktree's diff vs HEAD.
+
+    Uses ``git -C <worktree>`` so the worktree's own repo root is the target
+    (submodule-aware: returns nothing if the worktree isn't a valid git
+    checkout). Falls back to an empty list on non-zero exit rather than
+    raising — callers interpret rc != 0 as "diff unavailable".
+    """
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(worktree), "diff", "--name-only", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return (124, [])
+    if proc.returncode != 0:
+        return (proc.returncode, [])
+    paths = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    return (0, paths)
 
 
 
@@ -224,15 +374,6 @@ def extract_discovery_findings(review_result: dict[str, Any], task: dict[str, An
 
     return findings
 
-def _extract_text(content: list[dict[str, Any]]) -> str:
-    """Extract text from a content array."""
-    parts: list[str] = []
-    for item in content:
-        if isinstance(item, dict) and item.get("type") == "text":
-            parts.append(item.get("text", ""))
-    return "; ".join(parts)[:200]
-
-
 def main() -> None:
     state_dir = pathlib.Path(os.environ.get("GO_STATE_DIR", ""))
     run_id = os.environ.get("RUN_ID", "unknown")
@@ -257,7 +398,7 @@ def main() -> None:
         data = json.loads(task_file.read_text(encoding="utf-8"))
         task = data.get("task", data)
 
-    result = review(transcript, task)
+    result = review(transcript, task, worktree=_resolve_worktree(state_dir, run_id))
 
     # Write summary
     out = state_dir / f"pi-review_{run_id}.json"
