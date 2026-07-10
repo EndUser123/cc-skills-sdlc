@@ -60,7 +60,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         required_fields=("status", "exit_code"),
         optional_fields=("command", "session_id", "session_dir"),
         additive_field_policy="tolerated",
-        writer="python:adapters/pi/harness.py:main",
+        writer="python:adapters/pi/harness.py:run_pi_harness",
         readers=("python:orchestrate:run_common_tail",),
         failure_behavior="document",
     ),
@@ -135,6 +135,21 @@ _NON_SYMBOLIC_PREFIXES = frozenset({
     "external:", "script-step:", "manual:", "unknown:",
 })
 
+from pathlib import Path as _Path
+_SCRIPTS = _Path(__file__).resolve().parent.parent / "scripts"
+
+_MODULE_FILE_MAP = {
+    "classify_complexity": "classify_complexity.py",
+    "preflight_propose": "preflight_propose.py",
+    "orchestrate": "orchestrate.py",
+    "completion_evidence_review": "completion_evidence_review.py",
+    "omission_audit": "omission_audit.py",
+    "adapters/pi/resolve_model.py": "adapters/pi/resolve_model.py",
+    "adapters/pi/harness.py": "adapters/pi/harness.py",
+    "resolve_model": "adapters/pi/resolve_model.py",
+    "harness": "adapters/pi/harness.py",
+}
+
 
 def _is_non_symbolic(ref):
     return any(ref.startswith(p) for p in _NON_SYMBOLIC_PREFIXES)
@@ -166,8 +181,15 @@ def _resolve_python_symbol(ref):
         spec.loader.exec_module(mod)
     except Exception as exc:
         return (False, f"import error: {type(exc).__name__}: {exc}")
-    if not hasattr(mod, func_name):
-        return (False, f"function {func_name!r} not found in {module_name}")
+    # Handle dotted attrs like PiModelInfo.load
+    obj = mod
+    for attr in func_name.split('.'):
+        if not hasattr(obj, attr):
+            obj = None
+            break
+        obj = getattr(obj, attr)
+    if obj is None:
+        return (False, f"symbol {func_name!r} not found in {module_name}")
     return (True, "ok")
 
 
