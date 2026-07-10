@@ -430,6 +430,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "Runs pr-artifacts + tail only (steps 1-9.6 already ran).",
     )
     parser.add_argument(
+        "--falsification-resume",
+        metavar="RUN_ID",
+        default="",
+        help="Phase 2 of the bounded falsification gate: re-enter after SKILL.md spawned "
+        "the attacker Agent and wrote falsification-result_<run_id>.json. "
+        "Validates request/result binding, applies verdict policy, cleans the disposable "
+        "attack worktree, and resumes pr-artifacts only when permitted.",
+    )
+    parser.add_argument(
         "--validation",
         action="store_true",
         help="Mark this task as validation/audit type. G5 allows Stop when "
