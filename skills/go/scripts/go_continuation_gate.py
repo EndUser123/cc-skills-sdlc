@@ -35,8 +35,8 @@ Continuation semantics
 
 Self-scoping & fail-silent
 --------------------------
-This is a direct project-settings entry (P:/.claude/settings.json hooks.Stop[3]
--> source path), NOT wired through the plugin's hooks/hooks.json. It prints
+Wired via the plugin's __lib/router.py (settings.json hooks.Stop -> router Stop
+-> this script), keeping the central hooks config free of plugin-script paths.
 nothing whenever session_id is absent, pointer is missing, pointer is stale,
 or state is foreign -> inert in every non-/go session. ADDITIVE to the native
 goal-loop evaluator; does not replace it.
