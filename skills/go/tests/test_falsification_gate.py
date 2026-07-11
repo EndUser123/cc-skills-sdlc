@@ -240,7 +240,7 @@ class TestDisposableWorktree:
     def test_attack_worktree_created_and_isolated(self, tmp_path):
         repo = _make_repo(tmp_path)
         head = _git(repo, "rev-parse", "HEAD")
-        attack = create_attack_worktree(repo, "test-run", head)
+        attack = create_attack_worktree(repo, "test-run", head)[0]
         assert attack.exists()
         assert attack != repo
         # Attack worktree is writable
@@ -256,7 +256,7 @@ class TestDisposableWorktree:
     def test_authoritative_unchanged_after_attack(self, tmp_path):
         repo = _make_repo(tmp_path)
         head = _git(repo, "rev-parse", "HEAD")
-        attack = create_attack_worktree(repo, "test-run2", head)
+        attack = create_attack_worktree(repo, "test-run2", head)[0]
         # Mutate attack worktree
         (attack / "main.py").write_text("MUTATED\n")
         _git(attack, "add", "main.py")
@@ -396,7 +396,7 @@ class TestGoldCorpusRealPath:
         head = _git(repo, "rev-parse", "HEAD")
 
         # Create attack worktree
-        attack = create_attack_worktree(repo, "gold-run-2", head)
+        attack = create_attack_worktree(repo, "gold-run-2", head)[0]
         assert attack.exists()
 
         # Mutate attack worktree
@@ -456,7 +456,7 @@ class TestGoldCorpusRealPath:
         req_path.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
 
         # 3. Create the attack worktree (the attacker's environment).
-        attack = create_attack_worktree(repo, run_id, head)
+        attack = create_attack_worktree(repo, run_id, head)[0]
         assert attack.exists()
         assert attack != repo
 

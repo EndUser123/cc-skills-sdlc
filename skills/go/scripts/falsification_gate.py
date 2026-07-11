@@ -276,8 +276,10 @@ def create_attack_worktree(
     authoritative_worktree: Path,
     run_id: str,
     head_revision: str,
-) -> Path:
-    """Create a disposable Git worktree from the authoritative worktree's HEAD.
+    scope_in: list[str] | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """Create a disposable Git worktree from the authoritative worktree's HEAD,
+    then materialize the full authoritative state (staged, unstaged, untracked).
 
     Uses a Git worktree (not a clone) because:
     - it's instant (no file copy);
@@ -285,7 +287,10 @@ def create_attack_worktree(
     - it's isolated (separate working tree, separate branch);
     - it can be removed with `git worktree remove --force`.
 
-    The attacker may write here. The authoritative worktree is never writable.
+    Returns (attack_path, materialization_report).
+    The attacker may mutate the attack worktree. The authoritative worktree
+    is never writable. Without this materialization, the attacker would receive
+    HEAD-only code — missing uncommitted changes that are under review.
     """
     worktree_root = Path(os.environ.get("GO_WORKTREE_ROOT", "P:/worktrees"))
     ts = int(time.time())
@@ -310,7 +315,11 @@ def create_attack_worktree(
         raise RuntimeError(
             f"Failed to create attack worktree: {proc.stderr.strip() or proc.stdout.strip()}"
         )
-    return attack_path
+    # Materialize the full authoritative state (staged, unstaged, untracked).
+    mat_report = materialize_authoritative_state(
+        authoritative_worktree, attack_path, head_revision, scope_in,
+    )
+    return attack_path, mat_report
 
 
 def cleanup_attack_worktree(attack_path: Path) -> dict[str, Any]:

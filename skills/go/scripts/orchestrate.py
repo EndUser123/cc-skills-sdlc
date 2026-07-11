@@ -1911,11 +1911,43 @@ def _falsification_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
     req_path = state_dir / f"falsification-request_{run_id}.json"
     req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
-    # Create the disposable attack worktree.
+    # Budget enforcement: attempt counter.
+    attempt_file = state_dir / f".falsification-attempt_{run_id}"
+    attempt_count = 0
+    if attempt_file.exists():
+        try:
+            attempt_count = int(attempt_file.read_text(encoding="utf-8").strip() or "0")
+        except (ValueError, OSError):
+            attempt_count = 0
+    max_attempts = payload.get("budget", {}).get("max_attempts", 1)
+    if attempt_count >= max_attempts:
+        write_json(state_dir / f"blocked_{run_id}.json",
+                   {"reason_code": "falsification_max_attempts", "attempts": attempt_count})
+        touch(state_dir / f".blocked_{run_id}")
+        return "fail"
+
+    # Budget enforcement: pending age (total_elapsed_seconds).
+    pending_path = state_dir / f".falsification-pending_{run_id}"
+    if pending_path.exists():
+        import time as _time
+        try:
+            age = _time.time() - pending_path.stat().st_mtime
+            max_elapsed = payload.get("budget", {}).get("total_elapsed_seconds", 300)
+            if age > max_elapsed:
+                write_json(state_dir / f"blocked_{run_id}.json",
+                           {"reason_code": "falsification_timeout", "age_seconds": int(age)})
+                touch(state_dir / f".blocked_{run_id}")
+                return "fail"
+        except OSError:
+            pass
+
+    # Create the disposable attack worktree (includes full state materialization).
     try:
-        attack_path = _fg.create_attack_worktree(
-            Path(payload["authoritative_worktree"]), run_id, payload["head_revision"],
+        scope_in = task.get("scope_in", []) if isinstance(task, dict) else []
+        attack_path, mat_report = _fg.create_attack_worktree(
+            Path(payload["authoritative_worktree"]), run_id, payload["head_revision"], scope_in,
         )
+        payload["materialization_report"] = mat_report
         # Record attack worktree path in the request for cleanup on resume.
         payload["attack_worktree"] = str(attack_path)
         req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -1947,11 +1979,31 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
     if not res_path.is_file():
         return "fail"  # missing → fail closed
 
+    # Budget enforcement: output-size cap (enforced before loading).
+    output_size_limit = 5 * 1024 * 1024  # 5 MiB default
+    if res_path.stat().st_size > output_size_limit:
+        write_json(state_dir / f"blocked_{run_id}.json",
+                   {"reason_code": "falsification_output_too_large", "size": res_path.stat().st_size})
+        touch(state_dir / f".blocked_{run_id}")
+        return "fail"
+
     try:
         request = json.loads(req_path.read_text(encoding="utf-8")) if req_path.is_file() else {}
         result = json.loads(res_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return "fail"  # malformed → fail closed
+
+    # Budget enforcement: attempt counter increment.
+    attempt_file = state_dir / f".falsification-attempt_{run_id}"
+    try:
+        count = int(attempt_file.read_text(encoding="utf-8").strip() or "0") if attempt_file.exists() else 0
+    except (ValueError, OSError):
+        count = 0
+    count += 1
+    try:
+        attempt_file.write_text(str(count), encoding="utf-8")
+    except OSError:
+        pass
 
     ok, reason = _fg.validate_falsification_result(result, request, run_id)
     if not ok:
