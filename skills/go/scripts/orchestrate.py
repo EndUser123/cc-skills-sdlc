@@ -1899,8 +1899,10 @@ def _falsification_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
 
     # Build + write the request.
     try:
+        _session_id = (active.get("session_id", "") if isinstance(active, dict) else "") or ""
         payload = _fg.build_falsification_request(
             state_dir, run_id, worktree, task, changed_files, proposal, routing_reasons,
+            session_id=_session_id,
         )
     except Exception as exc:
         write_json(state_dir / f"blocked_{run_id}.json",
@@ -2005,18 +2007,40 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
     except OSError:
         pass
 
-    ok, reason = _fg.validate_falsification_result(result, request, run_id)
+    # Execution provenance (Part 1): load the run-scoped command ledger and
+    # the declared attack worktree so FALSIFIED counterexamples must reference
+    # real, bound command executions.
+    attack_path_str = request.get("attack_worktree", "")
+    ledger = _fg.load_ledger(state_dir, run_id)
+
+    ok, reason = _fg.validate_falsification_result(
+        result, request, run_id,
+        ledger=ledger, attack_worktree=attack_path_str,
+    )
     if not ok:
         write_json(state_dir / f"blocked_{run_id}.json",
                    {"reason_code": "falsification_result_rejected", "detail": reason})
         touch(state_dir / f".blocked_{run_id}")
+        _terminalize_falsification_pointer(request, state_dir, run_id)
         return "fail"
 
     verdict = result.get("verdict", "")
     policy = _fg.apply_verdict_policy(verdict)
 
+    # Part 2 budget enforcement: measure attack-worktree writes (file count +
+    # aggregate bytes) BEFORE cleanup. Enforced against the request budget.
+    budget_violation = ""
+    if attack_path_str:
+        writes = _fg.measure_attack_worktree_writes(Path(attack_path_str))
+        budget = request.get("budget", {}) if isinstance(request, dict) else {}
+        max_files = int(budget.get("max_files_writable", 50) or 0)
+        max_bytes = int(budget.get("max_aggregate_bytes", 10 * 1024 * 1024) or 0)
+        if max_files and writes.get("files_changed", 0) > max_files:
+            budget_violation = "falsification_file_budget_exceeded"
+        elif max_bytes and writes.get("bytes_written", 0) > max_bytes:
+            budget_violation = "falsification_byte_budget_exceeded"
+
     # Clean up the attack worktree regardless of verdict.
-    attack_path_str = request.get("attack_worktree", "")
     if attack_path_str:
         cleanup_report = _fg.cleanup_attack_worktree(Path(attack_path_str))
         # Verify authoritative worktree unchanged (HEAD + digests).
@@ -2033,7 +2057,18 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
                 "cleanup_report": cleanup_report,
             })
             touch(state_dir / f".blocked_{run_id}")
+            _terminalize_falsification_pointer(request, state_dir, run_id)
             return "fail"
+
+    if budget_violation:
+        write_json(state_dir / f"blocked_{run_id}.json", {
+            "reason_code": budget_violation,
+            "verdict": verdict,
+            "writes": writes,
+        })
+        touch(state_dir / f".blocked_{run_id}")
+        _terminalize_falsification_pointer(request, state_dir, run_id)
+        return "fail"
 
     phase_marker(state_dir, "falsification-resolved", run_id)
 
@@ -2045,7 +2080,23 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
         "verdict": verdict,
     })
     touch(state_dir / f".blocked_{run_id}")
+    # Part 4: terminal outcomes (FALSIFIED + fail-closed verdicts) must not
+    # leave the session pointer active for G4/G5 to loop on.
+    _terminalize_falsification_pointer(request, state_dir, run_id)
     return "block"
+
+
+def _terminalize_falsification_pointer(request: dict, state_dir: Path, run_id: str) -> None:
+    """Remove the exact session pointer for this run iff it binds to this
+    run_id + state_dir. Fail-silent; never touch foreign/newer pointers."""
+    try:
+        session_id = (request.get("session_id", "") if isinstance(request, dict) else "") or ""
+        if not session_id:
+            return
+        import falsification_gate as _fg
+        _fg.terminalize_session_pointer(session_id, run_id, str(state_dir))
+    except Exception:
+        pass
 
 
 def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
