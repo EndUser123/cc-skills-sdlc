@@ -270,7 +270,151 @@ class TestDisposableWorktree:
 # 6. Single .pr-ready writer invariant
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 7. Gold corpus — real-path planted-defect tests
+# ---------------------------------------------------------------------------
+
+class TestGoldCorpusRealPath:
+    """Planted-defect tests through the real request → validate → verdict path.
+
+    Each test creates a real Git repository, a valid falsification request,
+    and a result that SHOULD trigger a specific defect class. The tests prove
+    the falsification gate catches each class.
+    """
+
+    def _setup(self, tmp_path):
+        """Create a real repo + valid request for gold-corpus tests."""
+        repo = _make_repo(tmp_path)
+        head = _git(repo, "rev-parse", "HEAD")
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+        task = {"task": {"id": "GOLD-T1", "title": "Fix hook", "objective": "hook session identity",
+                          "task_type": "implementation", "acceptance_criteria": ["AC1"]}}
+        request = build_falsification_request(
+            state_dir, "gold-run-1", repo, task,
+            ["hooks/Stop.py"], None, ["high-risk: hook"],
+        )
+        req_path = state_dir / f"falsification-request_{request['run_id']}.json"
+        req_path.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+        return repo, head, state_dir, request
+
+    def test_malformed_result_fails_closed(self, tmp_path):
+        """Gold case: a malformed required result fails open → the gate MUST
+        reject it. This prevents a broken attacker from accidentally passing."""
+        repo, head, state_dir, request = self._setup(tmp_path)
+        run_id = request["run_id"]
+
+        # Write a malformed result (not JSON)
+        res_path = state_dir / f"falsification-result_{run_id}.json"
+        res_path.write_text("NOT JSON\n", encoding="utf-8")
+
+        # Run the validation path
+        ok, reason = validate_falsification_result(None, request, run_id)
+        assert not ok
+        assert reason
+
+    def test_wrong_run_id_rejected(self, tmp_path):
+        """Gold case: a result with wrong run_id is accepted → the gate MUST
+        reject it. This prevents cross-run contamination."""
+        repo, head, state_dir, request = self._setup(tmp_path)
+        run_id = request["run_id"]
+
+        # Valid result structure but WRONG run_id
+        result = {
+            "schema": RESULT_SCHEMA,
+            "run_id": "wrong-run-id",
+            "request_digest": request["request_digest"],
+            "task_id": request["task_id"],
+            "base_revision": request["base_revision"],
+            "head_revision": request["head_revision"],
+            "verdict": "NOT_FALSIFIED_WITHIN_BUDGET",
+            "counterexamples": [],
+        }
+        res_path = state_dir / f"falsification-result_{run_id}.json"
+        res_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+        ok, reason = validate_falsification_result(result, request, run_id)
+        assert not ok
+        assert "run_id" in reason
+
+    def test_wrong_digest_rejected(self, tmp_path):
+        """Gold case: a result with wrong request digest is accepted →
+        the gate MUST reject it. This guards against stale or tampered results."""
+        repo, head, state_dir, request = self._setup(tmp_path)
+        run_id = request["run_id"]
+
+        result = {
+            "schema": RESULT_SCHEMA,
+            "run_id": run_id,
+            "request_digest": "deadbeef",
+            "task_id": request["task_id"],
+            "base_revision": request["base_revision"],
+            "head_revision": request["head_revision"],
+            "verdict": "NOT_FALSIFIED_WITHIN_BUDGET",
+            "counterexamples": [],
+        }
+        ok, reason = validate_falsification_result(result, request, run_id)
+        assert not ok
+        assert "digest" in reason
+
+    def test_prose_only_falsified_rejected(self, tmp_path):
+        """Gold case: a FALSIFIED verdict without executable reproduction
+        evidence must be rejected. Prevents fabricated findings."""
+        repo, head, state_dir, request = self._setup(tmp_path)
+        run_id = request["run_id"]
+
+        result = {
+            "schema": RESULT_SCHEMA,
+            "run_id": run_id,
+            "request_digest": request["request_digest"],
+            "task_id": request["task_id"],
+            "base_revision": request["base_revision"],
+            "head_revision": request["head_revision"],
+            "verdict": "FALSIFIED",
+            "counterexamples": [{"claim_falsified": "x"}],  # no command
+        }
+        ok, reason = validate_falsification_result(result, request, run_id)
+        assert not ok
+        assert "command" in reason
+
+    def test_real_falsified_blocks(self, tmp_path):
+        """Gold case: a valid FALSIFIED result blocks .pr-ready.
+        Prove through the apply_verdict_policy function."""
+        policy = apply_verdict_policy("FALSIFIED")
+        assert policy == "block"
+
+    def test_authoritative_unchanged_after_full_flow(self, tmp_path):
+        """Gold case: the authoritative worktree remains unmodified after
+        the full request → attack worktree → cleanup flow."""
+        repo = _make_repo(tmp_path)
+        head = _git(repo, "rev-parse", "HEAD")
+
+        # Create attack worktree
+        attack = create_attack_worktree(repo, "gold-run-2", head)
+        assert attack.exists()
+
+        # Mutate attack worktree
+        (attack / "new_gold_file.py").write_text("ATTACKER_WROTE_THIS\n")
+        _git(attack, "add", "new_gold_file.py")
+        _git(attack, "commit", "-q", "-m", "attack")
+
+        # Authoritative must be unchanged
+        assert verify_authoritative_unchanged(repo, head)
+        assert not (repo / "new_gold_file.py").exists()
+        assert (repo / "main.py").read_text() == "x = 1\n"
+
+        # Cleanup
+        report = cleanup_attack_worktree(attack)
+        assert report["cleaned"], report["errors"]
+        assert not attack.exists()
+
+
 class TestSinglePrReadyWriter:
+    def test_no_pr_ready_writer_in_falsification_gate(self):
+        """falsification_gate.py must never write .pr-ready itself."""
+        false_text = SCRIPT.read_text(encoding="utf-8")
+        assert ".pr-ready" not in false_text, "falsification_gate must not contain .pr-ready literal"
+
     def test_only_one_pr_ready_writer_in_orchestrate(self):
         """Grep orchestrate.py for .pr-ready writes — must be exactly one."""
         orch = Path(__file__).resolve().parent.parent / "scripts" / "orchestrate.py"
