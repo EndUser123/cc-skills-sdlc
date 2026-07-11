@@ -1961,6 +1961,20 @@ def _falsification_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
             payload["materialization_baseline"] = mat_baseline
         except Exception:
             payload["materialization_baseline"] = {}
+        # Register with shared lifecycle primitive for reconciliation/cleanup.
+        try:
+            import worktree_safety as _ws
+            _ws.lifecycle_register(
+                attack_path,
+                f"falsify/{run_id[:8]}",
+                run_id,
+                Path(payload["authoritative_worktree"]),
+                "falsification_attack",
+                owner_session=_session_id,
+                state_dir=state_dir,
+            )
+        except Exception:
+            pass
         req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:
         write_json(state_dir / f"blocked_{run_id}.json",
@@ -2052,9 +2066,22 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
         elif max_bytes and writes.get("bytes_written", 0) > max_bytes:
             budget_violation = "falsification_byte_budget_exceeded"
 
-    # Clean up the attack worktree regardless of verdict.
+    # Clean up the attack worktree regardless of verdict (via shared lifecycle).
     if attack_path_str:
-        cleanup_report = _fg.cleanup_attack_worktree(Path(attack_path_str))
+        try:
+            import worktree_safety as _ws
+            auth_wt = Path(request.get("authoritative_worktree", ""))
+            repo_root = subprocess.run(
+                ["git", "-C", str(auth_wt), "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, timeout=10).stdout.strip() or str(auth_wt)
+            lc_report = _ws.lifecycle_clean_worktree(
+                Path(attack_path_str), Path(repo_root),
+                run_id=run_id, state_dir=state_dir,
+                branch_name=f"falsify/{run_id[:8]}",
+            )
+            cleanup_report = lc_report
+        except Exception:
+            cleanup_report = _fg.cleanup_attack_worktree(Path(attack_path_str))
         # Verify authoritative worktree unchanged (HEAD + digests).
         auth_report = _fg.verify_authoritative_unchanged(
             Path(request["authoritative_worktree"]),

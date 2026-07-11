@@ -454,3 +454,274 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle primitive v1 -- shared idempotent worktree lifecycle contract
+# ---------------------------------------------------------------------------
+# Consolidates allocation, registration, inspection, terminal-marking, cleanup,
+# quarantine, and reconciliation logic that was duplicated across
+# orchestrate.py (pi-task worktrees), falsification_gate.py (attack worktrees),
+# and worktree_safety.py (task worktrees).
+#
+# Every worktree-producing mechanism should use these same primitives.
+
+LIFECYCLE_MANAGED_WORKTREE_ROOT = Path(
+    os.environ.get("GO_MANAGED_WORKTREE_ROOT", "P:/worktrees")
+)
+
+LIFECYCLE_REGISTRY_DIR = "worktree-lifecycle"
+
+
+def _lifecycle_registry(state_dir: Path | None = None) -> Path:
+    base = state_dir if state_dir else _resolve_state_dir(None)
+    return base / LIFECYCLE_REGISTRY_DIR
+
+
+def _normalize_path(p: Path) -> str:
+    return str(p.resolve())
+
+
+def lifecycle_register(
+    worktree_path: Path,
+    branch: str,
+    run_id: str,
+    repo_root: Path,
+    worktree_type: str,
+    owner_session: str = "",
+    owner_task: str = "",
+    state_dir: Path | None = None,
+) -> dict:
+    reg = _lifecycle_registry(state_dir)
+    reg.mkdir(parents=True, exist_ok=True)
+    entry_id = run_id or branch.replace("/", "_")
+    entry = {
+        "schema": "worktree-lifecycle.v1",
+        "entry_id": entry_id,
+        "worktree_path": _normalize_path(worktree_path),
+        "branch": branch,
+        "run_id": run_id,
+        "repo_root": _normalize_path(repo_root),
+        "worktree_type": worktree_type,
+        "owner_session": owner_session,
+        "owner_task": owner_task,
+        "status": "active",
+        "cleanup_state": "none",
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "quarantine_reason": "",
+        "quarantine_expires_at": "",
+    }
+    _write_json(reg / f"{entry_id}.json", entry)
+    return entry
+
+
+def lifecycle_get_registration(run_id: str, state_dir: Path | None = None) -> dict:
+    reg = _lifecycle_registry(state_dir)
+    if not reg.is_dir():
+        return {}
+    for f in sorted(reg.glob("*.json")):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            if d.get("run_id") == run_id or d.get("entry_id") == run_id:
+                return d
+        except (OSError, ValueError):
+            continue
+    return {}
+
+
+def lifecycle_mark_terminal(
+    run_id: str, cleanup_state: str, state_dir: Path | None = None
+) -> dict:
+    entry = lifecycle_get_registration(run_id, state_dir)
+    if not entry:
+        return {}
+    entry["status"] = "terminal"
+    entry["cleanup_state"] = cleanup_state
+    entry["updated_at"] = _now_iso()
+    reg = _lifecycle_registry(state_dir)
+    _write_json(reg / f"{entry.get('entry_id', run_id)}.json", entry)
+    return entry
+
+
+def _get_active_worktree_git_metadata() -> dict:
+    result = {}
+    for repo_hint in ["P:", "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc"]:
+        try:
+            proc = subprocess.run(
+                ["git", "-C", repo_hint, "worktree", "list", "--porcelain"],
+                capture_output=True, text=True, timeout=15)
+            if proc.returncode != 0:
+                continue
+        except (OSError, subprocess.SubprocessError):
+            continue
+        current_path = None
+        for line in proc.stdout.splitlines():
+            if line.startswith("worktree "):
+                current_path = line[9:].strip()
+            elif line.startswith("branch ") and current_path:
+                result[current_path] = {"branch": line[7:].strip(), "head": "", "parent_repo": repo_hint}
+            elif line.startswith("HEAD ") and current_path:
+                if current_path in result:
+                    result[current_path]["head"] = line[5:].strip()
+    return result
+
+
+def lifecycle_inspect_worktree(worktree_path: Path, repo_root: Path | None = None) -> dict:
+    report = {"path": str(worktree_path), "exists_on_disk": False,
+              "git_metadata_ok": False, "branch_registered": False,
+              "branch_ref_exists": False, "dirty": False, "has_git_dir": False,
+              "modified_paths": []}
+    if worktree_path.is_dir():
+        report["exists_on_disk"] = True
+        dot_git = worktree_path / ".git"
+        report["has_git_dir"] = dot_git.exists()
+        p = _git(worktree_path, "status", "--porcelain")
+        if p.returncode == 0:
+            report["dirty"] = bool(p.stdout.strip())
+            report["modified_paths"] = [l.strip() for l in p.stdout.splitlines() if l.strip()]
+        if repo_root:
+            p2 = _git(repo_root, "worktree", "list", "--porcelain")
+            if p2.returncode == 0:
+                report["git_metadata_ok"] = str(worktree_path) in p2.stdout
+    return report
+
+
+def lifecycle_clean_worktree(
+    worktree_path: Path, repo_root: Path, run_id: str = "",
+    state_dir: Path | None = None, *, branch_name: str = "",
+) -> dict:
+    report = {"worktree_path": str(worktree_path), "git_remove_ok": False,
+              "branch_deleted": False, "git_pruned": False,
+              "directory_removed": False, "lifecycle_registry_updated": False,
+              "errors": []}
+    wt = Path(worktree_path)
+    rr = Path(repo_root)
+    p = _git(rr, "worktree", "remove", "--force", str(wt))
+    if p.returncode == 0:
+        report["git_remove_ok"] = True
+    else:
+        report["errors"].append(f"git worktree remove: {p.stderr.strip()}")
+    if wt.exists():
+        try:
+            shutil.rmtree(wt, ignore_errors=True)
+            report["directory_removed"] = not wt.exists()
+        except Exception as e:
+            report["errors"].append(f"rmtree: {e}")
+    if branch_name:
+        bp = _git(rr, "branch", "-D", branch_name)
+        if bp.returncode == 0:
+            report["branch_deleted"] = True
+    _git(rr, "worktree", "prune")
+    report["git_pruned"] = True
+    if run_id and state_dir:
+        reg_entry = lifecycle_mark_terminal(run_id, "cleaned", state_dir)
+        report["lifecycle_registry_updated"] = bool(reg_entry)
+    return report
+
+
+def lifecycle_quarantine(
+    worktree_path: Path, run_id: str, reason: str, repo_root: Path,
+    branch_name: str = "", state_dir: Path | None = None,
+    *, expire_hours: int = 168,
+) -> dict:
+    reg = _lifecycle_registry(state_dir)
+    if not reg.is_dir():
+        reg.mkdir(parents=True, exist_ok=True)
+    import datetime as _dt
+    expiry = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=expire_hours)
+              if expire_hours > 0 else "")
+    entry = lifecycle_get_registration(run_id, state_dir) or {
+        "schema": "worktree-lifecycle.v1",
+        "entry_id": run_id or branch_name.replace("/", "_"),
+        "worktree_path": _normalize_path(worktree_path),
+        "branch": branch_name, "run_id": run_id,
+        "repo_root": _normalize_path(repo_root),
+        "worktree_type": "quarantined",
+        "owner_session": "", "owner_task": "",
+        "created_at": _now_iso(),
+    }
+    entry["status"] = "terminal"
+    entry["cleanup_state"] = "preserved"
+    entry["quarantine_reason"] = reason
+    entry["quarantine_expires_at"] = expiry if isinstance(expiry, str) else expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
+    entry["updated_at"] = _now_iso()
+    _write_json(reg / f"{entry.get('entry_id', run_id)}.json", entry)
+    return entry
+
+
+MANAGED_WORKTREE_PREFIXES = frozenset({"falsify-", "pi-task-", "wt-"})
+
+
+def _is_managed_worktree_dir(name: str) -> bool:
+    return any(name.startswith(p) for p in MANAGED_WORKTREE_PREFIXES)
+
+
+def lifecycle_reconcile(state_dir: Path | None = None, *, dry_run: bool = True) -> dict:
+    reg_dir = _lifecycle_registry(state_dir)
+    reg_entries = {}
+    if reg_dir.is_dir():
+        for f in reg_dir.glob("*.json"):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+                wp = d.get("worktree_path", "")
+                if wp:
+                    reg_entries[wp] = d
+            except (OSError, ValueError):
+                pass
+    managed_root = LIFECYCLE_MANAGED_WORKTREE_ROOT
+    git_wt = _get_active_worktree_git_metadata()
+    all_paths = set()
+    if managed_root.is_dir():
+        for d in managed_root.iterdir():
+            if d.is_dir() and _is_managed_worktree_dir(d.name):
+                all_paths.add(str(d.resolve()))
+    for gp in git_wt:
+        if any(Path(gp).name.startswith(p) for p in MANAGED_WORKTREE_PREFIXES):
+            all_paths.add(str(Path(gp).resolve()))
+    for rp in reg_entries:
+        all_paths.add(str(Path(rp).resolve()))
+
+    counts = {}
+    entries = []
+    for rp in sorted(all_paths):
+        wp = Path(rp)
+        on_disk = wp.is_dir()
+        reg = reg_entries.get(rp, {})
+        in_git = rp in git_wt
+        wt_name = wp.name
+
+        if not on_disk and in_git:
+            cls = "ORPHAN_GIT_METADATA"
+            reason = f"directory gone but {git_wt.get(rp,{}).get('parent_repo','?')} still registered"
+        elif on_disk and not in_git and not reg:
+            cls = "ORPHAN_DIRECTORY"
+            reason = "unowned disk directory"
+        elif on_disk and reg.get("cleanup_state") == "preserved" and reg.get("status") == "terminal":
+            cls = "PRESERVED_FOR_REVIEW"
+            reason = reg.get("quarantine_reason", "preserved")
+        elif on_disk and reg.get("status") == "active":
+            cls = "ACTIVE"
+            reason = "registered active"
+        elif on_disk and in_git and not reg:
+            cls = "RECLAIMABLE"
+            reason = "git-registered but unowned"
+        elif on_disk and reg.get("cleanup_state") == "cleaned":
+            cls = "CLEANUP_FAILED"
+            reason = "registry says cleaned but directory present"
+        elif on_disk and not in_git:
+            cls = "ORPHAN_DIRECTORY"
+            reason = "orphan"
+        else:
+            cls = "FOREIGN_OR_UNKNOWN"
+            reason = ""
+
+        counts[cls] = counts.get(cls, 0) + 1
+        entries.append({
+            "path": rp, "on_disk": on_disk, "git_registered": in_git,
+            "lifecycle_registered": bool(reg), "classification": cls,
+            "reason": reason, "branch": git_wt.get(rp, {}).get("branch", ""),
+            "lifecycle_state": reg.get("cleanup_state", ""),
+        })
+
+    return {"entries": entries, "counts": counts}
