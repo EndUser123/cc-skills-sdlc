@@ -924,6 +924,20 @@ def create_worktree(
         state_dir / f"worktree-{run_id}.json",
         {"worktree": str(worktree), "target_repo": str(repo)},
     )
+    # Register with shared lifecycle authority for reconciliation/cleanup.
+    try:
+        _scripts_dir = str(Path(__file__).resolve().parent)
+        if _scripts_dir not in sys.path:
+            sys.path.insert(0, _scripts_dir)
+        import worktree_safety as _ws
+        _ws.lifecycle_register(
+            worktree, branch, run_id, repo,
+            f"{dispatch.upper()}_TASK",
+            owner_session=os.environ.get("CLAUDE_SESSION_ID", ""),
+            state_dir=state_dir,
+        )
+    except Exception:
+        pass  # lifecycle registration is best-effort; worktree still functions
     phase_marker(state_dir, "worktree-ready", run_id)
     return worktree
 
@@ -2436,14 +2450,47 @@ def orchestrate(args: argparse.Namespace) -> str:
         pi_info = classify_and_resolve_pi(state_dir, run_id)
         inject_route_decision(state_dir, run_id, "pi", pi_info)
         if pi_info is None or not dispatch_pi(worktree, state_dir, run_id, pi_info):
+            _cleanup_pi_worktree(worktree, state_dir, run_id)
             return finish("blocked")
         _apply_discovery_merge(state_dir, run_id)
 
     if not run_common_tail(worktree, state_dir, run_id):
         if (state_dir / f".completion-verify-pending_{run_id}").is_file():
             return "<promise>SPAWN_COMPLETION_VERIFIER</promise>"
+        if (state_dir / f".falsification-pending_{run_id}").is_file():
+            return "<promise>SPAWN_FALSIFIER</promise>"
+        _cleanup_pi_worktree(worktree, state_dir, run_id)
         return finish("blocked")
+    _cleanup_pi_worktree(worktree, state_dir, run_id)
     return finish("pr_ready")
+
+
+def _cleanup_pi_worktree(worktree: Path, state_dir: Path, run_id: str) -> None:
+    """Clean a PI task worktree via the shared lifecycle authority.
+
+    Called at every terminal exit (pr_ready, blocked) but NOT at SPAWN_*
+    exits (completion-verify, falsifier) where the worktree must survive
+    until the resume path completes.
+    """
+    try:
+        _scripts_dir = str(Path(__file__).resolve().parent)
+        if _scripts_dir not in sys.path:
+            sys.path.insert(0, _scripts_dir)
+        import worktree_safety as _ws
+        wt_meta = state_dir / f"worktree-{run_id}.json"
+        if wt_meta.is_file():
+            meta = json.loads(wt_meta.read_text(encoding="utf-8"))
+            repo_root = Path(meta.get("target_repo", "."))
+            branch_prefix = "pi" if meta.get("target_repo") else "pi"
+            # Derive the branch from the worktree name (pi/pi-task-...)
+            wt_name = worktree.name
+            branch = f"pi/{wt_name}"
+            _ws.lifecycle_clean_worktree(
+                worktree, repo_root, run_id=run_id,
+                state_dir=state_dir, branch_name=branch,
+            )
+    except Exception:
+        pass  # best-effort; worktree metadata may be partially gone
 
 
 _PREFLIGHT_FAIL_RC = 2
