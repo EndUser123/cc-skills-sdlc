@@ -49,12 +49,13 @@ def _fake_request(fg, run_id="run-x", request_digest="digest-x",
 
 def _git_repo(dst: Path) -> Path:
     """Create a throwaway git repo with one committed file."""
-    subprocess.run(["git", "init", "-q"], cwd=dst, check=True)
-    subprocess.run(["git", "config", "user.email", "t@t"], cwd=dst, check=True)
-    subprocess.run(["git", "config", "user.name", "t"], cwd=dst, check=True)
+    dst.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=str(dst), check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=str(dst), check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=str(dst), check=True)
     (dst / "seed.txt").write_text("seed\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=dst, check=True)
-    subprocess.run(["git", "commit", "-qm", "seed"], cwd=dst, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=str(dst), check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=str(dst), check=True)
     return dst
 
 
