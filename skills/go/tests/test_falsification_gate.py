@@ -55,6 +55,12 @@ def _make_repo(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 class TestRouting:
+    # Most routing tests require GO_FALSIFICATION_ENABLE=1. Set it via
+    # autouse fixture so individual tests don't need monkeypatch params.
+    @pytest.fixture(autouse=True)
+    def _enable_falsification(self, monkeypatch):
+        monkeypatch.setenv("GO_FALSIFICATION_ENABLE", "1")
+
     def test_docs_only_skips(self):
         req, reasons = should_falsify({"task": {"title": "Fix README", "objective": "documentation", "task_type": "implementation"}})
         assert req is False

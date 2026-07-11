@@ -85,9 +85,17 @@ def should_falsify(
     """
     reasons: list[str] = []
 
-    # Env opt-out.
+    # Env opt-out (can override the opt-in default below).
     if os.environ.get("GO_FALSIFICATION_SKIP", "").strip() == "1":
         reasons.append("GO_FALSIFICATION_SKIP=1 — opted out")
+        return False, reasons
+
+    # FALSIFICATION IS OFF BY DEFAULT. The runtime consumer (SPAWN_FALSIFIER
+    # token handling in SKILL.md) is not yet complete. Set
+    # GO_FALSIFICATION_ENABLE=1 to activate this gate. Remove this guard once
+    # the full main-loop consumer contract is wired.
+    if os.environ.get("GO_FALSIFICATION_ENABLE", "").strip() != "1":
+        reasons.append("GO_FALSIFICATION_ENABLE not set — falsification disabled by default")
         return False, reasons
 
     inner = task.get("task", task) if isinstance(task, dict) else {}
