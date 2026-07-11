@@ -52,12 +52,6 @@ _DEFAULT_BUDGET = {
     "timeout_seconds": 120,
     "total_elapsed_seconds": 300,
     "max_files_writable": 50,
-    # Hardening budgets (Part 2): command count is enforced inside
-    # run_constrained_command; file-count + aggregate bytes are enforced at
-    # resume time via measure_attack_worktree_writes.
-    "max_commands": 20,
-    "max_aggregate_bytes": 10 * 1024 * 1024,  # 10 MiB across the attack worktree
-    "output_byte_cap": 1 * 1024 * 1024,  # 1 MiB per captured command stream
 }
 
 # High-risk surfaces that trigger falsification (mirrors completion_evidence_review's
@@ -183,7 +177,6 @@ def build_falsification_request(
     changed_files: list[str],
     proposal: dict[str, Any] | None,
     routing_reasons: list[str],
-    session_id: str = "",
 ) -> dict[str, Any]:
     """Build the falsification request payload.
 
@@ -241,7 +234,6 @@ def build_falsification_request(
     payload: dict[str, Any] = {
         "schema": REQUEST_SCHEMA,
         "run_id": run_id,
-        "session_id": session_id or "",
         "task_id": inner.get("id", inner.get("task_id", "")),
         "title": inner.get("title", ""),
         "objective": inner.get("objective", ""),
@@ -268,9 +260,6 @@ def build_falsification_request(
             "output_artifact": f"falsification-result_{run_id}.json",
             "output_schema": RESULT_SCHEMA,
         },
-        # Agent identity (Part 3): requested policy + UNAVAILABLE sentinels.
-        # The main-loop Claude fills actual fields at spawn time.
-        "agent_identity": default_agent_identity("advisory", session_id),
     }
 
     # Compute and store digest for immutability validation.
@@ -516,19 +505,10 @@ def validate_falsification_result(
     result: dict[str, Any],
     request: dict[str, Any],
     expected_run_id: str,
-    *,
-    ledger: list | None = None,
-    attack_worktree: str | None = None,
 ) -> tuple[bool, str]:
     """Validate that a falsification result matches its request binding.
 
     Returns (valid, reason). Invalid results fail closed.
-
-    When ``ledger`` and ``attack_worktree`` are provided (resume path), each
-    FALSIFIED counterexample must additionally pass execution-provenance
-    verification: it must reference a real ledger entry with correct
-    run/request/worktree binding whose recorded command and output match the
-    claim. Without harness evidence, the counterexample is rejected.
     """
     if not isinstance(result, dict):
         return False, "result is not a JSON object"
@@ -580,14 +560,6 @@ def validate_falsification_result(
             claim = ce.get("claim_falsified", "")
             if not claim:
                 return False, f"counterexample {i} missing claim_falsified"
-            # Execution provenance (Part 1): when a ledger is available, the
-            # counterexample must be backed by a real command execution with
-            # correct run/request/worktree binding. No ledger => no trust.
-            if ledger is not None and attack_worktree is not None:
-                pok, preason = verify_counterexample_provenance(
-                    ce, ledger, request, expected_run_id, attack_worktree)
-                if not pok:
-                    return False, f"counterexample {i} provenance rejected: {preason}"
 
     return True, "valid"
 
@@ -627,354 +599,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-# ---------------------------------------------------------------------------
-# Part 1: Constrained command runner + append-only run-scoped command ledger
-# ---------------------------------------------------------------------------
-# Every accepted FALSIFIED counterexample must reference a ledger entry that
-# proves its reproduction command actually executed inside the declared attack
-# worktree. The validator rejects counterexamples whose command/output cannot
-# be matched to a ledger entry with correct run/request/worktree binding.
-
-LEDGER_SCHEMA = "go.falsification-command-ledger.v1"
-
-# Output captured per command is capped (default 1 MiB per stream).
-_OUTPUT_BYTE_CAP_DEFAULT = 1 * 1024 * 1024
-
-
-def ledger_path(state_dir, run_id: str) -> Path:
-    """Path to the append-only command ledger for a run."""
-    return Path(state_dir) / f"falsification-command-ledger_{run_id}.jsonl"
-
-
-def load_ledger(state_dir, run_id: str) -> list:
-    """Load all ledger entries for a run (append-only JSONL)."""
-    p = ledger_path(state_dir, run_id)
-    if not p.is_file():
-        return []
-    out = []
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            out.append(json.loads(line))
-        except ValueError:
-            continue
-    return out
-
-
-def _sha_bytes(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest() if b else hashlib.sha256(b"").hexdigest()
-
-
-def run_constrained_command(
-    state_dir,
-    run_id: str,
-    request: dict,
-    attack_worktree,
-    command: str,
-    *,
-    timeout: float,
-    budget_state: dict,
-    shell: bool = True,
-) -> dict:
-    """Run one reproduction command inside the attack worktree under budget.
-
-    Enforces: cwd == attack_worktree (resolved), per-command timeout,
-    command-count budget. Captures bounded stdout/stderr to artifact files and
-    appends an immutable ledger entry. Mutates budget_state in place
-    (commands_run, bytes_written). Returns the ledger entry dict.
-
-    On command-count exhaustion or a missing attack worktree, returns an entry
-    with rejected set and ran=False (no subprocess spawned).
-    """
-    state_dir = Path(state_dir)
-    aw = Path(attack_worktree).resolve()
-    entry_no = len(load_ledger(state_dir, run_id)) + 1
-    entry_id = f"{run_id}-cmd-{entry_no:04d}"
-    base = {
-        "schema": LEDGER_SCHEMA,
-        "entry_id": entry_id,
-        "run_id": run_id,
-        "request_digest": request.get("request_digest", "") if isinstance(request, dict) else "",
-        "attack_worktree": str(aw),
-        "cwd": str(aw),
-        "command": command,
-        "shell": shell,
-        "ran": False,
-        "completed": False,
-        "timed_out": False,
-        "exit_code": None,
-    }
-
-    # Budget: command count.
-    max_commands = int(budget_state.get("max_commands", 0) or 0)
-    if max_commands and budget_state.get("commands_run", 0) >= max_commands:
-        base["rejected"] = "command_count_exhausted"
-        return base
-
-    if not aw.is_dir():
-        base["rejected"] = "attack_worktree_missing"
-        return base
-
-    budget_state["commands_run"] = budget_state.get("commands_run", 0) + 1
-    cap = int(budget_state.get("output_byte_cap", _OUTPUT_BYTE_CAP_DEFAULT))
-
-    start_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    t0 = time.time()
-    stdout_b = b""
-    stderr_b = b""
-    timed_out = False
-    exit_code = None
-    try:
-        proc = subprocess.run(
-            command if shell else [command],
-            cwd=str(aw),
-            shell=shell,
-            capture_output=True,
-            timeout=timeout,
-        )
-        exit_code = proc.returncode
-        stdout_b = (proc.stdout or b"")
-        stderr_b = (proc.stderr or b"")
-        if isinstance(stdout_b, str):
-            stdout_b = stdout_b.encode("utf-8", "replace")
-        if isinstance(stderr_b, str):
-            stderr_b = stderr_b.encode("utf-8", "replace")
-    except subprocess.TimeoutExpired as e:
-        timed_out = True
-        out = e.stdout or b""
-        err = e.stderr or b""
-        if isinstance(out, str):
-            out = out.encode("utf-8", "replace")
-        if isinstance(err, str):
-            err = err.encode("utf-8", "replace")
-        stdout_b = out
-        stderr_b = err
-        exit_code = None
-    except (OSError, subprocess.SubprocessError) as e:
-        stderr_b = str(e).encode("utf-8", "replace")
-        exit_code = -1
-    duration_ms = int((time.time() - t0) * 1000)
-    end_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-    stdout_b = stdout_b[:cap]
-    stderr_b = stderr_b[:cap]
-
-    stdout_art = state_dir / f"falsification-cmd-stdout_{run_id}_{entry_no:04d}.bin"
-    stderr_art = state_dir / f"falsification-cmd-stderr_{run_id}_{entry_no:04d}.bin"
-    try:
-        stdout_art.write_bytes(stdout_b)
-        stderr_art.write_bytes(stderr_b)
-    except OSError:
-        pass
-
-    entry = dict(base)
-    entry.update({
-        "ran": True,
-        "completed": (not timed_out) and exit_code is not None,
-        "timed_out": timed_out,
-        "exit_code": exit_code,
-        "start_ts": start_iso,
-        "end_ts": end_iso,
-        "duration_ms": duration_ms,
-        "timeout_seconds": timeout,
-        "stdout_digest": _sha_bytes(stdout_b),
-        "stderr_digest": _sha_bytes(stderr_b),
-        "stdout_bytes": len(stdout_b),
-        "stderr_bytes": len(stderr_b),
-        "stdout_artifact": str(stdout_art),
-        "stderr_artifact": str(stderr_art),
-    })
-
-    # Append-only ledger.
-    try:
-        with ledger_path(state_dir, run_id).open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry) + "\n")
-    except OSError:
-        pass
-
-    budget_state["bytes_written"] = budget_state.get("bytes_written", 0) + len(stdout_b) + len(stderr_b)
-    return entry
-
-
-def verify_counterexample_provenance(
-    counterexample: dict,
-    ledger: list,
-    request: dict,
-    run_id: str,
-    attack_worktree,
-) -> tuple:
-    """Verify a FALSIFIED counterexample is backed by a real ledger entry.
-
-    Returns (ok, reason). Rejects when:
-      - no ledger_entry_id referenced;
-      - referenced entry absent;
-      - run_id / request_digest / attack_worktree binding mismatches;
-      - claimed command differs from recorded command;
-      - referenced command never completed (timed out);
-      - claimed output inconsistent with the recorded artifact.
-    """
-    if not isinstance(counterexample, dict):
-        return False, "counterexample is not a dict"
-    eid = counterexample.get("ledger_entry_id", "")
-    if not eid:
-        return False, "counterexample missing ledger_entry_id - no execution evidence"
-    entry = None
-    for e in ledger:
-        if isinstance(e, dict) and e.get("entry_id") == eid:
-            entry = e
-            break
-    if entry is None:
-        return False, f"ledger entry {eid} not found - fabricated command"
-    # Binding: run.
-    if entry.get("run_id") != run_id:
-        return False, f"ledger entry run_id mismatch: {entry.get('run_id')} != {run_id}"
-    # Binding: request.
-    exp_digest = request.get("request_digest", "") if isinstance(request, dict) else ""
-    if exp_digest and entry.get("request_digest") != exp_digest:
-        return False, "ledger entry request_digest mismatch (foreign request)"
-    # Binding: attack worktree (resolved identity).
-    aw_resolved = str(Path(attack_worktree).resolve())
-    if entry.get("attack_worktree") != aw_resolved:
-        return False, "ledger entry attack_worktree mismatch (foreign worktree)"
-    # Command must match.
-    if entry.get("command") != counterexample.get("command"):
-        return False, "claimed command differs from recorded command"
-    # Must have completed.
-    if not entry.get("completed"):
-        return False, "referenced command did not complete (timed out)"
-    # Output consistency.
-    claimed_output = (counterexample.get("output") or "")
-    if claimed_output:
-        recorded = ""
-        try:
-            recorded = Path(entry.get("stdout_artifact", "")).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            recorded = ""
-        try:
-            recorded += "\n" + Path(entry.get("stderr_artifact", "")).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            pass
-        claimed_digest = counterexample.get("output_digest", "")
-        if claimed_digest:
-            if claimed_digest != entry.get("stdout_digest"):
-                return False, "claimed output_digest inconsistent with recorded stdout"
-        else:
-            if claimed_output.strip() not in recorded:
-                return False, "claimed output not present in recorded artifact"
-    return True, "provenance verified"
-
-
-# ---------------------------------------------------------------------------
-# Part 2: Attack-worktree write measurement (file-count + aggregate bytes)
-# ---------------------------------------------------------------------------
-
-def measure_attack_worktree_writes(attack_worktree) -> dict:
-    """Measure files changed and aggregate bytes written in the attack worktree
-    relative to HEAD (modified tracked + untracked).
-
-    Enforced at resume time against max_files_writable and max_aggregate_bytes.
-    """
-    aw = Path(attack_worktree)
-    report = {"files_changed": 0, "bytes_written": 0, "files": [], "ok": True, "errors": []}
-    if not aw.is_dir():
-        report["errors"].append("attack_worktree_missing")
-        return report
-    files = set()
-    for args in (["diff", "--name-only", "HEAD"], ["ls-files", "--others", "--exclude-standard"]):
-        try:
-            pr = subprocess.run(["git", "-C", str(aw)] + args,
-                                capture_output=True, text=True, timeout=15)
-            if pr.returncode == 0:
-                for ln in pr.stdout.splitlines():
-                    ln = ln.strip()
-                    if ln:
-                        files.add(ln)
-        except (OSError, subprocess.SubprocessError) as e:
-            report["errors"].append(str(e))
-    total = 0
-    listed = []
-    for rel in sorted(files):
-        p = aw / rel
-        if p.is_file():
-            try:
-                total += p.stat().st_size
-                listed.append(rel)
-            except OSError:
-                pass
-    report["files_changed"] = len(listed)
-    report["bytes_written"] = total
-    report["files"] = listed
-    return report
-
-
-# ---------------------------------------------------------------------------
-# Part 4: Session-pointer terminalization
-# ---------------------------------------------------------------------------
-# A terminal falsification verdict (FALSIFIED, or fail-closed
-# INCONCLUSIVE/HARNESS_FAILURE/BUDGET_EXHAUSTED) must not leave G4/G5 in a
-# continuation loop. The session pointer written during task selection is
-# removed IFF it points at this exact run_id + go_state_dir. Foreign or newer
-# pointers are never touched. Fail-silent on stale/foreign/missing state.
-
-def _artifacts_root() -> Path:
-    return Path(os.environ.get("GO_ARTIFACTS_ROOT", str(Path.home() / ".claude" / ".artifacts")))
-
-
-def terminalize_session_pointer(session_id: str, run_id: str, go_state_dir) -> dict:
-    """Remove the session pointer for (session_id) iff it binds to this exact
-    run_id + go_state_dir. Never touches foreign or newer pointers.
-
-    Returns a report dict. Fail-silent (no raise) on any error.
-    """
-    report = {"terminalized": False, "reason": "", "path": "",
-              "matched_run_id": False, "matched_state_dir": False}
-    if not session_id or not run_id:
-        report["reason"] = "missing session_id or run_id"
-        return report
-    ptr = _artifacts_root() / "go-sessions" / f"{session_id}.json"
-    report["path"] = str(ptr)
-    if not ptr.is_file():
-        report["reason"] = "pointer absent (already terminalized or never written)"
-        report["terminalized"] = True
-        return report
-    try:
-        data = json.loads(ptr.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        report["reason"] = "pointer unreadable - leaving untouched (foreign state)"
-        return report
-    same_run = data.get("run_id") == run_id
-    same_state = str(data.get("go_state_dir", "")) == str(go_state_dir)
-    report["matched_run_id"] = same_run
-    report["matched_state_dir"] = same_state
-    if not (same_run and same_state):
-        report["reason"] = "pointer is foreign or newer - not touched"
-        return report
-    try:
-        ptr.unlink()
-        report["terminalized"] = True
-        report["reason"] = "terminalized (exact run + state match)"
-    except OSError as e:
-        report["reason"] = f"unlink failed: {e}"
-    return report
-
-
-# ---------------------------------------------------------------------------
-# Agent identity (Part 3): default block recorded when the runtime exposes
-# nothing. The main-loop Claude fills actual fields at spawn time.
-# ---------------------------------------------------------------------------
-
-def default_agent_identity(requested_model_policy: str = "advisory",
-                           parent_session_id: str = "") -> dict:
-    """Return an agent_identity block with UNAVAILABLE_FROM_RUNTIME sentinels
-    for fields the harness cannot introspect from a Bash-invoked orchestrator."""
-    return {
-        "requested_model_policy": requested_model_policy,
-        "actual_model": "UNAVAILABLE_FROM_RUNTIME",
-        "effort": "UNAVAILABLE_FROM_RUNTIME",
-        "agent_type": "UNAVAILABLE_FROM_RUNTIME",
-        "parent_session_id": parent_session_id or "UNAVAILABLE_FROM_RUNTIME",
-        "model_matches_implementing_model": "UNAVAILABLE_FROM_RUNTIME",
-    }
