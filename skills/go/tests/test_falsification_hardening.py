@@ -203,28 +203,39 @@ def test_5_command_count_exhausted(tmp_path):
 # Part 2: file-count + byte budgets (attack-worktree write measurement)
 # ---------------------------------------------------------------------------
 
-def test_6_file_count_budget_enforced(tmp_path):
-    fg = _import_fg()
+def _materialized_attack_repo(tmp_path, repo_maker):
+    """Helper: create a git repo, build a worktree, materialize, return
+    (attack_path, baseline)."""
+    import falsification_gate as fg
     repo = _git_repo(tmp_path / "repo")
-    # Create 3 new files (exceeds a budget of 2).
+    head = subprocess.run(["git","-C",str(repo),"rev-parse","HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+    aw = tmp_path / "attack"
+    subprocess.run(["git","-C",str(repo),"worktree","add","-b","t-test",str(aw),head],
+                   check=True)
+    mat = fg.materialize_authoritative_state(repo, aw, head, [])
+    assert mat["digest_match"]
+    baseline = fg.capture_materialization_baseline(aw)
+    return repo, aw, baseline
+
+
+def test_6_file_count_budget_enforced(tmp_path):
+    import falsification_gate as fg
+    repo, aw, baseline = _materialized_attack_repo(tmp_path, _git_repo)
+    # Create 3 attacker-new files (exceeds a budget of 2).
     for i in range(3):
-        (repo / f"new{i}.txt").write_text("x", encoding="utf-8")
-    writes = fg.measure_attack_worktree_writes(repo)
+        (aw / f"new{i}.txt").write_text("x", encoding="utf-8")
+    writes = fg.measure_attacker_writes(aw, baseline)
     assert writes["files_changed"] >= 3
-    # Resume-time budget check: max_files_writable=2 -> violation.
-    max_files = 2
-    assert writes["files_changed"] > max_files
 
 
 def test_7_byte_budget_enforced(tmp_path):
-    fg = _import_fg()
-    repo = _git_repo(tmp_path / "repo")
+    import falsification_gate as fg
+    repo, aw, baseline = _materialized_attack_repo(tmp_path, _git_repo)
     payload = "A" * 5000
-    (repo / "big.txt").write_text(payload, encoding="utf-8")
-    writes = fg.measure_attack_worktree_writes(repo)
+    (aw / "big.txt").write_text(payload, encoding="utf-8")
+    writes = fg.measure_attacker_writes(aw, baseline)
     assert writes["bytes_written"] >= 5000
-    # max_aggregate_bytes=2048 -> violation.
-    assert writes["bytes_written"] > 2048
 
 
 # ---------------------------------------------------------------------------

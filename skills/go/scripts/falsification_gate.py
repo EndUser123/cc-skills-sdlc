@@ -1053,11 +1053,17 @@ def capture_materialization_baseline(attack_worktree) -> dict[str, Any]:
     aw = Path(attack_worktree)
     changed = _authoritative_changed_files(aw)
     snapshot: dict[str, str] = {}
+    sizes: dict[str, int] = {}
     for rel in changed:
         snapshot[rel] = _file_content_sha(aw / rel)
+        try:
+            sizes[rel] = (aw / rel).stat().st_size
+        except OSError:
+            sizes[rel] = 0
     return {
         "baseline_files": sorted(snapshot.keys()),
         "baseline_digests": snapshot,
+        "baseline_sizes": sizes,
         "baseline_digest": hashlib.sha256(
             "".join(f"{k}\x00{v}\x00" for k, v in sorted(snapshot.items())).encode("utf-8")
         ).hexdigest(),
@@ -1093,15 +1099,26 @@ def measure_attacker_writes(attack_worktree, baseline: dict[str, Any]) -> dict[s
             except OSError:
                 pass
     # Agent-edited materialized files (content differs from baseline).
+    # For modified files, only charge the delta (net new bytes) so the
+    # legitimate materialized content does not consume attacker budget.
     for rel in sorted(baseline_files & set(current_digests)):
         if current_digests[rel] != baseline_digests.get(rel):
             p = aw / rel
             if p.is_file():
                 attacker_files.append(rel)
                 try:
-                    total_bytes += p.stat().st_size
+                    current_size = p.stat().st_size
+                    # Estimate the materialized baseline size from the first
+                    # measurement before agent touches anything.
+                    bl_sha = baseline_digests.get(rel, "")
+                    # We stored the baseline size alongside the digest in
+                    # capture_materialization_baseline.
+                    bl_size = (baseline.get("baseline_sizes", {}).get(rel, 0)
+                               if isinstance(baseline, dict) else 0)
+                    # Charge only the delta relative to materialized baseline.
+                    total_bytes += max(0, current_size - bl_size)
                 except OSError:
-                    pass
+                    total_bytes += 0
     return {
         "files_changed": len(attacker_files),
         "bytes_written": total_bytes,
