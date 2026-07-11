@@ -1952,6 +1952,15 @@ def _falsification_gate(worktree: Path, state_dir: Path, run_id: str) -> str:
         payload["materialization_report"] = mat_report
         # Record attack worktree path in the request for cleanup on resume.
         payload["attack_worktree"] = str(attack_path)
+        # Capture materialization baseline: the hash of every changed file's
+        # content at this exact moment, BEFORE the Agent mutates anything.
+        # The resume path uses this baseline to measure attacker-writes as a
+        # DELTA from materialized state, not from git HEAD.
+        try:
+            mat_baseline = _fg.capture_materialization_baseline(attack_path)
+            payload["materialization_baseline"] = mat_baseline
+        except Exception:
+            payload["materialization_baseline"] = {}
         req_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:
         write_json(state_dir / f"blocked_{run_id}.json",
@@ -2027,11 +2036,14 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
     verdict = result.get("verdict", "")
     policy = _fg.apply_verdict_policy(verdict)
 
-    # Part 2 budget enforcement: measure attack-worktree writes (file count +
-    # aggregate bytes) BEFORE cleanup. Enforced against the request budget.
+    # Part 2 budget enforcement: measure ATTACKER writes as a delta from the
+    # post-materialization baseline (not from git HEAD). The legitimate
+    # implementation diff consumed in materialization uses ZERO attacker budget.
     budget_violation = ""
     if attack_path_str:
-        writes = _fg.measure_attack_worktree_writes(Path(attack_path_str))
+        baseline = (request.get("materialization_baseline", {})
+                    if isinstance(request, dict) else {})
+        writes = _fg.measure_attacker_writes(Path(attack_path_str), baseline)
         budget = request.get("budget", {}) if isinstance(request, dict) else {}
         max_files = int(budget.get("max_files_writable", 50) or 0)
         max_bytes = int(budget.get("max_aggregate_bytes", 10 * 1024 * 1024) or 0)
