@@ -205,6 +205,32 @@ def build_falsification_request(
     except (OSError, subprocess.SubprocessError):
         base_rev = head_rev
 
+    # Capture authoritative state for content-binding (Phases 4-5).
+    # The attacked contents = HEAD + staged diff + unstaged diff.
+    try:
+        staged_proc = subprocess.run(
+            ["git", "-C", str(worktree), "diff", "--cached"],
+            capture_output=True, text=True, timeout=10,
+        )
+        staged_diff = staged_proc.stdout if staged_proc.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        staged_diff = ""
+
+    try:
+        unstaged_proc = subprocess.run(
+            ["git", "-C", str(worktree), "diff"],
+            capture_output=True, text=True, timeout=10,
+        )
+        unstaged_diff = unstaged_proc.stdout if unstaged_proc.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        unstaged_diff = ""
+
+    # Compute a content tree digest covering HEAD + all diffs.
+    content_digest_input = head_rev + base_rev + staged_diff + unstaged_diff
+    for cf in sorted(changed_files):
+        content_digest_input += cf
+    content_digest = hashlib.sha256(content_digest_input.encode("utf-8")).hexdigest()
+
     payload: dict[str, Any] = {
         "schema": REQUEST_SCHEMA,
         "run_id": run_id,
@@ -219,6 +245,10 @@ def build_falsification_request(
         "authoritative_worktree": str(worktree),
         "base_revision": base_rev,
         "head_revision": head_rev,
+        # Content binding (Phase 4): captures the exact state under attack.
+        "staged_diff_digest": hashlib.sha256((staged_diff or "").encode("utf-8")).hexdigest() if staged_diff else "",
+        "unstaged_diff_digest": hashlib.sha256((unstaged_diff or "").encode("utf-8")).hexdigest() if unstaged_diff else "",
+        "content_digest": content_digest,
         "changed_files": changed_files,
         "routing_reasons": routing_reasons,
         "risk_classification": "high" if routing_reasons else "low",
@@ -332,19 +362,58 @@ def cleanup_attack_worktree(attack_path: Path) -> dict[str, Any]:
 def verify_authoritative_unchanged(
     authoritative_worktree: Path,
     head_revision: str,
-) -> bool:
-    """Verify the authoritative worktree was not modified by the attacker.
+    expected_staged_digest: str = "",
+    expected_unstaged_digest: str = "",
+) -> dict[str, Any]:
+    """Verify the authoritative worktree was not modified.
 
-    Compares the current HEAD revision against the expected one.
+    Checks HEAD, staged diff, and unstaged diff. Returns a report dict with
+    per-check results so the caller can surface exactly what changed.
     """
+    report: dict[str, Any] = {"ok": True, "head_match": False, "staged_match": True,
+                               "unstaged_match": True, "digests": {}}
+
+    # HEAD check.
     try:
-        current = subprocess.run(
+        current_head = subprocess.run(
             ["git", "-C", str(authoritative_worktree), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10,
         ).stdout.strip()
     except (OSError, subprocess.SubprocessError):
-        return False
-    return current == head_revision
+        current_head = ""
+    report["head_match"] = bool(current_head and current_head == head_revision)
+    report["digests"]["head"] = current_head[:12] if current_head else ""
+
+    # Staged diff digest.
+    if expected_staged_digest:
+        try:
+            sp = subprocess.run(
+                ["git", "-C", str(authoritative_worktree), "diff", "--cached"],
+                capture_output=True, text=True, timeout=10,
+            )
+            current_staged = sp.stdout if sp.returncode == 0 else ""
+            import hashlib as _hl
+            actual = _hl.sha256(current_staged.encode("utf-8")).hexdigest()
+            report["staged_match"] = actual == expected_staged_digest
+        except (OSError, subprocess.SubprocessError):
+            report["staged_match"] = False
+
+    # Unstaged diff digest.
+    if expected_unstaged_digest:
+        try:
+            up = subprocess.run(
+                ["git", "-C", str(authoritative_worktree), "diff"],
+                capture_output=True, text=True, timeout=10,
+            )
+            current_unstaged = up.stdout if up.returncode == 0 else ""
+            import hashlib as _hl
+            actual = _hl.sha256(current_unstaged.encode("utf-8")).hexdigest()
+            report["unstaged_match"] = actual == expected_unstaged_digest
+        except (OSError, subprocess.SubprocessError):
+            report["unstaged_match"] = False
+
+    report["ok"] = report["head_match"] and report["staged_match"] and report["unstaged_match"]
+    return report
 
 
 # ---------------------------------------------------------------------------

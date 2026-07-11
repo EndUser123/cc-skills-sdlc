@@ -1967,12 +1967,17 @@ def _apply_falsification_result(state_dir: Path, run_id: str) -> str:
     attack_path_str = request.get("attack_worktree", "")
     if attack_path_str:
         cleanup_report = _fg.cleanup_attack_worktree(Path(attack_path_str))
-        # Verify authoritative worktree unchanged.
-        if not _fg.verify_authoritative_unchanged(
-            Path(request["authoritative_worktree"]), request["head_revision"],
-        ):
+        # Verify authoritative worktree unchanged (HEAD + digests).
+        auth_report = _fg.verify_authoritative_unchanged(
+            Path(request["authoritative_worktree"]),
+            request.get("head_revision", ""),
+            request.get("staged_diff_digest", ""),
+            request.get("unstaged_diff_digest", ""),
+        )
+        if not auth_report.get("ok", False):
             write_json(state_dir / f"blocked_{run_id}.json", {
                 "reason_code": "falsification_authoritative_mutated",
+                "authoritative_report": auth_report,
                 "cleanup_report": cleanup_report,
             })
             touch(state_dir / f".blocked_{run_id}")
