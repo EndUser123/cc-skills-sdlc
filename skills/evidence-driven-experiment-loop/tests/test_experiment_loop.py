@@ -47,7 +47,12 @@ def valid(tmp_path):
     state["authority_paths"] = ["."]
     state["lifecycle_state"] = "offline_attribution"
     state["headline_metric"] = "latency_ms"
-    state["claims"] = [{"type": "verified_fact", "text": "x"}]
+    state["claims"] = [{
+        "type": "verified_fact",
+        "text": "x",
+        "action_allowed": "use as offline evidence",
+        "evidence": "artifact.txt",
+    }]
     save(path, state)
     return path
 
@@ -100,7 +105,18 @@ def test_invalid_enums(tmp_path):
 
 @pytest.mark.parametrize(
     "action",
-    ["live benchmark", "run live benchmark", "launch telemetry validation", "production changes"],
+    [
+        "live benchmark",
+        "run live benchmark",
+        "launch telemetry validation",
+        "execute throughput validation",
+        "start production deployment",
+        "perform live comparison",
+        "deploy production change",
+        "modify production config",
+        "change live telemetry",
+        "production changes",
+    ],
 )
 def test_explicit_live_actions_require_authorization(tmp_path, action):
     path = valid(tmp_path)
@@ -134,6 +150,65 @@ def test_premature_ready_rejected(tmp_path):
     assert "verification" in result.stdout
 
 
+def test_ready_status_only_is_rejected(tmp_path):
+    path = valid(tmp_path)
+    state = load(path)
+    state["handoff_status"] = "ready_for_parent_review"
+    state["verification"] = {"status": "complete"}
+    state["adversarial_review"] = {"status": "complete"}
+    save(path, state)
+    result = run("validate", "--state", path)
+    assert result.returncode != 0
+    assert "evidence" in result.stdout
+
+
+def test_fully_evidenced_review_is_accepted(tmp_path):
+    path = valid(tmp_path)
+    state = load(path)
+    state["handoff_status"] = "ready_for_parent_review"
+    state["verification"] = {"status": "completed", "evidence": ["run.json"]}
+    state["adversarial_review"] = {
+        "status": "complete",
+        "load_bearing_claims": ["claim-1"],
+        "falsification_attempts": ["attempt-1"],
+        "result": "No blocking contradiction found",
+    }
+    save(path, state)
+    assert run("validate", "--state", path).returncode == 0
+
+
+@pytest.mark.parametrize("authority_path", [3, None, "", "   "])
+def test_invalid_authority_path_entries_are_actionable(tmp_path, authority_path):
+    path = valid(tmp_path)
+    state = load(path)
+    state["authority_paths"] = [authority_path]
+    save(path, state)
+    result = run("validate", "--state", path)
+    assert result.returncode == 1
+    assert "Traceback" not in result.stdout + result.stderr
+    assert "authority_paths[0]" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("claim", "message"),
+    [
+        ({"type": "verified_fact", "text": "x", "action_allowed": "use"}, "evidence"),
+        ({"type": "inference", "text": "x", "action_allowed": "use"}, "falsifier"),
+        ({"type": "unsupported", "text": "x", "action_allowed": "use"}, "not eligible"),
+        ({"type": "verified_fact", "action_allowed": "use", "evidence": "x"}, "text"),
+        ({"type": "verified_fact", "text": "x", "evidence": "x"}, "action_allowed"),
+    ],
+)
+def test_claim_requirements_are_rejected(tmp_path, claim, message):
+    path = valid(tmp_path)
+    state = load(path)
+    state["claims"] = [claim]
+    save(path, state)
+    result = run("validate", "--state", path)
+    assert result.returncode == 1
+    assert message in result.stdout
+
+
 def test_unsupported_claim_type(tmp_path):
     path = valid(tmp_path)
     state = load(path)
@@ -159,6 +234,17 @@ def test_malformed_types_report_errors(tmp_path):
     assert result.returncode != 0
     assert "schema_version" in result.stdout
     assert "authority_paths" in result.stdout
+
+
+@pytest.mark.parametrize("schema_version", [True, 1.0, "1", None])
+def test_schema_version_requires_exact_integer_one(tmp_path, schema_version):
+    path = valid(tmp_path)
+    state = load(path)
+    state["schema_version"] = schema_version
+    save(path, state)
+    result = run("validate", "--state", path)
+    assert result.returncode == 1
+    assert "schema_version must be integer 1" in result.stdout
 
 
 def test_init_does_not_overwrite(tmp_path):

@@ -54,8 +54,12 @@ REQUIRED = [
     "next_action",
     "handoff_status",
 ]
-LIVE_ACTION_PATTERN = re.compile(
-    r"\b(?:live benchmark|run live benchmark|launch telemetry validation|production changes)\b",
+EXECUTION_VERB_PATTERN = re.compile(
+    r"\b(?:run|launch|execute|start|perform|deploy|modify|change)\b",
+    re.IGNORECASE,
+)
+LIVE_SUBJECT_PATTERN = re.compile(
+    r"\b(?:live|benchmark|telemetry validation|throughput validation|production)\b",
     re.IGNORECASE,
 )
 
@@ -71,7 +75,15 @@ def read(path):
 def requests_live_action(actions):
     """Return true only for explicit live-execution action language."""
     return any(
-        isinstance(action, str) and LIVE_ACTION_PATTERN.search(action)
+        isinstance(action, str)
+        and (
+            re.search(r"\blive benchmark\b", action, re.IGNORECASE)
+            or re.search(r"\bproduction changes\b", action, re.IGNORECASE)
+            or (
+                EXECUTION_VERB_PATTERN.search(action)
+                and LIVE_SUBJECT_PATTERN.search(action)
+            )
+        )
         for action in actions
     )
 
@@ -88,7 +100,7 @@ def validate(state):
     if errors:
         return errors
 
-    if state["schema_version"] != 1 or isinstance(state["schema_version"], bool):
+    if type(state["schema_version"]) is not int or state["schema_version"] != 1:
         errors.append("schema_version must be integer 1")
     for field in ("objective", "workspace", "next_action", "headline_metric"):
         if not isinstance(state[field], str) or not state[field].strip():
@@ -116,18 +128,17 @@ def validate(state):
                 "authority_paths is empty; establish authority before relying on evidence"
             )
         elif workspace_path:
-            missing = [
-                path
-                for path in paths
-                if not isinstance(path, str)
-                or not os.path.exists(os.path.join(workspace_path, path))
-                if not os.path.isabs(path)
-            ]
-            missing.extend(
-                path
-                for path in paths
-                if isinstance(path, str) and os.path.isabs(path) and not os.path.exists(path)
-            )
+            missing = []
+            for index, path in enumerate(paths):
+                if not isinstance(path, str):
+                    errors.append(f"authority_paths[{index}] must be a string")
+                    continue
+                if not path.strip():
+                    errors.append(f"authority_paths[{index}] must not be empty or whitespace")
+                    continue
+                resolved = path if os.path.isabs(path) else os.path.join(workspace_path, path)
+                if not os.path.exists(resolved):
+                    missing.append(path)
             if missing:
                 errors.append(
                     "authority path missing or invalid: "
@@ -139,6 +150,24 @@ def validate(state):
         for index, claim in enumerate(claims):
             if not isinstance(claim, dict) or claim.get("type") not in CLAIM_TYPES:
                 errors.append(f"claim {index} has unsupported type")
+                continue
+            if not isinstance(claim.get("text"), str) or not claim["text"].strip():
+                errors.append(f"claim {index} requires non-empty text")
+            if not isinstance(claim.get("action_allowed"), str) or not claim["action_allowed"].strip():
+                errors.append(f"claim {index} requires non-empty action_allowed")
+            claim_type = claim["type"]
+            if claim_type in ("verified_fact", "measured_metric") and (
+                not isinstance(claim.get("evidence"), str) or not claim["evidence"].strip()
+            ):
+                errors.append(f"claim {index} requires non-empty evidence")
+            if claim_type in ("inference", "hypothesis") and (
+                not isinstance(claim.get("falsifier"), str) or not claim["falsifier"].strip()
+            ):
+                errors.append(f"claim {index} requires non-empty falsifier")
+            if claim_type == "unsupported" and claim["action_allowed"] not in (
+                "none", "no_action", "not_action_eligible"
+            ):
+                errors.append(f"claim {index} unsupported action_allowed is not eligible")
 
     gates = state["gates"] if isinstance(state["gates"], dict) else {}
     actions = state["allowed_actions"]
@@ -150,10 +179,19 @@ def validate(state):
             if not gates.get(field):
                 errors.append(f"live authorization requires gates.{field}")
     if state["handoff_status"] == "ready_for_parent_review":
-        for field in ("verification", "adversarial_review"):
-            review = state[field] if isinstance(state[field], dict) else {}
-            if review.get("status") not in ("complete", "completed"):
-                errors.append(f"ready_for_parent_review requires {field} completion")
+        verification = state["verification"]
+        if verification.get("status") not in ("complete", "completed"):
+            errors.append("ready_for_parent_review requires verification completion")
+        if not isinstance(verification.get("evidence"), list) or not verification["evidence"]:
+            errors.append("ready_for_parent_review requires verification evidence")
+        adversarial = state["adversarial_review"]
+        if adversarial.get("status") not in ("complete", "completed"):
+            errors.append("ready_for_parent_review requires adversarial_review completion")
+        for field in ("load_bearing_claims", "falsification_attempts"):
+            if not isinstance(adversarial.get(field), list) or not adversarial[field]:
+                errors.append(f"ready_for_parent_review requires adversarial_review {field}")
+        if not isinstance(adversarial.get("result"), str) or not adversarial["result"].strip():
+            errors.append("ready_for_parent_review requires adversarial_review result")
     return errors
 
 

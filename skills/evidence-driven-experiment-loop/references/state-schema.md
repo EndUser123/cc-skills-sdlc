@@ -18,6 +18,17 @@ Handoff enum: `in_progress`, `needs_fix`, `partial`, `blocked`,
 Claim types: `verified_fact`, `measured_metric`, `inference`, `hypothesis`,
 `historical_context`, `unsupported`.
 
+Every claim requires non-empty `text` and `action_allowed`. Verified facts and
+measured metrics additionally require non-empty `evidence`; inferences and
+hypotheses require non-empty `falsifier`. Unsupported claims must set
+`action_allowed` to `none`, `no_action`, or `not_action_eligible`.
+
+To mark a state `ready_for_parent_review`, set verification status to
+`complete` or `completed` with a non-empty `evidence` array. Set adversarial
+review status to `complete` or `completed` with non-empty
+`load_bearing_claims` and `falsification_attempts` arrays and a non-empty
+`result` string.
+
 Live authorization requires `gates.live_authorization: true`, a non-empty
 `gates.falsifier`, `gates.abort_gate`, and `gates.promotion_rule`. Validation
 also checks every authority path that is supplied.
