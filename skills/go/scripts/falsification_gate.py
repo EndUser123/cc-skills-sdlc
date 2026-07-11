@@ -281,76 +281,10 @@ def build_falsification_request(
 
 # ---------------------------------------------------------------------------
 
-def materialize_authoritative_state(
-    authoritative_worktree: Path,
-    attack_path: Path,
-    head_revision: str,
-    scope_in: list[str] | None = None,
-) -> dict[str, Any]:
-    """Materialize the full authoritative task state into the attack worktree.
-
-    Applies staged diff, unstaged diff, and copies task-scoped untracked files
-    so the attacker sees exactly the code under review -- including uncommitted
-    changes. Without this, a HEAD-only worktree would miss the uncommitted work.
-    """
-    report: dict[str, Any] = {
-        "staged_applied": False, "unstaged_applied": False,
-        "untracked_copied": 0, "errors": [],
-    }
-
-    # 1. Staged diff (git diff --cached --binary)
-    try:
-        sp = subprocess.run(
-            ["git", "-C", str(authoritative_worktree), "diff", "--cached", "--binary"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if sp.returncode == 0 and sp.stdout.strip():
-            subprocess.run(
-                ["git", "-C", str(attack_path), "apply", "--binary"],
-                input=sp.stdout, capture_output=True, text=True, timeout=10, check=True,
-            )
-            report["staged_applied"] = True
-    except (OSError, subprocess.SubprocessError, subprocess.CalledProcessError) as e:
-        report["errors"].append(f"staged: {e}")
-
-    # 2. Unstaged diff (git diff --binary)
-    try:
-        up = subprocess.run(
-            ["git", "-C", str(authoritative_worktree), "diff", "--binary"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if up.returncode == 0 and up.stdout.strip():
-            subprocess.run(
-                ["git", "-C", str(attack_path), "apply", "--binary"],
-                input=up.stdout, capture_output=True, text=True, timeout=10, check=True,
-            )
-            report["unstaged_applied"] = True
-    except (OSError, subprocess.SubprocessError, subprocess.CalledProcessError) as e:
-        report["errors"].append(f"unstaged: {e}")
-
-    # 3. Task-scoped untracked files
-    try:
-        ut = subprocess.run(
-            ["git", "-C", str(authoritative_worktree), "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if ut.returncode == 0:
-            import shutil
-            for rel in ut.stdout.splitlines():
-                rel = rel.strip()
-                if not rel:
-                    continue
-                src = authoritative_worktree / rel
-                dst = attack_path / rel
-                if src.is_file():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(str(src), str(dst))
-                    report["untracked_copied"] += 1
-    except (OSError, subprocess.SubprocessError) as e:
-        report["errors"].append(f"untracked: {e}")
-
-    return report
-
+# (Old git-apply-based materialize_authoritative_state removed: it was broken
+# on Windows because the diff round-tripped through Python text mode, which
+# converts LF->CRLF and corrupts the patch -> "patch does not apply". The
+# active implementation below is copy-based and digest-proven.)
 
 # Disposable attack worktree
 # ---------------------------------------------------------------------------
@@ -871,43 +805,6 @@ def verify_counterexample_provenance(
 # Part 2: Attack-worktree write measurement (file-count + aggregate bytes)
 # ---------------------------------------------------------------------------
 
-def measure_attack_worktree_writes(attack_worktree) -> dict:
-    """Measure files changed and aggregate bytes written in the attack worktree
-    relative to HEAD (modified tracked + untracked).
-
-    Enforced at resume time against max_files_writable and max_aggregate_bytes.
-    """
-    aw = Path(attack_worktree)
-    report = {"files_changed": 0, "bytes_written": 0, "files": [], "ok": True, "errors": []}
-    if not aw.is_dir():
-        report["errors"].append("attack_worktree_missing")
-        return report
-    files = set()
-    for args in (["diff", "--name-only", "HEAD"], ["ls-files", "--others", "--exclude-standard"]):
-        try:
-            pr = subprocess.run(["git", "-C", str(aw)] + args,
-                                capture_output=True, text=True, timeout=15)
-            if pr.returncode == 0:
-                for ln in pr.stdout.splitlines():
-                    ln = ln.strip()
-                    if ln:
-                        files.add(ln)
-        except (OSError, subprocess.SubprocessError) as e:
-            report["errors"].append(str(e))
-    total = 0
-    listed = []
-    for rel in sorted(files):
-        p = aw / rel
-        if p.is_file():
-            try:
-                total += p.stat().st_size
-                listed.append(rel)
-            except OSError:
-                pass
-    report["files_changed"] = len(listed)
-    report["bytes_written"] = total
-    report["files"] = listed
-    return report
 
 
 # ---------------------------------------------------------------------------
@@ -977,4 +874,237 @@ def default_agent_identity(requested_model_policy: str = "advisory",
         "agent_type": "UNAVAILABLE_FROM_RUNTIME",
         "parent_session_id": parent_session_id or "UNAVAILABLE_FROM_RUNTIME",
         "model_matches_implementing_model": "UNAVAILABLE_FROM_RUNTIME",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Transactional, digest-proven materialization (Windows-safe, copy-based)
+# ---------------------------------------------------------------------------
+# git apply is unreliable on Windows when the diff is round-tripped through
+# Python text mode (LF->CRLF corruption -> "patch does not apply"). Instead of
+# trusting git apply, we copy the exact authoritative working-tree bytes for
+# every changed file into the attack worktree, then PROVE equality by content
+# digest. A failed transfer never permits attacker execution: the orchestrator
+# fails closed before SPAWN_FALSIFIER when digest_match is False.
+
+
+def _safe_join(base: Path, rel: str) -> Path | None:
+    """Resolve rel under base, rejecting path traversal and symlink escape."""
+    rel = rel.replace("\\", "/").lstrip("/")
+    if not rel or rel == ".":
+        return None
+    target = (base / rel).resolve()
+    try:
+        base_r = base.resolve()
+    except OSError:
+        return None
+    try:
+        target.relative_to(base_r)
+    except ValueError:
+        return None
+    return target
+
+
+def _authoritative_changed_files(authoritative_worktree: Path) -> list[str]:
+    """Enumerate every changed path (staged + unstaged + untracked) relative to
+    HEAD. Returns sorted unique list."""
+    aw = Path(authoritative_worktree)
+    files: set[str] = set()
+    for args in (["diff", "--name-only", "HEAD"],
+                 ["ls-files", "--others", "--exclude-standard"]):
+        try:
+            pr = subprocess.run(["git", "-C", str(aw)] + args,
+                                capture_output=True, text=True, timeout=15)
+            if pr.returncode == 0:
+                for ln in pr.stdout.splitlines():
+                    ln = ln.strip()
+                    if ln:
+                        files.add(ln)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return sorted(files)
+
+
+def _file_content_sha(path: Path) -> str:
+    """SHA-256 of a file's raw bytes, or '<absent>' if missing."""
+    try:
+        if not path.is_file() or path.is_symlink():
+            # Symlinks are not transferred (escape risk); treat as absent.
+            return "<absent>"
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "<absent>"
+
+
+def compute_authoritative_tree_digest(authoritative_worktree) -> str:
+    """Digest over (path + content-sha) of every changed file in the
+    authoritative worktree. This is the exact content the attacker must see."""
+    aw = Path(authoritative_worktree)
+    files = _authoritative_changed_files(aw)
+    h = hashlib.sha256()
+    for rel in files:
+        csha = _file_content_sha(aw / rel)
+        h.update(rel.encode("utf-8"))
+        h.update(b"\x00")
+        h.update(csha.encode("ascii"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def materialize_authoritative_state(
+    authoritative_worktree: Path,
+    attack_path: Path,
+    head_revision: str,
+    scope_in: list[str] | None = None,
+) -> dict[str, Any]:
+    """Transactionally copy authoritative working-tree state into the attack
+    worktree and PROVE it by content digest.
+
+    Copy-based (no git apply): for every changed file, copy the authoritative
+    bytes (or delete if absent). Untracked files copied the same way. Symlinks
+    and path-traversal targets are rejected. The final attack-tree digest of
+    the changed set MUST equal the authoritative digest, otherwise the report
+    records digest_match=False and the orchestrator must fail closed.
+    """
+    auth = Path(authoritative_worktree)
+    attack = Path(attack_path)
+    report: dict[str, Any] = {
+        "method": "copy",
+        "staged_applied": False,
+        "unstaged_applied": False,
+        "untracked_copied": 0,
+        "copied": [],
+        "deleted": [],
+        "rejected": [],
+        "errors": [],
+        "files_in_scope": 0,
+        "expected_digest": "",
+        "actual_digest": "",
+        "digest_match": False,
+    }
+    files = _authoritative_changed_files(auth)
+    report["files_in_scope"] = len(files)
+
+    for rel in files:
+        src = _safe_join(auth, rel)
+        dst = _safe_join(attack, rel)
+        if src is None or dst is None:
+            report["rejected"].append(rel)
+            continue
+        src_exists = src.is_file() and not src.is_symlink()
+        if src_exists:
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(src), str(dst))
+                report["copied"].append(rel)
+            except OSError as e:
+                report["errors"].append(f"copy {rel}: {e}")
+        else:
+            # Authoritative file was deleted (or is a symlink we refuse).
+            try:
+                if dst.exists():
+                    dst.unlink()
+                report["deleted"].append(rel)
+            except OSError as e:
+                report["errors"].append(f"delete {rel}: {e}")
+
+    report["staged_applied"] = True
+    report["unstaged_applied"] = True
+    report["untracked_copied"] = len([r for r in report["copied"]
+                                      if r not in _head_tracked_set(auth)])
+
+    expected = compute_authoritative_tree_digest(auth)
+    actual = _attack_changed_digest(attack, files)
+    report["expected_digest"] = expected
+    report["actual_digest"] = actual
+    report["digest_match"] = (expected == actual) and not report["errors"]
+    return report
+
+
+def _head_tracked_set(repo: Path) -> set[str]:
+    try:
+        pr = subprocess.run(["git", "-C", str(repo), "ls-tree", "-r", "--name-only", "HEAD"],
+                            capture_output=True, text=True, timeout=15)
+        if pr.returncode == 0:
+            return set(pr.stdout.splitlines())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return set()
+
+
+def _attack_changed_digest(attack: Path, files: list[str]) -> str:
+    """Digest over (path + content-sha) of the same file set in the attack
+    worktree, for equality comparison with the authoritative digest."""
+    h = hashlib.sha256()
+    for rel in files:
+        csha = _file_content_sha(attack / rel)
+        h.update(rel.encode("utf-8"))
+        h.update(b"\x00")
+        h.update(csha.encode("ascii"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def capture_materialization_baseline(attack_worktree) -> dict[str, Any]:
+    """Snapshot the attack worktree state immediately after materialization,
+    BEFORE the Agent runs. The resume path measures attacker writes as the
+    delta from this baseline so the legitimate materialized diff does NOT
+    consume the attacker mutation budget."""
+    aw = Path(attack_worktree)
+    changed = _authoritative_changed_files(aw)
+    snapshot: dict[str, str] = {}
+    for rel in changed:
+        snapshot[rel] = _file_content_sha(aw / rel)
+    return {
+        "baseline_files": sorted(snapshot.keys()),
+        "baseline_digests": snapshot,
+        "baseline_digest": hashlib.sha256(
+            "".join(f"{k}\x00{v}\x00" for k, v in sorted(snapshot.items())).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
+def measure_attacker_writes(attack_worktree, baseline: dict[str, Any]) -> dict[str, Any]:
+    """Measure attacker-induced writes as the DELTA from the post-materialization
+    baseline. Files present in the materialized diff (legitimate implementation
+    under review) consume ZERO attacker budget. Only Agent-created files and
+    Agent edits to materialized files (content changed vs baseline) count.
+
+    Returns {files_changed, bytes_written, files[], method}.
+    """
+    aw = Path(attack_worktree)
+    baseline_digests = (baseline or {}).get("baseline_digests", {}) if isinstance(baseline, dict) else {}
+    baseline_files = set(baseline_digests.keys())
+
+    current = _authoritative_changed_files(aw)
+    current_digests: dict[str, str] = {}
+    for rel in current:
+        current_digests[rel] = _file_content_sha(aw / rel)
+
+    attacker_files: list[str] = []
+    total_bytes = 0
+    # New files the Agent created (not in baseline).
+    for rel in sorted(set(current_digests) - baseline_files):
+        p = aw / rel
+        if p.is_file():
+            attacker_files.append(rel)
+            try:
+                total_bytes += p.stat().st_size
+            except OSError:
+                pass
+    # Agent-edited materialized files (content differs from baseline).
+    for rel in sorted(baseline_files & set(current_digests)):
+        if current_digests[rel] != baseline_digests.get(rel):
+            p = aw / rel
+            if p.is_file():
+                attacker_files.append(rel)
+                try:
+                    total_bytes += p.stat().st_size
+                except OSError:
+                    pass
+    return {
+        "files_changed": len(attacker_files),
+        "bytes_written": total_bytes,
+        "files": attacker_files,
+        "method": "delta-from-materialization-baseline",
     }
