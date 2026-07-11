@@ -269,6 +269,78 @@ def build_falsification_request(
 
 
 # ---------------------------------------------------------------------------
+
+def materialize_authoritative_state(
+    authoritative_worktree: Path,
+    attack_path: Path,
+    head_revision: str,
+    scope_in: list[str] | None = None,
+) -> dict[str, Any]:
+    """Materialize the full authoritative task state into the attack worktree.
+
+    Applies staged diff, unstaged diff, and copies task-scoped untracked files
+    so the attacker sees exactly the code under review -- including uncommitted
+    changes. Without this, a HEAD-only worktree would miss the uncommitted work.
+    """
+    report: dict[str, Any] = {
+        "staged_applied": False, "unstaged_applied": False,
+        "untracked_copied": 0, "errors": [],
+    }
+
+    # 1. Staged diff (git diff --cached --binary)
+    try:
+        sp = subprocess.run(
+            ["git", "-C", str(authoritative_worktree), "diff", "--cached", "--binary"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if sp.returncode == 0 and sp.stdout.strip():
+            subprocess.run(
+                ["git", "-C", str(attack_path), "apply", "--binary"],
+                input=sp.stdout, capture_output=True, text=True, timeout=10, check=True,
+            )
+            report["staged_applied"] = True
+    except (OSError, subprocess.SubprocessError, subprocess.CalledProcessError) as e:
+        report["errors"].append(f"staged: {e}")
+
+    # 2. Unstaged diff (git diff --binary)
+    try:
+        up = subprocess.run(
+            ["git", "-C", str(authoritative_worktree), "diff", "--binary"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if up.returncode == 0 and up.stdout.strip():
+            subprocess.run(
+                ["git", "-C", str(attack_path), "apply", "--binary"],
+                input=up.stdout, capture_output=True, text=True, timeout=10, check=True,
+            )
+            report["unstaged_applied"] = True
+    except (OSError, subprocess.SubprocessError, subprocess.CalledProcessError) as e:
+        report["errors"].append(f"unstaged: {e}")
+
+    # 3. Task-scoped untracked files
+    try:
+        ut = subprocess.run(
+            ["git", "-C", str(authoritative_worktree), "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if ut.returncode == 0:
+            import shutil
+            for rel in ut.stdout.splitlines():
+                rel = rel.strip()
+                if not rel:
+                    continue
+                src = authoritative_worktree / rel
+                dst = attack_path / rel
+                if src.is_file():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(str(src), str(dst))
+                    report["untracked_copied"] += 1
+    except (OSError, subprocess.SubprocessError) as e:
+        report["errors"].append(f"untracked: {e}")
+
+    return report
+
+
 # Disposable attack worktree
 # ---------------------------------------------------------------------------
 
