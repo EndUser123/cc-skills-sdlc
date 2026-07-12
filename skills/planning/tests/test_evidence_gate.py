@@ -91,6 +91,24 @@ def test_evidence_gate_blocks_missing_ledger(tmp_path: Path) -> None:
     assert '"verdict": "BLOCKED"' in result.stdout
 
 
+def test_evidence_gate_accepts_compact_knowledge_section(tmp_path: Path) -> None:
+    compact = PLAN.replace(
+        "## Knowledge / Validation Ledger\n"
+        "| Source or check | Used? | Evidence | Claims supported | Status |\n"
+        "|---|---|---|---|---|\n"
+        "| /wiki | no | none | none | not applicable |",
+        "## Knowledge / Validation\n"
+        "- Sources/checks used: none\n"
+        "- Sources/checks not used: /wiki\n"
+        "- Evidence: none\n"
+        "- Claims affected: none\n"
+        "- Unverified claims: none",
+    )
+    path = _write_plan(tmp_path, compact)
+    result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True)
+    assert result.returncode == 0
+
+
 def test_read_verified_plan_rejects_forged_minimal_sidecar(tmp_path: Path) -> None:
     import importlib.util
 

@@ -61,8 +61,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--claims", required=True)
     parser.add_argument("--evidence", required=True)
     parser.add_argument("--entry-id")
+    parser.add_argument("--create-if-missing", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if args.create_if_missing and not args.changelog.exists():
+            args.changelog.parent.mkdir(parents=True, exist_ok=True)
+            args.changelog.write_text(
+                "# Changelog\n\n## [Unreleased]\n",
+                encoding="utf-8",
+            )
         entry_id = append_entry(
             args.changelog,
             summary=args.summary,

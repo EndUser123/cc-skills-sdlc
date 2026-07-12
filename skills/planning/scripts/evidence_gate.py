@@ -27,7 +27,6 @@ REQUIRED_HEADINGS = (
     "Test Matrix",
     "Assumptions / Defaults",
     "Open Questions",
-    "Knowledge / Validation Ledger",
     "Change Record",
 )
 
@@ -142,9 +141,14 @@ def validate_plan(path: Path) -> dict:
     if not ledger_content or ledger_content.count("|") < 4:
         findings.append({"code": "LEDGER", "detail": "implementation-ready plans require an Evidence Ledger"})
 
-    knowledge_content = _section_content(text, r"Knowledge / Validation Ledger")
-    if not knowledge_content or knowledge_content.count("|") < 4:
-        findings.append({"code": "KNOWLEDGE_LEDGER", "detail": "implementation-ready plans require a Knowledge / Validation Ledger"})
+    knowledge_content = _section_content(text, r"Knowledge / Validation(?: Ledger)?")
+    compact_knowledge = all(
+        marker in knowledge_content
+        for marker in ("Sources/checks used:", "Sources/checks not used:", "Evidence:", "Claims affected:", "Unverified claims:")
+    )
+    legacy_knowledge = knowledge_content.count("|") >= 4
+    if not knowledge_content or not (compact_knowledge or legacy_knowledge):
+        findings.append({"code": "KNOWLEDGE_LEDGER", "detail": "implementation-ready plans require a Knowledge / Validation section"})
 
     findings.extend(_validate_change_record(path, text))
 

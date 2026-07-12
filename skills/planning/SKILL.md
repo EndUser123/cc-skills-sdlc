@@ -495,8 +495,8 @@ The gate requires the current plan to have:
 - `status: implementation-ready` and `unresolved_blockers: 0`;
 - all canonical plan sections;
 - an Evidence Ledger or Claim Ledger;
-- a Knowledge / Validation Ledger that records used and unused named sources
-  and checks, with explicit evidence and status;
+- a compact `Knowledge / Validation` section that records used and unused named
+  sources/checks, evidence, affected claims, and unverified claims;
 - a Change Record pointing to an existing project `CHANGELOG.md` entry under
   `## [Unreleased]`, with an ISO-8601 UTC timestamp and entry ID;
 - at least one explicit falsifier;
@@ -512,11 +512,10 @@ or a plan rewrite as appropriate.
 The gate deliberately does not infer semantic value from grep results. Runtime
 probes and behavioral evidence remain plan-specific acceptance work.
 
-See `references/knowledge-validation-ledger.md` for the ledger and Change
-Record contract. The changelog is a dated, human-facing summary; do not use it
-as a substitute for detailed provenance. Record a changelog entry when a
-knowledge source or validation result materially changes the design or
-implementation decision, not for every skill invocation.
+See `references/knowledge-validation-ledger.md` for the compact section and
+Change Record contract. The changelog is a dated, human-facing summary; do not
+use it as an audit log. Create an entry only when the design or implementation
+decision is material, not for every skill invocation.
 
 ## Step 5: Present Results
 

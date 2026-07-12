@@ -45,3 +45,20 @@ def test_append_entry_is_dated_and_idempotence_guarded(tmp_path: Path) -> None:
         assert "already exists" in str(exc)
     else:
         raise AssertionError("duplicate entry must be rejected")
+
+
+def test_cli_can_lazily_create_changelog(tmp_path: Path) -> None:
+    changelog = tmp_path / "nested" / "CHANGELOG.md"
+    rc = module.main([
+        str(changelog),
+        "--summary", "Bootstrap material decision",
+        "--sources", "none",
+        "--claims", "none",
+        "--evidence", "none",
+        "--entry-id", "PROV-20260711T000000Z-bootstrap",
+        "--create-if-missing",
+    ])
+    assert rc == 0
+    text = changelog.read_text(encoding="utf-8")
+    assert "## [Unreleased]" in text
+    assert "PROV-20260711T000000Z-bootstrap" in text
