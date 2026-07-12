@@ -10,7 +10,7 @@ TaskUpdate / TaskList / TaskGet) remains the only task store. A receipt is
 evidence metadata about how a task was completed.
 
 Storage location (approved runtime state, NOT the skill/package dir):
-    P:/.claude/state/task_receipts/{task_id}.json
+    {CSF_STATE_DIR or P:/.claude/state}/task_receipts/{task_id}.json
 overridable via TASK_RECEIPT_DIR (kept in sync with the done-evidence gate).
 
 Receipt schema (receipt_version 1):
@@ -37,7 +37,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 RECEIPT_VERSION = 1
-DEFAULT_RECEIPT_DIR = Path(os.path.expanduser("~/.claude/state/task_receipts"))
+# Shared state root, matching the tracker hook's _bootstrap.state_root().
+# Cf. P:/packages/.claude-marketplace/plugins/cc-aca-observability/__lib/_bootstrap.py
+_STATE_ROOT = Path(os.environ.get("CSF_STATE_DIR", "P:/.claude/state"))
+DEFAULT_RECEIPT_DIR = _STATE_ROOT / "task_receipts"
 
 
 def receipt_dir() -> Path:

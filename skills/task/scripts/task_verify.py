@@ -43,7 +43,10 @@ BUCKETS = ("VERIFIED", "REVIEW", "NO_EVIDENCE", "STALE", "BLOCKED")
 
 # Existing tracker persistence (the only task "database" is the native task list;
 # this mirror is what /task reads for cross-terminal continuity).
-TRACKER_DIR = Path(os.environ.get("TASK_STATE_DIR", os.path.expanduser("~/.claude/state/task_tracker")))
+# Shared state root, matching the tracker hook's _bootstrap.state_root().
+# Cf. P:/packages/.claude-marketplace/plugins/cc-aca-observability/__lib/_bootstrap.py
+_STATE_ROOT = Path(os.environ.get("CSF_STATE_DIR", "P:/.claude/state"))
+TRACKER_DIR = Path(os.environ.get("TASK_STATE_DIR", str(_STATE_ROOT / "task_tracker")))
 
 
 def _norm_repo(p) -> str:
