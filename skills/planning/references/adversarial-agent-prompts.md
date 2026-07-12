@@ -8,6 +8,19 @@ contract: response text must contain ONLY the file path
 
 Reference for Step 4b: Dispatch the 5 phase-1 agents in one parallel batch, then dispatch the critic in a second phase.
 
+## Mandatory Fact-Checking Rule (All Agents)
+
+Before claiming any file, page, symbol, function, or class **does not exist**,
+you MUST run a glob or grep to verify the claim. If the glob or grep succeeds
+(returning results), the claim of absence is false — retract it.
+
+After making a positive claim (a citation exists, a page exists, a function is
+defined), you MUST include the absolute path or line number as evidence. If you
+cannot cite evidence, the claim is not ready to state.
+
+Rationale: Wrong claims of absence waste downstream turns on re-verification.
+A single glob resolves them in <1s.
+
 ## Compaction Resilience -- Idempotent Agents
 
 Each agent prompt prepends a pre-flight check: if its output file already exists and is non-empty, skip execution and return the path immediately. This means:
