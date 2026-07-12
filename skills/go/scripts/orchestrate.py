@@ -26,6 +26,20 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 PLUGIN_ROOT = SKILL_DIR.parent.parent
 ARTIFACTS_ROOT = Path(os.environ.get("GO_ARTIFACTS_ROOT", "P:/.claude/.artifacts"))
 
+
+def _read_verified_plan(plan_path: Path) -> str | None:
+    """Load the canonical planning evidence gate without duplicating it."""
+    gate_path = SKILL_DIR.parent / "planning" / "scripts" / "evidence_gate.py"
+    try:
+        spec = importlib.util.spec_from_file_location("planning_evidence_gate", gate_path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.read_verified_plan(plan_path)
+    except (OSError, ImportError, AttributeError, TypeError):
+        return None
+
 _TRANSCRIPT_PATH_FILE = Path.home() / "claude-log.transcript_path.txt"
 
 
@@ -463,21 +477,6 @@ def _heading_or_stem(path: Path, text: str) -> str:
     return path.stem.replace("-", " ").replace("_", " ").strip().title() or "Plan task"
 
 
-def _plan_evidence_gate_matches(plan_path: Path) -> bool:
-    """Return True only for a passing gate bound to the current plan bytes."""
-    artifact = plan_path.with_suffix(plan_path.suffix + ".evidence-gate.json")
-    try:
-        payload = json.loads(artifact.read_text(encoding="utf-8"))
-        digest = __import__("hashlib").sha256(plan_path.read_bytes()).hexdigest()
-        return (
-            payload.get("verdict") == "PASS"
-            and payload.get("plan_sha256") == digest
-            and Path(payload.get("plan_path", "")).resolve() == plan_path.resolve()
-        )
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False
-
-
 def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     plan_path = Path(args.plan).expanduser().resolve()
     if not plan_path.exists():
@@ -492,7 +491,8 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
         touch(state_dir / f".blocked_{run_id}")
         return None
 
-    if not _plan_evidence_gate_matches(plan_path):
+    plan_text = _read_verified_plan(plan_path)
+    if plan_text is None:
         write_json(
             state_dir / f"blocked_{run_id}.json",
             {
@@ -505,7 +505,6 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
         touch(state_dir / f".blocked_{run_id}")
         return None
 
-    plan_text = plan_path.read_text(encoding="utf-8")
     title = _heading_or_stem(plan_path, plan_text)
     terminal_id = _canonical_terminal_id()
     selected_at = now_utc_z()
@@ -722,6 +721,31 @@ def require_recon(
     )
 
 
+_PLAN_REQUIRED_MARKERS: tuple[str, ...] = (
+    "implement this proposal",
+    "implement the proposal",
+    "implement this design",
+    "apply this plan",
+    "cross-component",
+    "cross component",
+    "create a new hook",
+    "add a new hook",
+    "new schema",
+    "new registry",
+    "new state",
+    "add a field",
+    "change the mechanism",
+    "architecture decision record",
+    "adr-",
+)
+
+
+def _prompt_requires_plan_gate(prompt: str) -> bool:
+    """Detect prompts that must be normalized through /planning first."""
+    normalized = prompt.casefold()
+    return any(marker in normalized for marker in _PLAN_REQUIRED_MARKERS)
+
+
 def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     if args.prompt:
         # SEC-2: scrub secrets from the prompt before any state write or worker
@@ -731,6 +755,18 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             prompt = importlib.import_module("scrub_prompt").scrub(args.prompt)
         except Exception:
             prompt = args.prompt
+        if not getattr(args, "preflight_only", False) and _prompt_requires_plan_gate(prompt):
+            blocked = {
+                "phase": "task-selection",
+                "reason_code": "plan_evidence_gate_required",
+                "message": (
+                    "This prompt describes a proposal or contract-sensitive mechanism change. "
+                    "Run /planning first, then execute its implementation-ready plan with /go."
+                ),
+            }
+            write_json(state_dir / f"blocked_{run_id}.json", blocked)
+            touch(state_dir / f".blocked_{run_id}")
+            return None
         # Recon-before-dispatch gate (Phase 1 of agentic-reliability ladder).
         # Blocks dispatch for high-risk prompts until a recon artifact exists.
         if not getattr(args, "preflight_only", False) and not getattr(args, "recon_only", False):

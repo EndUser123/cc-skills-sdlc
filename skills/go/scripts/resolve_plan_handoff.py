@@ -25,7 +25,7 @@ the worker reads it via source_ref. This block carries only what is needed
 to identify and start the next task.
 """
 import datetime
-import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -39,6 +39,7 @@ PLANS_DIR = pathlib.Path(
 STATE_DIR = pathlib.Path(os.environ.get("GO_STATE_DIR", "."))
 RUN_ID = os.environ.get("RUN_ID", "")
 TERMINAL_ID = os.environ.get("TERMINAL_ID", "")
+EVIDENCE_GATE_PATH = pathlib.Path(__file__).resolve().parents[2] / "planning" / "scripts" / "evidence_gate.py"
 
 
 def _strip_quotes(v: str) -> str:
@@ -83,16 +84,13 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, str], dict[str, dict[str, s
 def _candidate_plans() -> list[tuple[pathlib.Path, dict[str, str], dict[str, str]]]:
     cands: list[tuple[pathlib.Path, dict[str, str], dict[str, str]]] = []
     for p in sorted(PLANS_DIR.glob("*.md"), key=lambda x: x.stat().st_mtime, reverse=True):
-        try:
-            text = p.read_text(encoding="utf-8")
-        except OSError:
+        text = _read_verified_plan(p)
+        if text is None:
             continue
         flat, nested = _parse_frontmatter(text)
         if flat.get("status") != "implementation-ready":
             continue
         if str(flat.get("unresolved_blockers", "0")).strip() != "0":
-            continue
-        if not _evidence_gate_matches(p):
             continue
         gnt = nested.get("go_next_task") or {}
         if not gnt.get("task_id") or not gnt.get("objective"):
@@ -101,23 +99,21 @@ def _candidate_plans() -> list[tuple[pathlib.Path, dict[str, str], dict[str, str
     return cands
 
 
-def _evidence_gate_matches(plan_path: pathlib.Path) -> bool:
-    """Require a passing evidence-gate sidecar for plan handoff.
+def _read_verified_plan(plan_path: pathlib.Path) -> str | None:
+    """Load a plan only when the canonical evidence gate verifies its bytes.
 
     The sidecar is intentionally bound to the exact plan bytes so a plan edit
     cannot retain a stale readiness verdict.
     """
-    artifact = plan_path.with_suffix(plan_path.suffix + ".evidence-gate.json")
     try:
-        payload = json.loads(artifact.read_text(encoding="utf-8"))
-        digest = hashlib.sha256(plan_path.read_bytes()).hexdigest()
-        return (
-            payload.get("verdict") == "PASS"
-            and payload.get("plan_sha256") == digest
-            and pathlib.Path(payload.get("plan_path", "")).resolve() == plan_path.resolve()
-        )
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False
+        spec = importlib.util.spec_from_file_location("planning_evidence_gate", EVIDENCE_GATE_PATH)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.read_verified_plan(plan_path)
+    except (OSError, ImportError, AttributeError, TypeError, ValueError, json.JSONDecodeError):
+        return None
 
 
 def _build_task(gnt: dict[str, str]) -> dict:

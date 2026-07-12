@@ -249,16 +249,44 @@ def test_tasks_argument_is_used_for_queue_selection(monkeypatch, tmp_path):
 def test_plan_argument_creates_task_from_plan_file(monkeypatch, tmp_path):
     plan_file = tmp_path / "plan.md"
     plan_file.write_text(
-        "# Harden parser\n\n- Add regression coverage\n- Verify with `python -m pytest skills/go/tests -q`\n",
+        """---
+status: implementation-ready
+unresolved_blockers: 0
+---
+# Harden parser
+## Goal
+Harden the parser.
+## Current State With Evidence
+The current parser path is documented by source inspection.
+## Design Decisions and Invariants
+Preserve the public behavior.
+## Implementation Changes
+### TASK-1: Harden parser
+**Acceptance:** Add regression coverage and verify the parser.
+## Test Matrix
+Run the focused parser tests.
+## Assumptions / Defaults
+No critical assumptions remain.
+## Open Questions
+None.
+## Evidence Ledger
+| Claim | Type | Evidence | Falsifier |
+|---|---|---|---|
+| Parser path is covered | verified | focused test | test fails |
+## Falsifiers
+- The focused parser test fails.
+""",
         encoding="utf-8",
     )
     import hashlib
 
     (tmp_path / "plan.md.evidence-gate.json").write_text(
         json.dumps({
+            "schema_version": 1,
             "verdict": "PASS",
             "plan_path": str(plan_file.resolve()),
             "plan_sha256": hashlib.sha256(plan_file.read_bytes()).hexdigest(),
+            "findings": [],
         }),
         encoding="utf-8",
     )
@@ -275,6 +303,16 @@ def test_plan_argument_creates_task_from_plan_file(monkeypatch, tmp_path):
     assert task.verification_commands == ["python -m pytest skills/go/tests -q"]
     active = json.loads((tmp_path / "active-task_run-plan.json").read_text(encoding="utf-8"))
     assert active["source_ref"] == str(plan_file.resolve())
+
+
+def test_prompt_proposal_requires_planning_gate(tmp_path):
+    args = _ORCHESTRATE.parse_args(["--prompt", "implement this proposal for a new hook"])
+
+    task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-proposal")
+
+    assert task is None
+    blocked = json.loads((tmp_path / "blocked_run-proposal.json").read_text(encoding="utf-8"))
+    assert blocked["reason_code"] == "plan_evidence_gate_required"
 
 
 def test_prompt_task_can_require_explicit_verification(monkeypatch, tmp_path):
