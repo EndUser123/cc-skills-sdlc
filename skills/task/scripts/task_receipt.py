@@ -52,8 +52,26 @@ def _safe_task_id(task_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(task_id)) or "unknown"
 
 
-def receipt_path(task_id: str) -> Path:
-    return receipt_dir() / f"{_safe_task_id(task_id)}.json"
+def receipt_path(task_id: str, *, terminal_id: str = "") -> Path:
+    """Build a terminal-scoped receipt path. Without terminal_id, falls back
+    to CLAUDE_TERMINAL_ID or WT_SESSION. The terminal discriminator prevents
+    cross-terminal collision on same-repo task IDs (SR-1 fix)."""
+    tid = terminal_id or os.environ.get("CLAUDE_TERMINAL_ID") or os.environ.get("WT_SESSION", "unknown")
+    safe_tid = _safe_task_id(tid)
+    return receipt_dir() / safe_tid / f"{_safe_task_id(task_id)}.json"
+
+
+def receipt_path_any_terminal(task_id: str) -> list[Path]:
+    """Find receipt files for a task_id across all terminal subdirectories.
+    Useful for enumeration/admin but NOT for verify (which uses the
+    terminal-scoped path above)."""
+    d = receipt_dir()
+    if not d.exists():
+        return []
+    # Two layouts: scoped (terminal_dir/task_id.json) or legacy (flat task_id.json)
+    scoped = sorted(d.glob("*/%s.json" % _safe_task_id(task_id)))
+    legacy = [d / ("%s.json" % _safe_task_id(task_id))]  # migrated
+    return scoped + [p for p in legacy if p.exists()]
 
 
 def _git(args, cwd, timeout=10):
@@ -65,7 +83,12 @@ def _git(args, cwd, timeout=10):
 
 
 def git_toplevel(cwd) -> str:
-    return _git(["rev-parse", "--show-toplevel"], cwd) or str(Path(cwd).resolve())
+    """Return the git toplevel path, or empty string if not inside a git repo.
+    An empty string tells the cross-repo guard in verify_task to skip comparison
+    (no repo info = no guard possible). Previously this fell back to
+    Path(cwd).resolve() which never matched a real toplevel, so every non-git
+    receipt failed the cross-repo check. (SR-6 fix.)"""
+    return _git(["rev-parse", "--show-toplevel"], cwd) or ""
 
 
 def git_head(cwd):
@@ -133,6 +156,10 @@ def classify(verification: list, final_sha) -> str:
     return "NO_EVIDENCE"
 
 
+def _resolve_terminal_id() -> str:
+    return os.environ.get("CLAUDE_TERMINAL_ID") or os.environ.get("WT_SESSION", "unknown")
+
+
 def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
                   verify_commands=None, baseline=None, no_verify=False, final_sha=None) -> dict:
     repo_path = str(repo) if repo else os.getcwd()
@@ -142,10 +169,11 @@ def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
     changed = changed_files(repo_path, base or None)
     cmds = [] if no_verify else (verify_commands or [])
     verification = run_verification(cmds, repo_path) if cmds else []
+    tid = terminal_id or _resolve_terminal_id()
     receipt = {
         "receipt_version": RECEIPT_VERSION,
         "task_id": str(task_id),
-        "terminal_id": terminal_id,
+        "terminal_id": tid,
         "session_id": session_id,
         "repo": top,
         "worktree": is_worktree(repo_path),
@@ -159,7 +187,8 @@ def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
     }
     d = receipt_dir()
     d.mkdir(parents=True, exist_ok=True)
-    path = receipt_path(task_id)
+    path = receipt_path(task_id, terminal_id=tid)
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".%s.tmp" % os.getpid())
     tmp.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     os.replace(tmp, path)
@@ -182,14 +211,28 @@ def has_receipt(task_id) -> bool:
 
 
 def list_receipts() -> dict:
-    out = {}
+    out: dict[str, dict] = {}
     d = receipt_dir()
     if not d.exists():
         return out
+    # New layout: terminal_id/task_id.json
+    for sub in sorted(d.iterdir()):
+        if not sub.is_dir():
+            continue
+        for p in sorted(sub.glob("*.json")):
+            try:
+                r = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(r, dict) and r.get("task_id"):
+                    out[str(r["task_id"])] = r
+            except (OSError, json.JSONDecodeError, ValueError):
+                continue
+    # Legacy flat layout (migrated)
     for p in sorted(d.glob("*.json")):
+        if p.name == "lost-plus-found.json":
+            continue
         try:
             r = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(r, dict) and r.get("task_id"):
+            if isinstance(r, dict) and r.get("task_id") and r["task_id"] not in out:
                 out[str(r["task_id"])] = r
         except (OSError, json.JSONDecodeError, ValueError):
             continue

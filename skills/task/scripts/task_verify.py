@@ -33,6 +33,15 @@ import re
 import sys
 from pathlib import Path
 
+# File lock for concurrent-safe tracker access (same module the tracker hook uses).
+try:
+    from __lib.file_lock import FileLock
+except ImportError:
+    try:
+        from file_lock import FileLock
+    except ImportError:
+        FileLock = None  # type: ignore[assignment,misc]
+
 # Import the receipt store from the sibling module.
 _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
@@ -63,9 +72,43 @@ def _sha_reachable_in(repo_path: str, sha: str | None) -> bool:
     return receipt.sha_reachable(sha, repo_path)
 
 
-def verify_task(task_id: str, *, current_repo: str | None = None) -> tuple[str, str]:
+def _resolve_terminal_id() -> str:
+    return os.environ.get("CLAUDE_TERMINAL_ID") or os.environ.get("WT_SESSION", "unknown")
+
+
+def _detect_current_repo(repo_arg: str | None) -> str | None:
+    if repo_arg:
+        return repo_arg
+    return receipt.git_toplevel(os.getcwd())
+
+
+def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: str | None = None) -> tuple[str, str]:
     """Return (bucket, reason) for a single task id."""
-    path = receipt.receipt_path(task_id)
+    tid = terminal_id or _resolve_terminal_id()
+    path = receipt.receipt_path(task_id, terminal_id=tid)
+    if not path.exists():
+        # Migration fallback: check legacy flat layout AND other terminal dirs.
+        # For cross-terminal results, verify the stored terminal_id matches;
+        # otherwise the path might be from another terminal's task with the
+        # same numeric ID (SR-1 guard).
+        candidates = receipt.receipt_path_any_terminal(task_id)
+        if candidates:
+            # Prefer the one matching the caller's terminal_id.
+            match_path = None
+            for cp in candidates:
+                try:
+                    r = json.loads(cp.read_text(encoding="utf-8"))
+                    if r.get("terminal_id", "") == tid:
+                        match_path = cp
+                        break
+                except (OSError, json.JSONDecodeError, ValueError):
+                    continue
+            path = match_path if match_path else path
+            # If we found receipts but none matching the terminal_id, we still
+            # don't have evidence for THIS terminal's task. The cross-repo guard
+            # below will eventually block even cross-terminal ones, but the
+            # correct block is NO_EVIDENCE (wrong terminal), not VERIFIED.
+            # NO_EVIDENCE is returned when the receipt body doesn't load.
     file_exists = path.is_file()
     r = receipt.read_receipt(task_id)
     if r is None:
@@ -100,13 +143,14 @@ def verify_task(task_id: str, *, current_repo: str | None = None) -> tuple[str, 
     return "NO_EVIDENCE", "receipt evidence_class=%s" % ev
 
 
-def verify_many(task_ids, *, current_repo: str | None = None) -> dict:
+def verify_many(task_ids, *, current_repo: str | None = None, terminal_id: str | None = None) -> dict:
+    tid = terminal_id or _resolve_terminal_id()
     buckets = {b: [] for b in BUCKETS}
     detail = {}
-    for tid in task_ids:
-        bucket, reason = verify_task(tid, current_repo=current_repo)
-        buckets[bucket].append(tid)
-        detail[tid] = {"bucket": bucket, "reason": reason}
+    for t in task_ids:
+        bucket, reason = verify_task(t, current_repo=current_repo, terminal_id=tid)
+        buckets[bucket].append(t)
+        detail[t] = {"bucket": bucket, "reason": reason}
     return {"buckets": buckets, "detail": detail}
 
 
@@ -126,32 +170,34 @@ def _render(report: dict) -> str:
     return "\n".join(lines)
 
 
-def _detect_current_repo(repo_arg: str | None) -> str | None:
-    if repo_arg:
-        return repo_arg
-    return receipt.git_toplevel(os.getcwd())
-
-
 # --- clean ------------------------------------------------------------------
 
 def _remove_from_tracker(task_id: str, tracker_dir: Path) -> int:
-    """Remove a task from tracker *_tasks.json mirror files. Returns files changed."""
+    """Remove a task from tracker *_tasks.json mirror files. Uses the same
+    FileLock the tracker hook holds, so concurrent TaskCreate/TaskUpdate during
+    clean does not lose tasks (SR-3 fix)."""
     changed = 0
-    if not tracker_dir.exists():
+    if not tracker_dir.exists() or FileLock is None:
         return 0
     for f in tracker_dir.glob("*_tasks.json"):
+        # Derive lock path matching the tracker hook's convention:
+        #   lock_path = get_state_dir() / f"{safe_terminal_id}_tasks.lock"
+        # The *_tasks.json file has the same stem.
+        lock_path = f.with_suffix(".lock")
         try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, ValueError):
+            with FileLock(str(lock_path), timeout=5.0):
+                # Re-read INSIDE the lock — file may have changed since iteration.
+                data = json.loads(f.read_text(encoding="utf-8"))
+                tasks = data.get("tasks") if isinstance(data, dict) else None
+                if not isinstance(tasks, dict) or task_id not in tasks:
+                    continue
+                tasks.pop(task_id, None)
+                tmp = f.with_suffix(".%s.tmp" % os.getpid())
+                tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                os.replace(tmp, f)
+                changed += 1
+        except (OSError, json.JSONDecodeError, ValueError, TimeoutError):
             continue
-        tasks = data.get("tasks") if isinstance(data, dict) else None
-        if not isinstance(tasks, dict) or task_id not in tasks:
-            continue
-        tasks.pop(task_id, None)
-        tmp = f.with_suffix(".%s.tmp" % os.getpid())
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        os.replace(tmp, f)
-        changed += 1
     return changed
 
 

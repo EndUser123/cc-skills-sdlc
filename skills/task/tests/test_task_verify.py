@@ -26,16 +26,21 @@ import task_receipt as R  # noqa: E402
 import task_verify as V  # noqa: E402
 
 REPO = "P:/packages/.claude-marketplace/plugins/cc-skills-sdlc"
+TEST_TERMINAL = "test_console"
 
 
 @pytest.fixture(autouse=True)
 def _isolated_receipts(tmp_path, monkeypatch):
     monkeypatch.setenv("TASK_RECEIPT_DIR", str(tmp_path / "receipts"))
-    (tmp_path / "receipts").mkdir()
+    monkeypatch.setenv("CLAUDE_TERMINAL_ID", TEST_TERMINAL)
+    # Ensure the terminal-scoped subdir exists
+    (tmp_path / "receipts" / TEST_TERMINAL).mkdir(parents=True, exist_ok=True)
     yield tmp_path
 
 
 def _write(tid, **kw):
+    # Always write with the test terminal_id so the receipt body and path match.
+    kw.setdefault("terminal_id", TEST_TERMINAL)
     return R.write_receipt(tid, repo=REPO, **kw)
 
 
