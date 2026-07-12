@@ -725,6 +725,7 @@ _PLAN_REQUIRED_MARKERS: tuple[str, ...] = (
     "implement this proposal",
     "implement the proposal",
     "implement this design",
+    "implement it",
     "apply this plan",
     "cross-component",
     "cross component",
