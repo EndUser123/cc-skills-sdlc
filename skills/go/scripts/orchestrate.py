@@ -463,6 +463,21 @@ def _heading_or_stem(path: Path, text: str) -> str:
     return path.stem.replace("-", " ").replace("_", " ").strip().title() or "Plan task"
 
 
+def _plan_evidence_gate_matches(plan_path: Path) -> bool:
+    """Return True only for a passing gate bound to the current plan bytes."""
+    artifact = plan_path.with_suffix(plan_path.suffix + ".evidence-gate.json")
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8"))
+        digest = __import__("hashlib").sha256(plan_path.read_bytes()).hexdigest()
+        return (
+            payload.get("verdict") == "PASS"
+            and payload.get("plan_sha256") == digest
+            and Path(payload.get("plan_path", "")).resolve() == plan_path.resolve()
+        )
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+
+
 def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     plan_path = Path(args.plan).expanduser().resolve()
     if not plan_path.exists():
@@ -472,6 +487,19 @@ def create_plan_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> 
                 "phase": "task-selection",
                 "reason_code": "plan_file_not_found",
                 "path": str(plan_path),
+            },
+        )
+        touch(state_dir / f".blocked_{run_id}")
+        return None
+
+    if not _plan_evidence_gate_matches(plan_path):
+        write_json(
+            state_dir / f"blocked_{run_id}.json",
+            {
+                "phase": "task-selection",
+                "reason_code": "plan_evidence_gate_missing_or_stale",
+                "path": str(plan_path),
+                "required_artifact": str(plan_path) + ".evidence-gate.json",
             },
         )
         touch(state_dir / f".blocked_{run_id}")

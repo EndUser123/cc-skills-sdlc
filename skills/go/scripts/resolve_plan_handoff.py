@@ -5,6 +5,7 @@ When /go is invoked with no --prompt, --plan, or --tasks, this scans
 ~/.claude/plans for the freshest plan that is:
   - status: implementation-ready
   - unresolved_blockers: 0
+  - matching <plan>.evidence-gate.json with verdict PASS and current plan hash
   - declares a go_next_task block (explicit next task)
 
 Single candidate -> bind (write active-task_{run_id}.json, exit 0).

@@ -51,7 +51,7 @@ def _write_plan(dir_: Path, name: str, tid: str, title: str = "t", objective: st
             {
                 "schema_version": 1,
                 "plan_path": str(p.resolve()),
-                "plan_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "plan_sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
                 "verdict": "PASS",
                 "findings": [],
             }

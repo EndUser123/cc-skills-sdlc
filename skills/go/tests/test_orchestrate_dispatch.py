@@ -252,6 +252,16 @@ def test_plan_argument_creates_task_from_plan_file(monkeypatch, tmp_path):
         "# Harden parser\n\n- Add regression coverage\n- Verify with `python -m pytest skills/go/tests -q`\n",
         encoding="utf-8",
     )
+    import hashlib
+
+    (tmp_path / "plan.md.evidence-gate.json").write_text(
+        json.dumps({
+            "verdict": "PASS",
+            "plan_path": str(plan_file.resolve()),
+            "plan_sha256": hashlib.sha256(plan_file.read_bytes()).hexdigest(),
+        }),
+        encoding="utf-8",
+    )
     args = _ORCHESTRATE.parse_args(["--plan", str(plan_file)])
     monkeypatch.setenv("GO_DEFAULT_VERIFICATION_COMMANDS", "python -m pytest skills/go/tests -q")
 
