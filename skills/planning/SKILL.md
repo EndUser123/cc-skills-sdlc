@@ -476,12 +476,45 @@ After collecting findings, Claude must:
 
 See `references/artifact-contract.md` for disposition table format required in `*.review.summary.md`.
 
+### Step 4d: Evidence Gate (Final Promotion Stage)
+
+The evidence gate is the final stage of `/planning`, after review findings have
+been synthesized and the plan has been rewritten. It is a mechanical promotion
+check, not another prose critique and not proof that a proposed mechanism has
+real-world value.
+
+Before presenting a plan as `implementation-ready`, run:
+
+```bash
+python P://packages/.claude-marketplace/plugins/cc-skills-sdlc/skills/planning/scripts/evidence_gate.py \
+  <plan_path> --write-artifact
+```
+
+The gate requires the current plan to have:
+
+- `status: implementation-ready` and `unresolved_blockers: 0`;
+- all canonical plan sections;
+- an Evidence Ledger or Claim Ledger;
+- at least one explicit falsifier;
+- a Contract Boundary Matrix when the plan is boundary-sensitive;
+- no placeholder markers.
+
+The sidecar `<plan_path>.evidence-gate.json` records the plan SHA-256 and is
+authoritative for promotion. If the plan changes after the gate runs, rerun
+the gate; never reuse a verdict for an older hash. A blocked gate leaves the
+plan `in-review` and routes the remaining issue to investigation, `/design`,
+or a plan rewrite as appropriate.
+
+The gate deliberately does not infer semantic value from grep results. Runtime
+probes and behavioral evidence remain plan-specific acceptance work.
+
 ## Step 5: Present Results
 
 If the plan is `implementation-ready`, present ONLY:
 - Plan artifact path
 - Status: `draft` | `in-review` | `implementation-ready`
 - Unresolved blocker count
+- Evidence-gate sidecar path and matching plan hash
 - Summary of changes made (not raw findings)
 
 ```
