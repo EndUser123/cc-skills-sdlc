@@ -423,6 +423,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Skip the recon-before-dispatch requirement. Audit-logged.",
     )
+    parser.add_argument(
+        "--require-plan",
+        action="store_true",
+        help="Require an implementation-ready plan with a valid evidence gate.",
+    )
     parser.add_argument("--plan", help="Path to plan.md")
     parser.add_argument("--tasks", help="Path to tasks.json")
     parser.add_argument("--scope-in", nargs="*", default=[], help="Scope in patterns")
@@ -721,32 +726,6 @@ def require_recon(
     )
 
 
-_PLAN_REQUIRED_MARKERS: tuple[str, ...] = (
-    "implement this proposal",
-    "implement the proposal",
-    "implement this design",
-    "implement it",
-    "apply this plan",
-    "cross-component",
-    "cross component",
-    "create a new hook",
-    "add a new hook",
-    "new schema",
-    "new registry",
-    "new state",
-    "add a field",
-    "change the mechanism",
-    "architecture decision record",
-    "adr-",
-)
-
-
-def _prompt_requires_plan_gate(prompt: str) -> bool:
-    """Detect prompts that must be normalized through /planning first."""
-    normalized = prompt.casefold()
-    return any(marker in normalized for marker in _PLAN_REQUIRED_MARKERS)
-
-
 def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) -> TaskContract | None:
     if args.prompt:
         # SEC-2: scrub secrets from the prompt before any state write or worker
@@ -756,7 +735,14 @@ def load_or_create_task(args: argparse.Namespace, state_dir: Path, run_id: str) 
             prompt = importlib.import_module("scrub_prompt").scrub(args.prompt)
         except Exception:
             prompt = args.prompt
-        if not getattr(args, "preflight_only", False) and _prompt_requires_plan_gate(prompt):
+        if (
+            not getattr(args, "preflight_only", False)
+            and not getattr(args, "plan", None)
+            and (
+                getattr(args, "require_plan", False)
+                or os.environ.get("GO_REQUIRE_PLAN", "") == "1"
+            )
+        ):
             blocked = {
                 "phase": "task-selection",
                 "reason_code": "plan_evidence_gate_required",

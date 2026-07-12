@@ -306,7 +306,9 @@ None.
 
 
 def test_prompt_proposal_requires_planning_gate(tmp_path):
-    args = _ORCHESTRATE.parse_args(["--prompt", "implement this proposal for a new hook"])
+    args = _ORCHESTRATE.parse_args([
+        "--prompt", "implement this proposal for a new hook", "--require-plan"
+    ])
 
     task = _ORCHESTRATE.load_or_create_task(args, tmp_path, "run-proposal")
 

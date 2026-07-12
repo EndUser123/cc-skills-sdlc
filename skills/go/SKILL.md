@@ -108,6 +108,10 @@ Valid modes:
   proposal is mechanism-changing, stateful, hook-driven, cross-component, or
   otherwise contract-sensitive, route it through `/planning` and its final
   evidence gate first.
+- When a caller explicitly requires that boundary for a direct prompt, use
+  `/go --require-plan` (or `GO_REQUIRE_PLAN=1`). This is an explicit control,
+  not a second keyword classifier; it blocks prompt dispatch until a valid
+  implementation-ready plan is supplied.
 - Direct `/go` prompts remain valid for bounded local fixes whose task contract
   is already concrete and whose work does not require plan-level architecture
   decisions. `/go` must record why the plan gate was not required.

@@ -36,6 +36,27 @@ READY = textwrap.dedent(
       priority: P2
     ---
     # {title}
+    ## Goal
+    Execute the task.
+    ## Current State With Evidence
+    The current path is verified by source inspection.
+    ## Design Decisions and Invariants
+    Preserve existing behavior.
+    ## Implementation Changes
+    ### TASK-1: Execute
+    **Acceptance:** the task is verified.
+    ## Test Matrix
+    Run the focused tests.
+    ## Assumptions / Defaults
+    No critical assumptions remain.
+    ## Open Questions
+    None.
+    ## Evidence Ledger
+    | Claim | Type | Evidence | Falsifier |
+    |---|---|---|---|
+    | Task path is wired | verified | source inspection | test fails |
+    ## Falsifiers
+    - The focused test fails.
     """
 ).strip() + "\n"
 
