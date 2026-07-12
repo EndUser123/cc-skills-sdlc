@@ -128,11 +128,33 @@ so the user knows the meta-critique didn't run.
   itself the failure mode," or "we're mitigating the symptom while the root
   cause persists"? Name it here.
 
+### Boundary Classification
+
+Before writing the Escalation Recommendation, classify each surface below as
+`YES`, `NO`, or `UNKNOWN`, and give one evidence-backed reason. `UNKNOWN` is
+not equivalent to `NO`.
+
+| Surface | Classification | Evidence / reason |
+|---|---|---|
+| Shared artifact with multiple producers or consumers | | |
+| Hook, gate, plugin, workflow, routing, or runtime behavior | | |
+| Persisted state, concurrency, crash recovery, or cross-terminal scope | | |
+| Producer/consumer or cross-component contract | | |
+| Security, permissions, prompt injection, or trust boundary | | |
+| Irreversible action or high blast radius | | |
+
+Treat a shared registry, manifest, event stream, cache, or state file with
+multiple readers as a shared artifact and a cross-component contract unless
+repo evidence proves otherwise. Do not infer consumer safety merely because a
+serialization format permits unknown fields; assess the consumers' actual
+field access and behavior.
+
 ### Falsification
 
-**Design the verification the user would run** for the top risk only: the
-specific input, state, race, or environment condition that would bypass the
-mitigation, and how you'd prove the fix broke. This is verification *design* —
+**Design the verification the user would run** for the highest-leverage risk
+only: the specific input, state, race, or environment condition that would
+bypass the mitigation, and how you'd prove the fix broke. This is verification
+*design* —
 running it is the user's responsibility (this skill has no tools and runs
 nothing).
 
@@ -157,7 +179,10 @@ Recommend `RUN /red-team` when at least one concrete trigger applies:
 
 Recommend `NO /red-team NEEDED` only for a bounded, local, reversible change
 with no shared state, trust boundary, routing behavior, or cross-component
-contract.
+contract. A `YES` or `UNKNOWN` in any Boundary Classification row blocks this
+decision unless a different follow-up skill fully owns the concern; in that
+case use `NO /red-team NEEDED` and name that skill in `Follow-up:` with a
+concrete reason.
 
 If another skill is the better follow-up, name it instead of `/red-team`:
 `/claude-audit` for hook/runtime wiring, `/skill-audit` for capability or
@@ -169,6 +194,8 @@ Include all three fields beneath the decision:
 - `Triggers:` the concrete triggers found, or `none`;
 - `Checks not performed:` the relevant skipped checks;
 - `Follow-up:` `/red-team`, `/claude-audit`, `/skill-audit`, `/review`, or
+  `none` (skill name only);
+- `Operational next step:` a concrete implementation or validation action, or
   `none`.
 
 Use `Decision: NO /red-team NEEDED` when another follow-up is sufficient, and
@@ -177,6 +204,19 @@ record that skill in `Follow-up:`. Do not force every escalation through
 
 This is a recommendation only. Do not invoke another skill, claim that an
 escalation occurred, or treat the recommendation as a verdict.
+
+### Evidence discipline
+
+- Separate observed facts, inferences, and hypotheses. Label them when they
+  affect the decision.
+- Do not claim that a change is deployed, accepted, tested, backward-compatible,
+  or working without naming the evidence that establishes it.
+- Do not label a risk `theater` merely because a default avoids a crash or a
+  parser ignores unknown fields. A risk is theater only when the stated
+  failure mechanism is disproved by relevant producer/consumer evidence;
+  otherwise retain it as real or unresolved.
+- Every `theater` dismissal must name the disproving evidence in Findings
+  Review. Unsupported dismissals are findings, not conclusions.
 
 ### Skipped (report honestly; do not auto-route)
 
