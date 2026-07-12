@@ -21,6 +21,24 @@ cannot cite evidence, the claim is not ready to state.
 Rationale: Wrong claims of absence waste downstream turns on re-verification.
 A single glob resolves them in <1s.
 
+## Boundary-First Review Rule (All Agents)
+
+Before reviewing the plan by category, identify the highest-risk producer →
+transport/storage → consumer boundary. Trace the actual source and runtime
+registration, then challenge these fields explicitly:
+
+- identity and scope;
+- authority when sources disagree;
+- ordering and deduplication;
+- freshness and invalidation;
+- malformed, missing, stale, foreign-session, and crash behavior;
+- the test or probe that would demonstrate the boundary works.
+
+Record a finding when the plan names a boundary contract but leaves one of
+these fields assumed, contradictory, or untestable. Do not treat a static
+reader, persisted field, or successful unit test as proof of runtime value.
+Use the category-specific lens below only after this boundary pass.
+
 ## Compaction Resilience -- Idempotent Agents
 
 Each agent prompt prepends a pre-flight check: if its output file already exists and is non-empty, skip execution and return the path immediately. This means:

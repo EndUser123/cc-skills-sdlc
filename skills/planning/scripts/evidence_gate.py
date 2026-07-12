@@ -15,7 +15,6 @@ import argparse
 import hashlib
 import json
 import re
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -31,11 +30,8 @@ REQUIRED_HEADINGS = (
 )
 
 PLACEHOLDER_RE = re.compile(r"\[(?:TODO|TBD|FIXME|PLACEHOLDER)\]|<TODO>|<TBD>", re.I)
-CRITICAL_UNKNOWN_RE = re.compile(
-    r"\b(?:open question|unresolved|unknown|assumed|hypothesis)\b", re.I
-)
 BOUNDARY_RE = re.compile(
-    r"\b(?:hook|handoff|artifact|schema|registry|cross[- ]component|state|producer|consumer|transport)\b",
+    r"\b(?:hook|handoff|schema|registry|cross[- ]component|producer|consumer|transport)\b",
     re.I,
 )
 
@@ -92,7 +88,7 @@ def validate_plan(path: Path) -> dict:
     # hypotheses or explicitly deferred investigation.  The hard promotion
     # checks are the status, blocker count, required evidence artifacts, and
     # explicit falsifier.  This keeps the gate mechanical rather than semantic.
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return {
         "schema_version": 1,
         "checked_at": datetime.now(UTC).isoformat(),
