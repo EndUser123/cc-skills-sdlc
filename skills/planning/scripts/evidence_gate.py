@@ -117,8 +117,10 @@ def read_verified_plan(path: Path) -> str | None:
         artifact = path.with_suffix(path.suffix + ".evidence-gate.json")
         payload = json.loads(artifact.read_text(encoding="utf-8"))
         frontmatter = _frontmatter(text)
+        current_result = validate_plan(path)
         if (
-            payload.get("schema_version") == 1
+            current_result.get("verdict") == "PASS"
+            and payload.get("schema_version") == 1
             and payload.get("verdict") == "PASS"
             and payload.get("findings") == []
             and payload.get("plan_sha256") == hashlib.sha256(plan_bytes).hexdigest()
