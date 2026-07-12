@@ -221,7 +221,7 @@ escalation occurred, or treat the recommendation as a verdict.
 ### Knowledge / Validation Coverage
 
 If a plan, design, or implementation claim is being assessed, inspect its
-Knowledge / Validation Ledger and Change Record when present. Report:
+compact Knowledge / Validation section and Change Record when present. Report:
 
 - `Used:` sources and checks with evidence;
 - `Not used:` named sources or checks explicitly marked `no`;
