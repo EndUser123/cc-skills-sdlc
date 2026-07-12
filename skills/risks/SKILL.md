@@ -30,9 +30,9 @@ single-pass, no dispatch, structured risks + a meta-critique, in roughly
 
 This skill is independent of, but compatible with, the proposal-critique-gate
 Stop hook (any `/risks` output that recommends an action is still checked by
-that gate for a self-critique) and with `/red-team` (which takes over when a
-finding warrants a PROCEED/REVISE/BLOCK verdict). `/risks` does not rely on
-either.
+that gate for a self-critique) and with `/red-team`. `/risks` may recommend a
+follow-up skill, but it never invokes or auto-routes to one; the user decides
+whether to continue.
 
 ## Lookback rule
 
@@ -40,12 +40,15 @@ Risk-pass on the most recent **un-actioned** proposal in context.
 
 **"Un-actioned" = proposed in prose this session, but not yet written or
 committed.** If the most recent thing the user raised is already implemented
-or already shipped, say so in the first line and ask what to assess. If
-several un-actioned candidates exist, assess the most recent one.
+or already shipped, do not silently relabel it as an un-actioned proposal. If
+the user explicitly asks to assess the implementation, assess the implemented
+artifact and label it as such; otherwise say so in the first line and ask what
+to assess. If several un-actioned candidates exist, assess the most recent one.
 
 **State what you're assessing in the first line** — `Assessing: <one-line
-summary>`. If that's not what the user meant, stop and ask. If no un-actioned
-proposal exists, ask what to assess.
+summary>`. Include `state: un-actioned proposal` or `state: implemented
+artifact` when relevant. If that's not what the user meant, stop and ask. If
+no target exists, ask what to assess.
 
 If `$0` is provided, weight that domain in every section.
 
@@ -133,15 +136,59 @@ mitigation, and how you'd prove the fix broke. This is verification *design* —
 running it is the user's responsibility (this skill has no tools and runs
 nothing).
 
-### Skipped (escalate to `/red-team` if any of these matter)
+### Escalation Recommendation
+
+This section is mandatory and must appear in every pass. Choose exactly one:
+
+`Decision: RUN /red-team` | `Decision: NO /red-team NEEDED` |
+`Decision: UNCERTAIN — RUN /red-team`
+
+Recommend `RUN /red-team` when at least one concrete trigger applies:
+
+- security, authentication, secrets, permissions, or prompt-injection boundary;
+- hook, gate, workflow, routing, plugin, or runtime behavior where trust,
+  bypass, or promotion semantics are at issue;
+- persisted state, concurrency, crash recovery, or cross-terminal scope;
+- producer/consumer or other cross-component contract;
+- irreversible or high-blast-radius behavior;
+- a material finding whose resolution needs a `PROCEED`, `REVISE`, or `BLOCK`
+  trust verdict; or
+- the pass cannot determine whether one of these conditions applies.
+
+Recommend `NO /red-team NEEDED` only for a bounded, local, reversible change
+with no shared state, trust boundary, routing behavior, or cross-component
+contract.
+
+If another skill is the better follow-up, name it instead of `/red-team`:
+`/claude-audit` for hook/runtime wiring, `/skill-audit` for capability or
+consolidation claims, and `/review` for routine file:line code review.
+
+Include all three fields beneath the decision:
+
+- `Reason:` one sentence tied to the proposal;
+- `Triggers:` the concrete triggers found, or `none`;
+- `Checks not performed:` the relevant skipped checks;
+- `Follow-up:` `/red-team`, `/claude-audit`, `/skill-audit`, `/review`, or
+  `none`.
+
+Use `Decision: NO /red-team NEEDED` when another follow-up is sufficient, and
+record that skill in `Follow-up:`. Do not force every escalation through
+`/red-team`.
+
+This is a recommendation only. Do not invoke another skill, claim that an
+escalation occurred, or treat the recommendation as a verdict.
+
+### Skipped (report honestly; do not auto-route)
 
 - End-to-end trace of adjacent modules or remote state coupling
 - Adversarial multi-perspective verification (this is single-pass)
 - Deep failure-mode pre-mortem with web research
 - Trust verdict on a security boundary
 
-If the proposal touches any Skipped area at all, route to `/red-team` first
-rather than delivering a partial `/risks` result and asking for a re-launch.
+Use the skipped checks to justify the Escalation Recommendation. Do not make
+the presence of a skipped check an automatic escalation by itself: explain
+whether it is material to this proposal. If material, recommend the
+appropriate follow-up and still deliver the bounded `/risks` result.
 
 ## Worked example (illustrative — the structure, not the domain, is the template)
 
@@ -171,6 +218,7 @@ exemption list into M3 instead of a separate rule.
 
 ## Escalation
 
-If the proposal crosses a trust boundary (auth, secrets, security surface)
-**or** any single finding would warrant a PROCEED/REVISE/BLOCK verdict, run
-`/red-team` instead. `/risks` surfaces risks; `/red-team` adjudicates them.
+`/risks` surfaces risks and recommends the next review; `/red-team` adjudicates
+trust when the user chooses to run it. Never write "route," "run," or "escalate
+to" as though the follow-up already happened. Say `recommend RUN /red-team`
+or `recommend NO /red-team NEEDED` instead.
