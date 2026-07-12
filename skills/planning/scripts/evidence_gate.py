@@ -27,6 +27,8 @@ REQUIRED_HEADINGS = (
     "Test Matrix",
     "Assumptions / Defaults",
     "Open Questions",
+    "Knowledge / Validation Ledger",
+    "Change Record",
 )
 
 PLACEHOLDER_RE = re.compile(r"\[(?:TODO|TBD|FIXME|PLACEHOLDER)\]|<TODO>|<TBD>", re.I)
@@ -34,6 +36,11 @@ BOUNDARY_RE = re.compile(
     r"\b(?:hook|handoff|schema|registry|cross[- ]component|producer|consumer|transport)\b",
     re.I,
 )
+CHANGELOG_PATH_RE = re.compile(r"^\s*-\s*Changelog:\s*`?([^`\r\n]+?)`?\s*$", re.I | re.M)
+ENTRY_ID_RE = re.compile(r"^\s*-\s*Entry ID:\s*`?([A-Za-z0-9._:-]+)`?\s*$", re.I | re.M)
+ENTRY_STATUS_RE = re.compile(r"^\s*-\s*Entry status:\s*`?(recorded|complete)`?\s*$", re.I | re.M)
+TIMESTAMP_RE = re.compile(r"\b20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\b")
+UNRELEASED_RE = re.compile(r"^##\s+\[?Unreleased\]?\s*$", re.I | re.M)
 
 
 def _frontmatter(text: str) -> dict[str, str]:
@@ -62,6 +69,54 @@ def _section_content(text: str, heading_pattern: str) -> str:
     return tail[: next_heading.start() if next_heading else len(tail)]
 
 
+def _find_changelog(plan_path: Path, raw_path: str) -> Path | None:
+    candidate = Path(raw_path.strip())
+    if candidate.is_absolute() and candidate.is_file():
+        return candidate.resolve()
+    current = plan_path.parent.resolve()
+    for root in (current, *current.parents):
+        candidate = (root / raw_path.strip()).resolve()
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _validate_change_record(plan_path: Path, text: str) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    record = _section_content(text, r"Change Record")
+    changelog_match = CHANGELOG_PATH_RE.search(record)
+    entry_match = ENTRY_ID_RE.search(record)
+    if not changelog_match:
+        return [{"code": "CHANGELOG", "detail": "Change Record must name a changelog path"}]
+    if not entry_match:
+        findings.append({"code": "CHANGELOG_ENTRY", "detail": "Change Record must name an Entry ID"})
+        return findings
+    if not ENTRY_STATUS_RE.search(record):
+        findings.append({"code": "CHANGELOG_STATUS", "detail": "Change Record Entry status must be recorded or complete"})
+    changelog = _find_changelog(plan_path, changelog_match.group(1))
+    if changelog is None:
+        findings.append({"code": "CHANGELOG_FILE", "detail": "referenced changelog does not exist"})
+        return findings
+    changelog_text = changelog.read_text(encoding="utf-8")
+    if not UNRELEASED_RE.search(changelog_text):
+        findings.append({"code": "CHANGELOG_FORMAT", "detail": "changelog must contain ## [Unreleased]"})
+    entry_id = entry_match.group(1)
+    unreleased_match = UNRELEASED_RE.search(changelog_text)
+    unreleased_tail = changelog_text[unreleased_match.end():] if unreleased_match else ""
+    next_release = re.search(r"^##\s+", unreleased_tail, re.M)
+    unreleased_body = unreleased_tail[: next_release.start() if next_release else len(unreleased_tail)]
+    if entry_id not in unreleased_body:
+        findings.append({"code": "CHANGELOG_ENTRY", "detail": f"changelog does not contain Entry ID: {entry_id}"})
+    else:
+        entry_line = next(
+            (line for line in unreleased_body.splitlines() if entry_id in line),
+            "",
+        )
+        if not TIMESTAMP_RE.search(entry_line):
+            findings.append({"code": "CHANGELOG_TIMESTAMP", "detail": f"changelog entry {entry_id} lacks an ISO-8601 UTC timestamp"})
+    return findings
+
+
 def validate_plan(path: Path) -> dict:
     findings: list[dict[str, str]] = []
     try:
@@ -86,6 +141,12 @@ def validate_plan(path: Path) -> dict:
     ledger_content = _section_content(text, r"(?:Evidence|Claim) Ledger")
     if not ledger_content or ledger_content.count("|") < 4:
         findings.append({"code": "LEDGER", "detail": "implementation-ready plans require an Evidence Ledger"})
+
+    knowledge_content = _section_content(text, r"Knowledge / Validation Ledger")
+    if not knowledge_content or knowledge_content.count("|") < 4:
+        findings.append({"code": "KNOWLEDGE_LEDGER", "detail": "implementation-ready plans require a Knowledge / Validation Ledger"})
+
+    findings.extend(_validate_change_record(path, text))
 
     falsifier_content = _section_content(text, r"Falsifiers?|Falsification")
     if not falsifier_content or not re.search(r"(?:^\s*[-*]\s+|\|)", falsifier_content, re.M):
