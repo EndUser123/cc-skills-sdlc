@@ -1,8 +1,8 @@
-# Search Integration Reference
+# Search Integration Reference (Opt-In Mode)
 
 ## Search Integration Overview
 
-When `/task list` is invoked (without `--no-suggest`), the skill performs contextual search to surface relevant tasks and unresolved items.
+When `/task list --suggest` or `/task scan` is invoked, the skill performs contextual search to surface relevant tasks and unresolved items. This is **opt-in** — default `/task list` does NOT run CHS/CKS searches (quota-preserving design).
 
 ### Terminal Context Building
 

@@ -62,8 +62,13 @@ def _sha_reachable_in(repo_path: str, sha: str | None) -> bool:
 
 def verify_task(task_id: str, *, current_repo: str | None = None) -> tuple[str, str]:
     """Return (bucket, reason) for a single task id."""
+    path = receipt.receipt_path(task_id)
+    file_exists = path.is_file()
     r = receipt.read_receipt(task_id)
     if r is None:
+        # Distinguish malformed (file present but unreadable) from missing.
+        if file_exists:
+            return "BLOCKED", "receipt for %s is unreadable/malformed" % task_id
         return "NO_EVIDENCE", "no completion receipt for task %s" % task_id
     if not isinstance(r, dict) or "task_id" not in r or "evidence_class" not in r:
         return "BLOCKED", "receipt for %s is malformed" % task_id

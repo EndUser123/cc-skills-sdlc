@@ -98,9 +98,16 @@ def changed_files(cwd, baseline) -> list:
 
 
 def sha_reachable(sha, cwd) -> bool:
+    """True if sha is reachable in the repo (still present). Returncode-based:
+    `git cat-file -e` prints nothing on success, so stdout cannot be used."""
     if not sha:
         return False
-    return bool(_git(["cat-file", "-e", sha], cwd, timeout=8))
+    try:
+        r = subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"],
+                           capture_output=True, text=True, timeout=8, cwd=str(cwd))
+        return r.returncode == 0
+    except (subprocess.SubprocessError, OSError):
+        return False
 
 
 def run_verification(commands, cwd) -> list:

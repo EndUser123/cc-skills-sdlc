@@ -14,6 +14,7 @@ alone never does).
 from __future__ import annotations
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -214,8 +215,7 @@ def test_status_completed_alone_never_deletes(_isolated_receipts):
 # --- unresolved suggester is opt-in (default /task list is cheap) -----------
 
 def test_unresolved_suggester_disabled_by_default():
-    obs_lib = Path("P:/packages/.claude-marketplace/plugins/cc-aca-observability/__lib/posttooluse")
-    sys.path.insert(0, str(obs_lib.parent))
-    import task_unresolved_suggester_hook as sug  # noqa: E402
-    assert sug.TaskUnresolvedSuggesterHook.default_enabled is False, \
-        "suggester must default OFF so bare TaskList is cheap"
+    """Default /task list must NOT invoke CHS/CKS -> PostToolUse suggester is opt-in."""
+    src = Path("P:/packages/.claude-marketplace/plugins/cc-aca-observability/__lib/posttooluse/task_unresolved_suggester_hook.py").read_text()
+    assert re.search(r"default_enabled\s*=\s*False", src), \
+        "TaskUnresolvedSuggesterHook.default_enabled must be False so bare TaskList is cheap"
