@@ -182,6 +182,12 @@ When the user names a skill, command, package, or module:
 5. **Contract Closure**: For contract-sensitive work, emit a **Contract Authority Packet**.
 6. **Critic Review**: Narrow audit for safety contradictions and packet drift.
 7. **Payload Validation**: Save result and write verification flag.
+8. **Provenance Record**: Emit a Knowledge / Validation Ledger for every
+   source or check that materially informs the design, explicitly marking named
+   sources that were not used. When the decision is material, add a dated
+   Change Record entry under the project changelog's `## [Unreleased]` section.
+   Do not treat a changelog entry as proof that a source was actually used; link
+   it to the underlying transcript, document, command output, or artifact.
 
    > **Testability Contract (implementation-bound designs):** If the design will be implemented as code, include a `testability_contract` section listing: (a) the critical-path behaviors that mutation testing must cover, (b) their target module paths, and (c) whether they qualify as `tier: critical` for `quality_gates.json`. Designs without this section cannot be handed off to `/go` or `/code`.
 
