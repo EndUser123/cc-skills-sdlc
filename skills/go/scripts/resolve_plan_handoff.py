@@ -24,6 +24,7 @@ the worker reads it via source_ref. This block carries only what is needed
 to identify and start the next task.
 """
 import datetime
+import hashlib
 import json
 import os
 import pathlib
@@ -90,11 +91,32 @@ def _candidate_plans() -> list[tuple[pathlib.Path, dict[str, str], dict[str, str
             continue
         if str(flat.get("unresolved_blockers", "0")).strip() != "0":
             continue
+        if not _evidence_gate_matches(p):
+            continue
         gnt = nested.get("go_next_task") or {}
         if not gnt.get("task_id") or not gnt.get("objective"):
             continue
         cands.append((p, flat, gnt))
     return cands
+
+
+def _evidence_gate_matches(plan_path: pathlib.Path) -> bool:
+    """Require a passing evidence-gate sidecar for plan handoff.
+
+    The sidecar is intentionally bound to the exact plan bytes so a plan edit
+    cannot retain a stale readiness verdict.
+    """
+    artifact = plan_path.with_suffix(plan_path.suffix + ".evidence-gate.json")
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8"))
+        digest = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+        return (
+            payload.get("verdict") == "PASS"
+            and payload.get("plan_sha256") == digest
+            and pathlib.Path(payload.get("plan_path", "")).resolve() == plan_path.resolve()
+        )
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
 
 
 def _build_task(gnt: dict[str, str]) -> dict:

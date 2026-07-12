@@ -11,6 +11,7 @@ Layer map:
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import sys
 import textwrap
@@ -41,7 +42,22 @@ READY = textwrap.dedent(
 
 def _write_plan(dir_: Path, name: str, tid: str, title: str = "t", objective: str = "do it") -> Path:
     p = dir_ / name
-    p.write_text(READY.format(tid=tid, title=title, objective=objective), encoding="utf-8")
+    text = READY.format(tid=tid, title=title, objective=objective)
+    p.write_text(text, encoding="utf-8")
+    import hashlib
+
+    (p.with_suffix(p.suffix + ".evidence-gate.json")).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "plan_path": str(p.resolve()),
+                "plan_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "verdict": "PASS",
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
     return p
 
 

@@ -96,6 +96,24 @@ Valid modes:
 - Use `plan.md` as a scheduler source
 - Auto-push or create remote PRs
 
+## Planning and Proposal Boundary
+
+`/go` is the execution owner, not a substitute for `/planning`.
+
+- A plan-handoff may be executed only when the plan is
+  `implementation-ready`, has `unresolved_blockers: 0`, and has a matching
+  `<plan>.evidence-gate.json` sidecar whose SHA-256 matches the current plan.
+- A direct request such as “implement this proposal” must not silently turn
+  an unverified conversational proposal into an implementation task. If the
+  proposal is mechanism-changing, stateful, hook-driven, cross-component, or
+  otherwise contract-sensitive, route it through `/planning` and its final
+  evidence gate first.
+- Direct `/go` prompts remain valid for bounded local fixes whose task contract
+  is already concrete and whose work does not require plan-level architecture
+  decisions. `/go` must record why the plan gate was not required.
+- If a plan is present but below readiness, stop with a routing/blocker result;
+  do not infer readiness from polished prose or from a successful test command.
+
 ---
 
 ## Pi Dispatch Mode
