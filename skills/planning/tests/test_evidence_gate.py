@@ -60,9 +60,39 @@ def test_evidence_gate_passes_and_binds_hash(tmp_path: Path) -> None:
     assert artifact["verdict"] == "PASS"
     assert artifact["plan_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
 
+    path.write_text(path.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8")
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("evidence_gate_under_test", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.read_verified_plan(path) is None
+
 
 def test_evidence_gate_blocks_missing_ledger(tmp_path: Path) -> None:
     path = _write_plan(tmp_path, PLAN.replace("## Evidence Ledger", "## Notes"))
     result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True)
     assert result.returncode == 2
     assert '"verdict": "BLOCKED"' in result.stdout
+
+
+def test_read_verified_plan_rejects_forged_minimal_sidecar(tmp_path: Path) -> None:
+    import importlib.util
+
+    path = _write_plan(tmp_path)
+    artifact = path.with_suffix(path.suffix + ".evidence-gate.json")
+    artifact.write_text(
+        json.dumps({
+            "verdict": "PASS",
+            "plan_path": str(path.resolve()),
+            "plan_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }),
+        encoding="utf-8",
+    )
+    spec = importlib.util.spec_from_file_location("evidence_gate_under_test", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.read_verified_plan(path) is None
