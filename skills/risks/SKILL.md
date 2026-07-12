@@ -218,6 +218,22 @@ escalation occurred, or treat the recommendation as a verdict.
 - Every `theater` dismissal must name the disproving evidence in Findings
   Review. Unsupported dismissals are findings, not conclusions.
 
+### Knowledge / Validation Coverage
+
+If a plan, design, or implementation claim is being assessed, inspect its
+Knowledge / Validation Ledger and Change Record when present. Report:
+
+- `Used:` sources and checks with evidence;
+- `Not used:` named sources or checks explicitly marked `no`;
+- `Unverified:` claimed sources, checks, or changelog entries without
+  supporting artifacts; and
+- `Material gap:` whether the missing provenance changes the risk or decision.
+
+Do not infer source use from a changelog mention alone. If the artifact claims
+research, testing, deployment, acceptance, or validation but has no ledger or
+dated Change Record, treat that as an evidence gap and include it in the
+escalation decision when material.
+
 ### Skipped (report honestly; do not auto-route)
 
 - End-to-end trace of adjacent modules or remote state coupling
