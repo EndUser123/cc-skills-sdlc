@@ -273,9 +273,23 @@ None.
 | Claim | Type | Evidence | Falsifier |
 |---|---|---|---|
 | Parser path is covered | verified | focused test | test fails |
+## Knowledge / Validation Ledger
+| Source or check | Used? | Evidence | Claims supported | Status |
+|---|---|---|---|---|
+| /wiki | no | none | none | not applicable |
+## Change Record
+- Changelog: `CHANGELOG.md`
+- Entry ID: `PROV-20260711T000000Z-test`
+- Entry status: recorded
 ## Falsifiers
 - The focused parser test fails.
 """,
+        encoding="utf-8",
+    )
+    (tmp_path / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n"
+        "### Evidence / Design — 2026-07-11T00:00:00Z — PROV-20260711T000000Z-test\n"
+        "- Summary: test\n- Sources / checks: none\n- Claims supported: none\n- Evidence: test\n",
         encoding="utf-8",
     )
     import hashlib
