@@ -41,6 +41,10 @@ def _isolated_receipts(tmp_path, monkeypatch):
 def _write(tid, **kw):
     # Always write with the test terminal_id so the receipt body and path match.
     kw.setdefault("terminal_id", TEST_TERMINAL)
+    kw.setdefault("baseline", "HEAD")
+    kw.setdefault("evidence_files", ["skills/task/SKILL.md"])
+    kw.setdefault("subject", "Task %s" % tid)
+    kw.setdefault("description", "Change tracked by test %s" % tid)
     return R.write_receipt(tid, repo=REPO, **kw)
 
 
@@ -71,6 +75,41 @@ def test_read_has_list_roundtrip():
     assert R.read_receipt("103")["task_id"] == "103"
     assert "103" in R.list_receipts()
     assert not R.has_receipt("999")
+
+
+def test_list_receipt_records_preserves_same_id_across_terminals():
+    _write("104")
+    _write("104", terminal_id="other_terminal")
+    records = R.list_receipt_records()
+    assert {(r["task_id"], r["terminal_id"]) for r in records} == {
+        ("104", TEST_TERMINAL), ("104", "other_terminal")
+    }
+
+
+def test_unrelated_evidence_file_cannot_be_verified():
+    r = _write("105", verify_commands=["echo ok"], evidence_files=["CLAUDE.md"])
+    assert r["evidence_class"] == "REVIEW"
+    assert r["evidence_hashes"] == {}
+
+
+def test_changed_evidence_hash_invalidates_receipt():
+    _write("106", verify_commands=["echo ok"])
+    path = REPO + "/skills/task/SKILL.md"
+    evidence_path = Path(path)
+    original = evidence_path.read_text(encoding="utf-8")
+    try:
+        evidence_path.write_text(original + "\n", encoding="utf-8")
+        b, reason = V.verify_task("106", current_repo=REPO)
+        assert b == "STALE", reason
+    finally:
+        evidence_path.write_text(original, encoding="utf-8")
+
+
+def test_native_identity_mismatch_is_not_verified():
+    _write("107", verify_commands=["echo ok"], subject="Original subject")
+    expected = R.task_fingerprint("Different subject", "Change tracked by test 107")
+    b, reason = V.verify_task("107", current_repo=REPO, expected_fingerprint=expected)
+    assert b == "NO_EVIDENCE", reason
 
 
 # --- verify_task buckets ----------------------------------------------------
@@ -196,9 +235,11 @@ def test_clean_only_deletes_verified(_isolated_receipts):
     td = _make_tracker(_isolated_receipts, ["700", "701"])
     r = _cli_clean(["--apply", "700", "701"], td)
     data = json.loads((td / "console_test_tasks.json").read_text())
-    assert "700" not in data["tasks"]
+    assert "700" in data["tasks"]
     assert "701" in data["tasks"]
     assert R.has_receipt("700")
+    assert "NATIVE_DELETE_REQUIRED: #700" in r.stdout
+    assert "No tracker files modified" in r.stdout
 
 
 def test_clean_dry_run_does_not_delete(_isolated_receipts):

@@ -60,7 +60,7 @@ When you invoke `/task <command>`, the following occurs:
 ```
 1. User: /task clean [ids...] [--apply]
 2. Claude: Calls scripts/task_verify.py clean [ids...] [--apply]
-3. Only VERIFIED-receipt tasks are removed from the tracker mirror
+3. Only VERIFIED-receipt tasks are emitted as native deletion candidates; the script never mutates the tracker mirror. The caller issues native `TaskUpdate(status="deleted")`, then verifies absence with `TaskList`.
 4. Receipts are preserved. Dry-run by default.
 ```
 
@@ -94,7 +94,7 @@ task = TaskGet(taskId="123")
 - **TaskCreate/TaskUpdate/TaskList/TaskGet**: Native tools (NOT "Task" which does not exist)
 - **PostToolUse task tracker**: Persists task changes to file system (`P:/.claude/state/task_tracker/`)
 - **Session management**: Tasks survive compaction and restore
-- **Completion receipts**: `P:/.claude/state/task_receipts/{task_id}.json` (deterministic verification)
+- **Completion receipts**: `P:/.claude/state/task_receipts/{terminal_id}/{task_id}.json` (deterministic verification)
 - **Unresolved suggester**: Disabled by default (opt-in via env var TASK_UNRESOLVED_SUGGEST_ENABLED or `/task list --suggest`)
 - **PreToolUse self-doc gate**: Blocks vague TaskCreate/TaskUpdate at the hook layer
 - **PreToolUse done-evidence gate**: Advisory nudge when completing without a receipt (non-blocking)

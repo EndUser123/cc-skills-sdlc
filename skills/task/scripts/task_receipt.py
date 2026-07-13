@@ -15,12 +15,14 @@ overridable via TASK_RECEIPT_DIR (kept in sync with the done-evidence gate).
 
 Receipt schema (receipt_version 1):
     task_id, terminal_id, session_id, repo, worktree, baseline_commit,
-    final_commit_sha, changed_files[], verification[{command,exit_code,output_tail}],
+    final_commit_sha, changed_files[], evidence_files[],
+    verification[{command,exit_code,output_tail}],
     evidence_class (VERIFIED|REVIEW|NO_EVIDENCE), timestamp, verifier
 
 Evidence classification:
-    VERIFIED    -- at least one verification command exited 0
-    REVIEW      -- no verification command, but a final_commit_sha was captured
+    VERIFIED    -- a verification command passed and baseline/evidence files
+                   bind that result to this task
+    REVIEW      -- a final commit was captured, but verification is incomplete
     NO_EVIDENCE -- neither
 
 Receipts are preserved after task deletion -- nothing here ever deletes a receipt.
@@ -28,6 +30,7 @@ Receipts are preserved after task deletion -- nothing here ever deletes a receip
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -148,10 +151,66 @@ def run_verification(commands, cwd) -> list:
     return results
 
 
-def classify(verification: list, final_sha) -> str:
-    if verification and any(v.get("exit_code") == 0 for v in verification):
+def _normalize_repo_file(repo_path: str, value: str) -> str | None:
+    """Return a repo-relative evidence path, rejecting paths outside repo."""
+    try:
+        repo_root = Path(repo_path).resolve()
+        candidate = Path(value)
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        resolved = candidate.resolve()
+        relative = resolved.relative_to(repo_root)
+        return relative.as_posix()
+    except (OSError, ValueError):
+        return None
+
+
+def _evidence_snapshot(repo_path: str, evidence_files: list[str], changed: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Hash only existing, repo-local evidence files that are task changes."""
+    changed_norm = {str(p).replace("\\", "/").lstrip("./") for p in changed}
+    files: list[str] = []
+    hashes: dict[str, str] = {}
+    for raw in evidence_files:
+        normalized = _normalize_repo_file(repo_path, str(raw).strip())
+        if not normalized or normalized not in changed_norm:
+            continue
+        path = Path(repo_path) / Path(normalized)
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        files.append(normalized)
+        hashes[normalized] = digest
+    return files, hashes
+
+
+def task_fingerprint(subject: str = "", description: str = "") -> str | None:
+    """Bind a receipt to the native task's human-readable identity."""
+    if not subject.strip() and not description.strip():
+        return None
+    payload = (subject.strip() + "\n" + description.strip()).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def classify(verification: list, final_sha, baseline: str | None,
+             evidence_files: list[str], evidence_hashes: dict[str, str],
+             fingerprint: str | None) -> str:
+    """Classify only evidence bound to this task.
+
+    A passing command by itself is not proof that this task changed anything.
+    Require both a task baseline and explicit task evidence files before
+    authorizing cleanup.
+    """
+    if (
+        verification
+        and any(v.get("exit_code") == 0 for v in verification)
+        and baseline
+        and evidence_files
+        and len(evidence_hashes) == len(evidence_files)
+        and fingerprint
+    ):
         return "VERIFIED"
-    if final_sha:
+    if final_sha and (baseline or evidence_files):
         return "REVIEW"
     return "NO_EVIDENCE"
 
@@ -161,7 +220,8 @@ def _resolve_terminal_id() -> str:
 
 
 def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
-                  verify_commands=None, baseline=None, no_verify=False, final_sha=None) -> dict:
+                  verify_commands=None, baseline=None, no_verify=False, final_sha=None,
+                  evidence_files=None, subject="", description="") -> dict:
     repo_path = str(repo) if repo else os.getcwd()
     top = git_toplevel(repo_path)
     sha = final_sha or git_head(repo_path)
@@ -169,6 +229,8 @@ def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
     changed = changed_files(repo_path, base or None)
     cmds = [] if no_verify else (verify_commands or [])
     verification = run_verification(cmds, repo_path) if cmds else []
+    task_files, evidence_hashes = _evidence_snapshot(repo_path, evidence_files or [], changed)
+    fingerprint = task_fingerprint(subject, description)
     tid = terminal_id or _resolve_terminal_id()
     receipt = {
         "receipt_version": RECEIPT_VERSION,
@@ -180,8 +242,13 @@ def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
         "baseline_commit": base or None,
         "final_commit_sha": sha,
         "changed_files": changed,
+        "evidence_files": task_files,
+        "evidence_hashes": evidence_hashes,
+        "task_subject": subject,
+        "task_description": description,
+        "task_fingerprint": fingerprint,
         "verification": verification,
-        "evidence_class": classify(verification, sha),
+        "evidence_class": classify(verification, sha, base or None, task_files, evidence_hashes, fingerprint),
         "timestamp": datetime.now(UTC).isoformat(),
         "verifier": "task_receipt.py v%s" % RECEIPT_VERSION,
     }
@@ -195,12 +262,15 @@ def write_receipt(task_id, *, terminal_id="", session_id="", repo=None,
     return receipt
 
 
-def read_receipt(task_id):
-    path = receipt_path(task_id)
+def read_receipt_path(path: Path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, ValueError):
         return None
+
+
+def read_receipt(task_id, *, terminal_id=""):
+    return read_receipt_path(receipt_path(task_id, terminal_id=terminal_id))
 
 
 def has_receipt(task_id) -> bool:
@@ -239,20 +309,39 @@ def list_receipts() -> dict:
     return out
 
 
+def list_receipt_records() -> list[dict]:
+    """Return every receipt without collapsing same IDs across terminals."""
+    records: list[dict] = []
+    d = receipt_dir()
+    if not d.exists():
+        return records
+    for p in sorted(d.glob("*/*.json")) + sorted(d.glob("*.json")):
+        if p.name == "lost-plus-found.json":
+            continue
+        try:
+            record = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(record, dict) and record.get("task_id"):
+            records.append(record)
+    return records
+
+
 def _cmd_write(args):
     receipt = write_receipt(
         args.task_id, terminal_id=args.terminal_id, session_id=args.session_id,
         repo=args.repo, verify_commands=args.verify, baseline=args.baseline,
-        no_verify=args.no_verify)
+        no_verify=args.no_verify, evidence_files=args.file,
+        subject=args.subject, description=args.description)
     print(json.dumps({"status": "written", "task_id": receipt["task_id"],
                       "evidence_class": receipt["evidence_class"],
-                      "receipt_path": str(receipt_path(args.task_id)),
+                      "receipt_path": str(receipt_path(args.task_id, terminal_id=args.terminal_id)),
                       "changed_files": len(receipt["changed_files"])}, indent=2))
     return 0
 
 
 def _cmd_read(args):
-    r = read_receipt(args.task_id)
+    r = read_receipt(args.task_id, terminal_id=args.terminal_id)
     if r is None:
         print("MISSING: no receipt for task %s" % args.task_id, file=sys.stderr)
         return 1
@@ -285,10 +374,15 @@ def main() -> int:
     w.add_argument("--session-id", default="")
     w.add_argument("--verify", action="append", default=[], help="verification command (repeatable)")
     w.add_argument("--baseline", help="baseline commit sha (if available)")
+    w.add_argument("--file", action="append", default=[],
+                   help="task-linked evidence file (repeatable; required for VERIFIED)")
+    w.add_argument("--subject", default="", help="native task subject (required for VERIFIED)")
+    w.add_argument("--description", default="", help="native task description (required for VERIFIED)")
     w.add_argument("--no-verify", action="store_true")
     w.set_defaults(func=_cmd_write)
     r = sub.add_parser("read", help="print a receipt")
     r.add_argument("--task-id", required=True)
+    r.add_argument("--terminal-id", default=os.environ.get("CLAUDE_TERMINAL_ID", ""))
     r.set_defaults(func=_cmd_read)
     h = sub.add_parser("has", help="exit 0 if receipt exists, 1 otherwise")
     h.add_argument("--task-id", required=True)

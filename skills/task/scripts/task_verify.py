@@ -27,20 +27,12 @@ Exit codes (deterministic):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
-
-# File lock for concurrent-safe tracker access (same module the tracker hook uses).
-try:
-    from __lib.file_lock import FileLock
-except ImportError:
-    try:
-        from file_lock import FileLock
-    except ImportError:
-        FileLock = None  # type: ignore[assignment,misc]
 
 # Import the receipt store from the sibling module.
 _HERE = Path(__file__).resolve().parent
@@ -82,7 +74,8 @@ def _detect_current_repo(repo_arg: str | None) -> str | None:
     return receipt.git_toplevel(os.getcwd())
 
 
-def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: str | None = None) -> tuple[str, str]:
+def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: str | None = None,
+                expected_fingerprint: str | None = None) -> tuple[str, str]:
     """Return (bucket, reason) for a single task id."""
     tid = terminal_id or _resolve_terminal_id()
     path = receipt.receipt_path(task_id, terminal_id=tid)
@@ -110,7 +103,7 @@ def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: s
             # correct block is NO_EVIDENCE (wrong terminal), not VERIFIED.
             # NO_EVIDENCE is returned when the receipt body doesn't load.
     file_exists = path.is_file()
-    r = receipt.read_receipt(task_id)
+    r = receipt.read_receipt_path(path) if file_exists else None
     if r is None:
         # Distinguish malformed (file present but unreadable) from missing.
         if file_exists:
@@ -118,12 +111,21 @@ def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: s
         return "NO_EVIDENCE", "no completion receipt for task %s" % task_id
     if not isinstance(r, dict) or "task_id" not in r or "evidence_class" not in r:
         return "BLOCKED", "receipt for %s is malformed" % task_id
+    if str(r.get("task_id")) != str(task_id):
+        return "BLOCKED", "receipt path/content task id mismatch for %s" % task_id
+
+    # A receipt without an exact terminal identity is not safe to associate
+    # with a native task, even when the repo happens to match.
+    if r.get("terminal_id", "") != tid:
+        return "NO_EVIDENCE", "receipt terminal does not match current terminal"
 
     # Cross-repo / cross-terminal guard: a receipt from a different repo does
     # NOT constitute evidence for the task in the current repo.
     if current_repo:
         rec_repo = r.get("repo", "")
-        if rec_repo and _norm_repo(rec_repo) != _norm_repo(current_repo):
+        if not rec_repo:
+            return "NO_EVIDENCE", "receipt has no repo identity"
+        if _norm_repo(rec_repo) != _norm_repo(current_repo):
             return (
                 "NO_EVIDENCE",
                 "receipt repo %s != current repo %s (cross-repo; not evidence)" % (rec_repo, current_repo),
@@ -135,7 +137,25 @@ def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: s
         return "STALE", "final_commit_sha %s no longer reachable in %s" % (final_sha, repo_for_check)
 
     ev = r.get("evidence_class", "NO_EVIDENCE")
-    if ev == "VERIFIED":
+    if ev == "VERIFIED" and r.get("baseline_commit") and r.get("evidence_files"):
+        hashes = r.get("evidence_hashes")
+        if not isinstance(hashes, dict) or set(hashes) != set(r.get("evidence_files", [])):
+            return "NO_EVIDENCE", "receipt lacks complete evidence hashes"
+        for evidence_file in r.get("evidence_files", []):
+            normalized = receipt._normalize_repo_file(repo_for_check, evidence_file)
+            if normalized != evidence_file:
+                return "NO_EVIDENCE", "evidence path is outside repo or not normalized"
+            path = Path(repo_for_check) / Path(evidence_file)
+            try:
+                current_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                return "STALE", "evidence file %s is missing" % evidence_file
+            if current_hash != hashes[evidence_file]:
+                return "STALE", "evidence file %s changed since receipt" % evidence_file
+        if not r.get("task_fingerprint"):
+            return "NO_EVIDENCE", "receipt lacks native task identity fingerprint"
+        if expected_fingerprint and r.get("task_fingerprint") != expected_fingerprint:
+            return "NO_EVIDENCE", "native task identity does not match receipt"
         return "VERIFIED", "receipt VERIFIED (%d changed files, %d verification cmds)" % (
             len(r.get("changed_files", [])), len(r.get("verification", [])))
     if ev == "REVIEW":
@@ -143,12 +163,14 @@ def verify_task(task_id: str, *, current_repo: str | None = None, terminal_id: s
     return "NO_EVIDENCE", "receipt evidence_class=%s" % ev
 
 
-def verify_many(task_ids, *, current_repo: str | None = None, terminal_id: str | None = None) -> dict:
+def verify_many(task_ids, *, current_repo: str | None = None, terminal_id: str | None = None,
+               expected_fingerprint: str | None = None) -> dict:
     tid = terminal_id or _resolve_terminal_id()
     buckets = {b: [] for b in BUCKETS}
     detail = {}
     for t in task_ids:
-        bucket, reason = verify_task(t, current_repo=current_repo, terminal_id=tid)
+        bucket, reason = verify_task(t, current_repo=current_repo, terminal_id=tid,
+                                     expected_fingerprint=expected_fingerprint)
         buckets[bucket].append(t)
         detail[t] = {"bucket": bucket, "reason": reason}
     return {"buckets": buckets, "detail": detail}
@@ -172,41 +194,14 @@ def _render(report: dict) -> str:
 
 # --- clean ------------------------------------------------------------------
 
-def _remove_from_tracker(task_id: str, tracker_dir: Path) -> int:
-    """Remove a task from tracker *_tasks.json mirror files. Uses the same
-    FileLock the tracker hook holds, so concurrent TaskCreate/TaskUpdate during
-    clean does not lose tasks (SR-3 fix)."""
-    changed = 0
-    if not tracker_dir.exists() or FileLock is None:
-        return 0
-    for f in tracker_dir.glob("*_tasks.json"):
-        # Derive lock path matching the tracker hook's convention:
-        #   lock_path = get_state_dir() / f"{safe_terminal_id}_tasks.lock"
-        # The *_tasks.json file has the same stem.
-        lock_path = f.with_suffix(".lock")
-        try:
-            with FileLock(str(lock_path), timeout=5.0):
-                # Re-read INSIDE the lock — file may have changed since iteration.
-                data = json.loads(f.read_text(encoding="utf-8"))
-                tasks = data.get("tasks") if isinstance(data, dict) else None
-                if not isinstance(tasks, dict) or task_id not in tasks:
-                    continue
-                tasks.pop(task_id, None)
-                tmp = f.with_suffix(".%s.tmp" % os.getpid())
-                tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-                os.replace(tmp, f)
-                changed += 1
-        except (OSError, json.JSONDecodeError, ValueError, TimeoutError):
-            continue
-    return changed
-
 
 def cmd_clean(args) -> int:
-    """Delete only VERIFIED-receipt tasks from the tracker mirror. Dry-run by default.
+    """Emit native deletion candidates without mutating tracker state.
 
-    Receipts are NEVER deleted. The native live task list cannot be removed via
-    API (no TaskDelete exists), so clean operates on the tracker persistence
-    mirror that /task reads for cross-terminal continuity.
+    The native task list is authoritative. This command cannot safely delete a
+    native task itself, so ``--apply`` means "authorize/emit candidates" and
+    the caller must issue the native TaskUpdate(status="deleted") call, then
+    verify that TaskList no longer returns the task.
     """
     candidates = [str(x) for x in args.task_ids]
     if args.from_stdin:
@@ -216,7 +211,9 @@ def cmd_clean(args) -> int:
         return 1
 
     current_repo = _detect_current_repo(args.repo)
-    report = verify_many(candidates, current_repo=current_repo)
+    expected = receipt.task_fingerprint(args.subject, args.description) if args.subject or args.description else None
+    report = verify_many(candidates, current_repo=current_repo, terminal_id=args.terminal_id,
+                         expected_fingerprint=expected)
     deletable = report["buckets"]["VERIFIED"]
 
     print("Candidates: %d" % len(candidates))
@@ -232,16 +229,13 @@ def cmd_clean(args) -> int:
 
     print("\nVERIFIED (deletion-safe): %s" % (", ".join("#" + t for t in sorted(deletable))))
     if not args.apply:
-        print("\nDRY RUN -- re-run with --apply to remove these from the tracker mirror.")
-        print("Receipts are preserved either way.")
+        print("\nDRY RUN -- re-run with --apply to emit native deletion candidates.")
+        print("No tracker files modified. Receipts are preserved.")
         return 0 if not (report["buckets"]["REVIEW"] or report["buckets"]["NO_EVIDENCE"]
                          or report["buckets"]["STALE"] or report["buckets"]["BLOCKED"]) else 1
 
-    removed_files = 0
-    for tid in sorted(deletable):
-        removed_files += _remove_from_tracker(tid, Path(args.tracker_dir))
-    print("\nRemoved %d VERIFIED task(s) from %d tracker file(s). Receipts preserved."
-          % (len(deletable), removed_files))
+    print("\nNATIVE_DELETE_REQUIRED: %s" % ", ".join("#" + t for t in sorted(deletable)))
+    print("No tracker files modified. Issue native TaskUpdate(status=deleted), then verify TaskList.")
     # exit 0 only if every candidate was VERIFIED
     return 0 if not (report["buckets"]["REVIEW"] or report["buckets"]["NO_EVIDENCE"]
                      or report["buckets"]["STALE"] or report["buckets"]["BLOCKED"]) else 1
@@ -253,12 +247,16 @@ def cmd_verify(args) -> int:
         candidates = [l.strip() for l in sys.stdin.read().splitlines() if l.strip()]
     if not candidates:
         # default: verify every receipt we have
-        candidates = sorted(receipt.list_receipts().keys(), key=lambda t: str(t))
+        records = receipt.list_receipt_records()
+        terminal_records = [r for r in records if r.get("terminal_id", "") == _resolve_terminal_id()]
+        candidates = sorted({str(r.get("task_id")) for r in terminal_records if r.get("task_id")}, key=lambda t: str(t))
         if not candidates:
             print("NO_EVIDENCE: 0 (no receipts and no task ids given)")
             return 1
     current_repo = _detect_current_repo(args.repo)
-    report = verify_many(candidates, current_repo=current_repo)
+    expected = receipt.task_fingerprint(args.subject, args.description) if args.subject or args.description else None
+    report = verify_many(candidates, current_repo=current_repo, terminal_id=args.terminal_id,
+                         expected_fingerprint=expected)
     if args.json:
         print(json.dumps(report, indent=2))
     else:
@@ -275,12 +273,18 @@ def main() -> int:
     v.add_argument("task_ids", nargs="*", help="task ids (default: all receipts)")
     v.add_argument("--from-stdin", action="store_true", help="read task ids from stdin (one per line)")
     v.add_argument("--repo", help="current repo (default: git toplevel of cwd)")
+    v.add_argument("--terminal-id", help="terminal identity (default: current terminal)")
+    v.add_argument("--subject", default="", help="native task subject for identity matching")
+    v.add_argument("--description", default="", help="native task description for identity matching")
     v.add_argument("--json", action="store_true", help="emit JSON")
     v.set_defaults(func=cmd_verify)
-    c = sub.add_parser("clean", help="delete only VERIFIED-receipt tasks from the tracker mirror")
+    c = sub.add_parser("clean", help="emit native deletion candidates from VERIFIED receipts")
     c.add_argument("task_ids", nargs="*", help="candidate task ids")
     c.add_argument("--from-stdin", action="store_true")
     c.add_argument("--repo")
+    c.add_argument("--terminal-id", help="terminal identity (default: current terminal)")
+    c.add_argument("--subject", default="", help="native task subject for identity matching")
+    c.add_argument("--description", default="", help="native task description for identity matching")
     c.add_argument("--tracker-dir", default=str(TRACKER_DIR))
     c.add_argument("--apply", action="store_true", help="actually remove (default: dry-run)")
     c.set_defaults(func=cmd_clean)

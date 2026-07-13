@@ -16,7 +16,7 @@ Orchestrator for Claude Code task list operations. Routes sub-commands to built-
 - **Evidence-based**: Completion verification uses deterministic receipts, not subject matching.
 - **Persistence**: `.claude/state/task_tracker/{terminal_id}_tasks.json` via PostToolUse task tracker.
 - **Multi-terminal safe**: Tasks survive compaction and sessions.
-- **Receipt-based verification**: Completion receipts stored in `P:/.claude/state/task_receipts/{task_id}.json` (approved artifact location, NOT inside the skill dir). Read by `scripts/task_receipt.py`. Verified by `scripts/task_verify.py`.
+- **Receipt-based verification**: Completion receipts stored in `P:/.claude/state/task_receipts/{terminal_id}/{task_id}.json` (approved artifact location, NOT inside the skill dir). Read by `scripts/task_receipt.py`. Verified by `scripts/task_verify.py`.
 
 ## Commands
 
@@ -34,10 +34,10 @@ Orchestrator for Claude Code task list operations. Routes sub-commands to built-
 /task done 123                       # Complete + write receipt (TaskUpdate + task_receipt.py write)
 /task done 123 --verify "pytest -q"  # Complete with verification commands
 
-/task verify [ids...]                # Receipt-based verification (VERIFIED / REVIEW / NO_EVIDENCE / STALE / BLOCKED)
+/task verify [ids...]                # TaskGet each id, then receipt verification (VERIFIED / REVIEW / NO_EVIDENCE / STALE / BLOCKED)
 /task verify --json                  # Machine-readable output
-/task clean [ids...]                 # Remove only VERIFIED-receipt tasks (dry-run by default)
-/task clean [ids...] --apply         # Actually remove
+/task clean [ids...]                 # TaskGet candidates, then show native deletion candidates
+/task clean [ids...] --apply         # Emit candidates; native TaskUpdate performs deletion
 
 /task search "authentication"        # Search within built-in task list
 ```
@@ -68,11 +68,11 @@ Terminal console_def tasks:
 
 ## /task done — Durable Completion Receipt
 
-**Behavior:** Calls TaskUpdate(status="completed") AND writes a durable completion receipt via `scripts/task_receipt.py write --task-id <id> --verify <commands>`. The receipt is the deterministic evidence that authorizes later cleanup.
+**Behavior:** Calls TaskGet first, then calls TaskUpdate(status="completed") AND writes a durable completion receipt via `scripts/task_receipt.py write --task-id <id> --subject <subject> --description <description> --verify <commands> --baseline <sha> --file <path>`. A passing command alone is not proof: VERIFIED requires a task baseline, native task identity, existing task-linked files that are part of the task change set, hashes of those files, and at least one passing verification command. The receipt is the deterministic evidence that authorizes later cleanup.
 
 Receipt fields:
 - task ID, terminal/session, repository/worktree, baseline commit (if available)
-- changed files, verification commands/results
+- changed files, task-linked evidence files, verification commands/results
 - final commit SHA, timestamp, evidence classification (VERIFIED/REVIEW/NO_EVIDENCE)
 
 Receipts are NEVER deleted by /task clean — they outlive the task entry.
@@ -100,11 +100,11 @@ Replaces the old subject-based `verify_completed.py` (basename / commit-message 
 **Never:** ask the LLM to manually inspect every task when receipts are available.
 **Receipts are preserved after deletion.**
 
-`/task clean` operates on the tracker mirror (`_tasks.json` files in `P:/.claude/state/task_tracker/`) — the native live task list has no public TaskDelete API.
+`/task clean` never edits tracker JSON. It emits `NATIVE_DELETE_REQUIRED` candidates. For each candidate, call the native `TaskUpdate(taskId=<id>, status="deleted")`, then call `TaskList` and report verified absence. This avoids treating a persistence mirror as the authoritative task store.
 
 ```bash
-/task clean [ids...]           # Dry-run: shows what would be deleted
-/task clean [ids...] --apply   # Actually removes VERIFIED-receipt tasks from tracker mirror
+/task clean [ids...]           # Dry-run: shows native deletion candidates
+/task clean [ids...] --apply   # Emits native deletion candidates; does not mutate files
 ```
 
 If a task lacks evidence, leave it untouched and report the exact reason (NO_EVIDENCE, STALE, BLOCKED).
@@ -117,7 +117,7 @@ If a task lacks evidence, leave it untouched and report the exact reason (NO_EVI
 /task verify                                # Check all tasks (reads receipts)
 /task verify 1 2 --json                     # Check specific tasks, JSON output
 /task clean                                 # Dry-run cleanup
-/task clean 1 2 --apply                     # Remove VERIFIED tasks from tracker
+/task clean 1 2 --apply                     # Emit candidates, then native TaskUpdate deleted + TaskList verify
 /task list --suggest                        # List with suggestions
 /task scan                                  # Scan for unresolved items
 ```
