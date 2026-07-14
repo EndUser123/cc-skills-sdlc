@@ -71,6 +71,7 @@ from preflight_propose import apply_discovery_evidence_merge as _apply_discovery
 from preflight_propose import emit_discovery_evidence_telemetry as _emit_discovery_telemetry  # noqa: E402
 from preflight_propose import record_pi_outcome as _record_pi_outcome  # noqa: E402
 from preflight_propose import record_failover_telemetry as _record_failover_telemetry  # noqa: E402
+from evidence_index import load_index as _load_index, append_index_entry as _append_index_entry, _build_index_entry, _read_json  # noqa: E402
 
 
 @dataclass
@@ -1812,11 +1813,73 @@ def _pr_artifacts_and_tail(worktree: Path, state_dir: Path, run_id: str) -> bool
     except Exception:
         pass
     try:
+        _persist_evidence(state_dir, run_id)
+    except Exception:
+        pass
+    try:
         _record_pi_outcome(state_dir, run_id, dispatch_route="",
                            review_verdict="", rescue_escalation_needed=False)
     except Exception:
         pass
     return True
+
+
+def _persist_evidence(state_dir: Path, run_id: str) -> None:
+    """Copy discovery evidence to go-runs artifact store and update index.
+
+    Called in pr-ready tail. Fail-soft: evidence persistence is advisory and
+    must never block the pr-ready signal.
+    """
+    try:
+        import evidence_index as _ei
+        session_id = resolve_session_id()
+        if not session_id:
+            return
+        de_path = state_dir / f"discovery-evidence_{run_id}.json"
+        if not de_path.is_file():
+            return
+        # Read the evidence
+        data = _read_json(de_path)
+        if not isinstance(data, dict):
+            return
+        findings = data.get("findings", [])
+        if not isinstance(findings, list):
+            return
+        # Read run record for status and revision
+        rr_path = ARTIFACTS_ROOT / "go-runs" / session_id / run_id / "run-record.json"
+        rr = _read_json(rr_path) if rr_path.is_file() else None
+        status = str(rr.get("lifecycle_status", "")) if isinstance(rr, dict) else ""
+        repository = str(rr.get("repository", "")) if isinstance(rr, dict) else ""
+        base_revision = str(rr.get("base_revision", "")) if isinstance(rr, dict) else ""
+        # Copy evidence to go-runs artifact store
+        dest = ARTIFACTS_ROOT / "go-runs" / session_id / run_id / f"discovery-evidence_{run_id}.json"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+        shutil.copy2(str(de_path), str(dest))
+        # Build and append index entry
+        surface_labels = sorted({
+            si
+            for f in findings if isinstance(f, dict)
+            for si in (f.get("structural_issues") or [])
+        })
+        entry = _build_index_entry(
+            discovery_path=dest,
+            run_id=run_id,
+            session_id=session_id,
+            status=status or "completed",
+            repository=repository,
+            base_revision=base_revision,
+            surface_labels=list(surface_labels),
+            finding_count=len(findings),
+            structural_issue_count=sum(
+                1 for f in findings
+                if isinstance(f, dict) and isinstance(f.get("structural_issues"), list)
+            ),
+        )
+        index_path = ARTIFACTS_ROOT / "discovery-index.json"
+        _append_index_entry(index_path, entry)
+    except Exception:
+        pass
 
 
 def _completion_verify_request_payload(state_dir: Path, run_id: str) -> dict:

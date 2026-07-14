@@ -3214,6 +3214,42 @@ def record_failover_telemetry(state_dir, run_id: str, candidate_chain: list,
         pass
     return record
 
+def _inject_prior_evidence(proposal: dict) -> None:
+    """Inject advisory prior_evidence into the proposal from the discovery index.
+
+    Fail-soft: if the index is missing or any error occurs, prior_evidence is
+    set to empty. Prior evidence accelerates discovery, never replaces it.
+    """
+    try:
+        import evidence_index as _ei
+        import evidence_reader as _er
+        from pathlib import Path as _Path
+        import os as _os
+        root = _Path(_os.environ.get("GO_ARTIFACTS_ROOT", "P:/.claude/.artifacts"))
+        idx_path = root / "discovery-index.json"
+        if not idx_path.is_file():
+            proposal["prior_evidence"] = {"prior_evidence": [], "count": 0, "advisory": True}
+            return
+        idx = _ei.load_index(idx_path)
+        if not idx:
+            proposal["prior_evidence"] = {"prior_evidence": [], "count": 0, "advisory": True}
+            return
+        od = proposal.get("operational_discovery", {}) or {}
+        surface_labels = od.get("surfaces", [])
+        rewritten = proposal.get("rewrittenGoal", "")
+        task_intent = proposal.get("task_intent", "")
+        sf = _ei.compute_surface_fingerprint(
+            rewritten_goal=rewritten,
+            surface_labels=surface_labels,
+            task_intent=task_intent,
+        )
+        result = _er.query(idx, surface_fingerprint=sf,
+                             surface_labels=surface_labels, limit=3)
+        proposal["prior_evidence"] = result
+    except Exception:
+        proposal["prior_evidence"] = {"prior_evidence": [], "count": 0, "advisory": True}
+
+
 def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> Path:
     """Build proposal + write ``task-proposal-<runid>.json`` (terminal-scoped).
 
@@ -3225,6 +3261,7 @@ def run_preflight(args: Any, state_dir: Path, run_id: str, terminal_id: str) -> 
     visible instead of silently skipped (goal req. 7).
     """
     proposal = generate_proposal(args.prompt, run_id, terminal_id)
+    _inject_prior_evidence(proposal)
     artifact = state_dir / f"task-proposal_{run_id}.json"
     _atomic_write_json(artifact, proposal)
 
