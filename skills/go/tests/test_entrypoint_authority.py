@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Tests for Pass 2 of /go authority consolidation.
+"""Tests for /go authority: orchestrate.py is the single canonical full runtime.
 
 Proves:
-- orchestrate.py is the canonical full runtime entrypoint.
-- go_safe.py is a compatibility initialization guard, not a runtime authority.
-- The root go-safe.sh is a convenience wrapper with no runtime registration.
-- scripts/go-safe.sh is dead code.
-- No wrapper duplicates orchestration logic.
+- orchestrate.py is the only supported runtime entrypoint.
+- Legacy wrappers are removed (negative existence test).
+- No active documentation references deleted entrypoints.
 """
 from __future__ import annotations
 
@@ -15,30 +13,17 @@ import sys
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
-ROOT = SCRIPTS.parent  # skills/go/
-PACKAGE = ROOT.parent.parent  # cc-skills-sdlc/
+ROOT = SCRIPTS.parent
+PACKAGE = ROOT.parent.parent
 
 
 def _load_orchestrate():
     """Load orchestrate.py as a module for testing."""
-    import importlib
     import sys as _sys
-    # Use path-based import so annotations resolve correctly (spec_from_file_location
-    # doesn't register __module__ properly for Python 3.14's dataclass string annotations).
     _sys.path.insert(0, str(SCRIPTS))
     import orchestrate as _orch
     _sys.path.pop(0)
     return _orch
-
-
-def _load_go_safe():
-    """Load go_safe.py as a module for testing."""
-    import importlib
-    import sys as _sys
-    _sys.path.insert(0, str(SCRIPTS))
-    import go_safe as _gs
-    _sys.path.pop(0)
-    return _gs
 
 
 # --- Canonical runtime authority --------------------------------------------
@@ -55,7 +40,7 @@ def test_orchestrate_is_the_canonical_full_runtime():
     assert callable(getattr(orch, "orchestrate", None)), "missing orchestrate"
 
 
-def test_orchestrate_help_does_not_mutate_state():
+def test_orchestrate_help_succeeds():
     """--help exits 0 without creating artifacts or worktrees."""
     result = subprocess.run(
         [sys.executable, str(SCRIPTS / "orchestrate.py"), "--help"],
@@ -66,8 +51,8 @@ def test_orchestrate_help_does_not_mutate_state():
     assert "/go orchestrator" in result.stdout
 
 
-def test_orchestrate_preflight_only_does_not_dispatch(tmp_path, monkeypatch):
-    """--preflight-only with a prompt should not create a worktree."""
+def test_orchestrate_preflight_only_does_not_create_worktree(tmp_path, monkeypatch):
+    """--preflight-only does not create a worktree (may fail, but no production state)."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GO_STATE_DIR", str(tmp_path / "state"))
     result = subprocess.run(
@@ -75,104 +60,52 @@ def test_orchestrate_preflight_only_does_not_dispatch(tmp_path, monkeypatch):
          "--preflight-only", "--prompt", "test preflight"],
         capture_output=True, text=True, cwd=tmp_path,
     )
-    # May fail (no git repo) but must NOT create production state in P:/
     assert not (tmp_path / ".worktrees").exists(), "worktree was created"
     assert not (tmp_path / ".claude").exists(), "artifacts were created"
 
 
-# --- go_safe.py compatibility role ------------------------------------------
-
-
-def test_go_safe_is_not_the_orchestrator():
-    """go_safe.py does not provide orchestration functions."""
-    gs = _load_go_safe()
-    assert hasattr(gs, "infer_args"), "missing infer_args"
-    assert hasattr(gs, "main"), "missing main"
-    # Must NOT have orchestration functions
-    assert not hasattr(gs, "create_worktree"), "go_safe should not create worktrees"
-    assert not hasattr(gs, "ensure_runtime_env"), "go_safe should not be runtime env"
-    assert not hasattr(gs, "dispatch_pi"), "go_safe should not dispatch"
-    assert not hasattr(gs, "run_common_tail"), "go_safe should not run tail"
-
-
-def test_go_safe_has_no_active_runtime_callers():
-    """go_safe.py is referenced only in its own test and a refactor scan list."""
-    import subprocess
-    import sys
-    result = subprocess.run(
-        [sys.executable, "-m", "skills.go.scripts.go_safe",
-         "--root-dir", "/nonexistent", "--go-run-id", "test", "--terminal-id", "test"],
-        capture_output=True, text=True,
-    )
-    # Should fail (no git repo) but prove the entry point is separate
-    assert result.returncode != 0
-
-
-# --- Shell wrapper documentation --------------------------------------------
-
-def test_root_go_safe_sh_not_used_by_orchestrate():
-    """The root go-safe.sh is NOT invoked by orchestrate.py or SKILL.md."""
-    orch_text = (SCRIPTS / "orchestrate.py").read_text(encoding="utf-8")
-    assert "go-safe.sh" not in orch_text, "orchestrate.py references go-safe.sh"
-
-
-def test_scripts_go_safe_sh_has_no_references():
-    """scripts/go-safe.sh has zero references outside itself and tests."""
-    import subprocess
-    result = subprocess.run(
-        ["grep", "-rn", "scripts/go-safe\\.sh",
-         str(PACKAGE / "skills" / "go" / "scripts")],
-        capture_output=True, text=True,
-    )
-    lines = [l for l in result.stdout.splitlines()
-             if "__pycache__" not in l
-             and l.strip() != ""]
-    assert len(lines) == 0, f"scripts/go-safe.sh references found: {lines}"
-
-
-# --- Entrypoint authority manifest ------------------------------------------
-
-ENTRYPOINT_REGISTRY = {
-    "orchestrate.py": {
-        "role": "canonical full runtime",
-        "authority": "run identity, task acquisition, state, worktrees, dispatch, continuation, completion",
-        "invoked_by": "SKILL.md (direct python invocation), Stop hook, user handoff",
-        "status": "active",
-    },
-    "go_safe.py": {
-        "role": "compatibility initialization guard",
-        "authority": "artifact init and validation (non-orchestration)",
-        "invoked_by": "none (no active runtime callers)",
-        "status": "compatibility",
-    },
-    "go-safe.sh": {
-        "role": "interactive user-facing convenience wrapper",
-        "authority": "none — calls /go or go command",
-        "invoked_by": "documentation (IMPLEMENTATION-GUIDE.md, GO-QUICK-REFERENCE.md)",
-        "status": "documented-convenience",
-    },
-    "scripts/go-safe.sh": {
-        "role": "Bash init/validation (superseded by go_safe.py)",
-        "authority": "none — dead code",
-        "invoked_by": "none",
-        "status": "dead",
-    },
-}
-
-
-def test_entrypoint_manifest_accurate():
-    """Every entrypoint has a documented role and status."""
-    for name, info in ENTRYPOINT_REGISTRY.items():
-        assert "role" in info, f"{name} missing role"
-        assert "status" in info, f"{name} missing status"
-        if name == "orchestrate.py":
-            assert info["status"] == "active"
-            assert info["role"] == "canonical full runtime"
-
-
 def test_only_one_canonical_full_runtime():
-    """Exactly one entrypoint claims canonical full runtime authority."""
-    canonicals = [n for n, i in ENTRYPOINT_REGISTRY.items()
-                  if i.get("role") == "canonical full runtime"]
-    assert len(canonicals) == 1, f"Expected 1 canonical runtime, found {canonicals}"
-    assert canonicals[0] == "orchestrate.py"
+    """Only orchestrate.py remains as a full runtime entrypoint."""
+    orch_text = (SCRIPTS / "orchestrate.py").read_text(encoding="utf-8")
+    assert "def create_worktree" in orch_text
+    assert "def ensure_runtime_env" in orch_text
+
+
+# --- Deleted entrypoint verification ----------------------------------------
+
+
+def test_legacy_go_safe_deleted():
+    """go_safe.py has been removed (no active consumers)."""
+    assert not (SCRIPTS / "go_safe.py").exists()
+
+
+def test_legacy_init_go_run_deleted():
+    """init_go_run.py has been removed."""
+    assert not (SCRIPTS / "init_go_run.py").exists()
+
+
+def test_legacy_validate_go_contracts_deleted():
+    """validate_go_contracts.py has been removed."""
+    assert not (SCRIPTS / "validate_go_contracts.py").exists()
+
+
+def test_scripts_go_safe_sh_deleted():
+    """scripts/go-safe.sh has been removed."""
+    assert not (SCRIPTS / "go-safe.sh").exists()
+
+
+def test_root_go_safe_sh_deleted():
+    """Root go-safe.sh has been removed."""
+    assert not (ROOT / "go-safe.sh").exists()
+
+
+# --- Negative registration check --------------------------------------------
+
+
+def test_orchestrate_does_not_reference_deleted_wrappers():
+    """orchestrate.py does not reference any deleted wrapper filename."""
+    orch_text = (SCRIPTS / "orchestrate.py").read_text(encoding="utf-8")
+    assert "go_safe.py" not in orch_text
+    assert "go-safe.sh" not in orch_text
+    assert "init_go_run" not in orch_text
+    assert "validate_go_contracts" not in orch_text

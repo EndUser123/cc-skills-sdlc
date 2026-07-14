@@ -57,12 +57,18 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
     "dispatch-result.v1": ArtifactContract(
         version="dispatch-result.v1",
         artifact="dispatch-result_{run_id}.json",
-        required_fields=("status", "exit_code"),
-        optional_fields=("command", "session_id", "session_dir"),
+        required_fields=("status",),
+        optional_fields=("exit_code", "dispatch", "model", "reason",
+                          "command", "session_id", "session_dir",
+                          "run_id", "transcript_path", "updated_at",
+                          "schema_version"),
         additive_field_policy="tolerated",
         writer="python:adapters/pi/harness.py:run_pi_harness",
-        readers=("python:orchestrate:run_common_tail",),
+        readers=("python:completion_evidence_review:_has_real_subprocess_evidence",),
         failure_behavior="document",
+        note="Also written by orchestrate dispatch_claude and run_local_verification "
+             "(pre-dispatch status markers without exit_code). "
+             "Readers only check existence, not field content.",
     ),
     "pi-candidate-attempt.v1": ArtifactContract(
         version="pi-candidate-attempt.v1",

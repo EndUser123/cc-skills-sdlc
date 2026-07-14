@@ -399,6 +399,32 @@ def write_current_run(state_dir: Path, run_id: str, status: str, dispatch: str) 
     write_json(state_dir / f"current-run_{terminal_id}.json", payload)
 
 
+def finalize_run(state_dir, run_id, session_id='',
+                 workspace_id='', artifacts_root=None,
+                 leases_root=None):
+    """Finalize run: persist evidence and release lease."""
+    try:
+        from run_record import (update_run_record_status as _upd,
+                                read_run_record as _read,
+                                release_workspace_lease as _rel)
+        aid = _read(session_id=session_id, run_id=run_id,
+                    artifacts_root=artifacts_root)
+        ws = workspace_id or (aid.get('workspace_id', '') if aid else '')
+        if session_id:
+            _upd(session_id=session_id, run_id=run_id,
+                 lifecycle_status='artifacts_finalized',
+                 artifacts_root=artifacts_root)
+        if ws and session_id:
+            rel = _rel(workspace_id=ws, session_id=session_id,
+                       run_id=run_id, leases_root=leases_root)
+            if not rel.get('released'):
+                return {'success': False,
+                        'reason_code': rel.get('reason_code', 'LEASE_FAILED')}
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'reason_code': str(e)[:120]}
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="/go orchestrator")
     parser.add_argument(
@@ -463,6 +489,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Mark this task as validation/audit type. G5 allows Stop when "
         "validation contract is satisfied (task_type=validation + .pr-ready "
         "or status=completed). Implementation tasks always require full SDLC gates.",
+    )
+    parser.add_argument(
+        "--finalize-run",
+        metavar="SESSION_ID",
+        default="",
+        help="Finalize the run for RUN_ID: persist evidence, release lease. "
+        "SESSION_ID from the hook payload. Must be invoked after Step 6 (/check). "
+        "Part of the lease lifecycle: artifacts_finalized -> lease_released.",
     )
     return parser.parse_args(argv)
 
@@ -557,6 +591,28 @@ def ensure_runtime_env(dispatch: str) -> tuple[Path, str]:
     )
     os.environ["RUN_ID"] = run_id
     os.environ["GO_RUN_ID"] = run_id
+    # Write the authoritative run record (identity path: session_id -> run_id-scoped file)
+    # and acquire an exclusive workspace lease.
+    _session_id = resolve_session_id()
+    if _session_id:
+        try:
+            from run_record import write_run_record as _write_run_record
+            from run_record import acquire_workspace_lease as _acquire_lease
+            from run_record import current_worktree_path as _wt_path
+            from run_record import generate_workspace_id as _gen_ws_id
+            from run_record import current_branch as _cur_branch
+            _wt = _wt_path()
+            _br = _cur_branch()
+            _ws_id = _gen_ws_id(_wt, _br)
+            _write_run_record(session_id=_session_id, run_id=run_id,
+                lifecycle_status="active", workspace_id=_ws_id,
+                worktree_path=_wt)
+            # Acquire workspace lease. If this fails (already held), the
+            # PreToolUse gate will deny writes. The run continues for read-only.
+            _acquire_lease(workspace_id=_ws_id, session_id=_session_id,
+                run_id=run_id, worktree_path=_wt)
+        except Exception:
+            pass  # fail-open at startup
     os.environ.setdefault("MAX_ATTEMPTS", "3")
     default_state_dir = Path.cwd() / ".claude" / ".artifacts" / terminal_id / "go"
     state_dir = Path(os.environ.get("GO_STATE_DIR", str(default_state_dir))).resolve()
@@ -2342,6 +2398,15 @@ def run_common_tail(worktree: Path, state_dir: Path, run_id: str) -> bool:
 def orchestrate(args: argparse.Namespace) -> str:
     state_dir, run_id = ensure_runtime_env(args.dispatch)
     write_current_run(state_dir, run_id, "running", args.dispatch)
+
+    # Standalone finalize-run: persist evidence and release lease.
+    # Invoked at Step 7 of the /go lifecycle after Step 6 (/check) passes.
+    if getattr(args, "finalize_run", ""):
+        session_id = args.finalize_run
+        result = finalize_run(state_dir, run_id, session_id)
+        if result.get("success"):
+            return "<promise>RUN_FINALIZED</promise>"
+        return f"<promise>BLOCKED: finalize_run {result.get('reason_code', 'unknown')}</promise>"
 
     def finish(status: str) -> str:
         write_current_run(state_dir, run_id, status, args.dispatch)

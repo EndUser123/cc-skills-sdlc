@@ -201,7 +201,7 @@ Interpretation:
 ## Manual Run
 
 ```bash
-bash go-safe.sh
+python scripts/orchestrate.py --help
 ```
 
 Expected behavior:
@@ -284,7 +284,7 @@ Gen 1 concepts that no longer apply:
 ## Fast Smoke Test
 
 1. create `.claude/.artifacts/{TERMINAL_ID}/go/active-plan.json`
-2. run `bash go-safe.sh`
+2. run `python scripts/orchestrate.py --help`
 3. verify:
    - `active-task_{RUN_ID}.json` exists
    - `task-result_{RUN_ID}.json` exists
@@ -316,10 +316,10 @@ Stop immediately if any of these happen:
 Use this order only:
 
 1. replace `SKILL.md`
-2. replace `go-safe.sh`
+2. invoke `scripts/orchestrate.py`
 3. replace `ralph-go-loop.sh`
 4. replace this quick reference
 5. replace implementation guide
 6. create starter `active-plan.json`
-7. run `bash go-safe.sh`
+7. run `python scripts/orchestrate.py --help`
 8. run `bash ralph-go-loop.sh 10`

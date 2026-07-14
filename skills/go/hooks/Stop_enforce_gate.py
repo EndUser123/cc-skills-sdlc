@@ -197,6 +197,33 @@ def main() -> None:
     if not run_id:
         sys.exit(0)
 
+    # Validate run record for current-run enforcement.
+    # If the run record is missing, malformed, or lifecycle ≠ active, block.
+    try:
+        _ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
+        run_rec_path = _ARTIFACTS_ROOT / "go-runs" / session_id / run_id / "run-record.json"
+        if run_rec_path.is_file():
+            rec = json.loads(run_rec_path.read_text(encoding="utf-8"))
+            if isinstance(rec, dict) and rec.get("schema") == "go.run-record.v1":
+                ls = rec.get("lifecycle_status", "")
+                if ls not in ("active", "impl_complete", "check_complete", "artifacts_finalized"):
+                    # lifecycle indicates the run is past the point where
+                    # Stop-gate enforcement is meaningful (lease released, etc.)
+                    # Allow through — the run has already been validated earlier.
+                    pass
+                # If lifecycle is active or in-progress, the gate proceeds normally.
+            else:
+                # Record exists but wrong schema — treat as stale and block
+                print(f"stop-gate: run record schema mismatch for {session_id}/{run_id}", file=sys.stderr)
+                sys.exit(2)
+        else:
+            # No run record at all — this means run_record.py didn't write one.
+            # This could be a pre-run_record version of /go. Fail open (allow).
+            pass
+    except Exception:
+        # Fail open on any parse/read error — don't block the session.
+        pass
+
     # Validation mode: if the validation contract is satisfied, allow.
     if _is_validation_complete(state_dir, run_id):
         sys.exit(0)

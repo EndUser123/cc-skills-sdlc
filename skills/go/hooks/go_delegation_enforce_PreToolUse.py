@@ -228,6 +228,25 @@ def _decide(payload: dict) -> int:
     if not mutating:
         return 0  # read-only tools always pass
 
+    # Pre-write: validate current run identity before allowing mutation.
+    # This blocks writes when the run record is missing, foreign, or stale.
+    try:
+        _run_rec_path = _ARTIFACTS_ROOT / "go-runs" / session_id / run_id / "run-record.json"
+        _rec_data = None
+        if _run_rec_path.is_file():
+            _rec_data = json.loads(_run_rec_path.read_text(encoding="utf-8"))
+        if _rec_data is None:
+            return _deny(f"PreToolUse: no run record for {session_id}/{run_id} — cannot verify current run")
+        if not isinstance(_rec_data, dict):
+            return _deny("PreToolUse: run record is malformed")
+        if _rec_data.get("schema") != "go.run-record.v1":
+            return _deny("PreToolUse: run record has wrong schema version")
+        if _rec_data.get("lifecycle_status") != "active":
+            return _deny(f"PreToolUse: run lifecycle is '{
+                _rec_data.get('lifecycle_status', 'unknown')}' — not active")
+    except Exception as e:
+        return _deny(f"PreToolUse: run identity check failed: {e}")
+
     role = dp.get("advisory_reviewer") if mode == "advisory" else dp.get("worker")
     scope = list(dp.get("worker_scope") or [])
 

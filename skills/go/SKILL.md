@@ -336,13 +336,13 @@ git worktree add -b "ai/ai-task-$TS" "$WORKTREE" HEAD
 
 | Dispatch | Behavior |
 |----------|----------|
-| `pi` | Create `P:/worktrees/pi-task-*`, resolve model, run `pi -p --mode json --model <resolved>` |
+| `pi` | Create `P:/.worktrees/pi-task-*`, resolve model, run `pi -p --mode json --model <resolved>` |
 | `local` | Use current checkout as the worktree for verification/review/artifact gates |
 | `claude` | Phase 1: write `claude-task-request_{RUN_ID}.json` (tier-resolved model, scrubbed prompt, tools, scope) and return `<promise>SPAWN_CLAUDE_SUBAGENT</promise>`. Phase 2 (below): main-loop Claude spawns `Agent(...)`, then `--claude-resume` runs the tail. |
 
 `/go` remains on `main` throughout — it orchestrates, workers execute.
 
-**Submodule-aware provisioning (#916).** `create_worktree` resolves each `scope_in` path to its nearest `.git` root and creates the worktree via `git -C <repo>` — so a task targeting an embedded/gitlink plugin (cc-skills-sdlc, skill-guard, snapshot, cc-skills-ai-api, cc-skills-media, cc-skills-utils, search-research — gitlinks without `.gitmodules`) gets a *populated* worktree, not an empty parent-level dir. `scope_in` spanning more than one git repo → `<promise>BLOCKED</promise>` (split the task). Override the worktree root with `GO_WORKTREE_ROOT` (default `P:/worktrees`).
+**Submodule-aware provisioning (#916).** `create_worktree` resolves each `scope_in` path to its nearest `.git` root and creates the worktree via `git -C <repo>` — so a task targeting an embedded/gitlink plugin (cc-skills-sdlc, skill-guard, snapshot, cc-skills-ai-api, cc-skills-media, cc-skills-utils, search-research — gitlinks without `.gitmodules`) gets a *populated* worktree, not an empty parent-level dir. `scope_in` spanning more than one git repo → `<promise>BLOCKED</promise>` (split the task). Override the worktree root with `GO_WORKTREE_ROOT` (default `P:/.worktrees`).
 
 ### Claude native-subagent dispatch (two-phase)
 
@@ -493,7 +493,7 @@ python scripts/worktree_safety.py start \
   --title "Fix CLI-boundary detector" \
   --repo-root P:/packages/.claude-marketplace/plugins/cc-skills-sdlc \
   --intended-files skills/go/scripts/orchestrate.py \
-  --worktree-root P:/worktrees
+  --worktree-root P:/.worktrees
 ```
 
 Use `--dry-run` to preview. Use `--resume` to re-enter an existing active task.
@@ -561,6 +561,46 @@ auto-registered — add to SKILL.md frontmatter `hooks.PreToolUse` or
 
 ---
 
+## STEP 0.7: Contract, Identity, and Worktree Disposition (B0)
+
+Before any planning or implementation, establish the run identity envelope and worktree disposition.
+
+### Session and Run Identity
+
+| Field | Source | Purpose |
+|---|---|---|
+| session_id | Hook payload session_id field (or sessionId). THIS is the sole session authority. Do NOT use WT_SESSION, CLAUDE_TERMINAL_ID, active-session files, mtime, or filename heuristics. | Logical session identity |
+| run_id | Generated fresh per invocation: go-<session_id>-<timestamp>-<suffix> | Single /go execution |
+| workspace_id | Reuse existing worktree identity if available; otherwise establish from workstream intent (NOT from directory names alone, branch names alone, or contract fingerprint alone) | Longer-lived worktree ownership |
+
+Use orchestrate.py write_session_pointer() for pointer persistence. Use git worktree list --porcelain for worktree inventory.
+
+### Worktree Disposition
+
+Return exactly one: USE_CURRENT_ISOLATED_WORKTREE | REUSE_OWNED_WORKTREE | CREATE_NEW_WORKTREE_REQUIRED | READ_ONLY_NO_WORKTREE_NEEDED | BLOCKED_WORKTREE_OWNERSHIP_AMBIGUOUS | BLOCKED_NO_SAFE_WORKTREE
+
+**Rules:** B0 must NOT automatically create, remove, clean, reset, merge, rebase, prune, or delete foreign/ambiguous worktrees. Foreign artifacts fail silent. Ambiguous identity blocks. No newest-artifact or mtime fallback.
+
+### Contract Boundary
+
+Record: session_id, run_id, workspace_id, repository, base_revision, Goal, Authorization, In scope, Out of scope, Must not change, contract_fingerprint = SHA256(canonical(...)).
+
+## STEP 0.8: Mandatory Pre-Plan Discovery (A-p)
+
+Before planning or editing, perform proportionate mandatory discovery over the target surface. Extends the discovery-first contract from operational questions to ALL implementation tasks.
+
+### Scope
+Determine: capability existence under any name; complete/partial/dormant status; exact consumed source and runtime path (cache vs source SHA256); entry points and registrations; inbound consumers; outbound dependencies; state and artifacts; tests; configuration; documentation; compatibility; removal provenance; runtime evidence needs; repository/worktree state; identity.
+
+Path tracing: user intent -> entry point -> registration/router -> implementation -> storage/state -> reader/consumer -> authority -> freshness -> failure behavior. Each link verified by direct inspection.
+
+### Dispositions and Refresh
+ALREADY_EXISTS | NO_CHANGE | CLARIFY_EXISTING | REUSE_EXISTING | EXTEND_EXISTING | REPAIR_EXISTING | SIMPLIFY_EXISTING | REMOVE_DUPLICATE | DEPRECATE_FIRST | NEW_MECHANISM_JUSTIFIED | BLOCKED_DISCOVERY_INCOMPLETE
+
+A new mechanism is NOT justified until discovery shows why existing mechanisms cannot satisfy the goal.
+
+Compute affected_surfaces_fingerprint. Scope to session_id + run_id. Stale discovery must be refreshed when contract, revision, worktree, surfaces, or registration surface changes. Emergency revert exemption only.
+
 ## STEP 1: Task Acquisition
 
 **From plan (GO_PLAN_FILE) — queue-pointer rule:** Before synthesizing, read the plan's
@@ -619,157 +659,6 @@ destructive permission, budget decision, or inaccessible system.
 
 Full rule + worked examples at
 `cc-skills-analysis/skills/debrief/references/discoverability-classification.md`.
-
-## STEP 0: Establish Contract and Worktree Identity (B0)
-
-Before any planning or implementation, establish the run identity envelope and worktree disposition.
-
-### 0.1 Session and Run Identity
-
-Record the following identity envelope. Every run artifact and evidence record from Steps 1-8 is scoped to `session_id + run_id`.
-
-| Field | Source | Purpose |
-|---|---|---|
-| `session_id` | Hook payload `session_id` field (or `sessionId`). THIS is the sole session authority. Do NOT use `WT_SESSION`, `CLAUDE_TERMINAL_ID`, active-session files, mtime, filename heuristics, or any other source. | Logical session identity — governs pointer files and session-scoped artifacts |
-| `run_id` | Generated fresh per invocation: `go-<session_id>-<timestamp>-<suffix>` | Single `/go` execution — governs run-scoped artifacts |
-| `workspace_id` | Reuse existing worktree workspace identity if available; otherwise establish a descriptive identifier from the workstream intent (NOT from directory names, branch names alone, or contract fingerprint alone) | Longer-lived identity for reusable worktree ownership |
-
-The existing `orchestrate.py` mechanisms (`write_session_pointer`, `resolve_session_id`) handle pointer persistence. The LLM must verify that `session_id` from the hook payload is used as the authoritative source for all artifact scoping.
-
-### 0.2 Worktree Inventory and Disposition
-
-Before proceeding, inventory worktrees and determine disposition.
-
-**Inventory:**
-
-```bash
-git worktree list --porcelain
-git rev-parse HEAD
-git rev-parse --abbrev-ref HEAD
-git status --short
-```
-
-For each existing worktree, record: path, branch, HEAD, clean/dirty state, untracked files.
-
-**Disposition:**
-
-Return exactly one:
-
-| Disposition | When |
-|---|---|
-| `USE_CURRENT_ISOLATED_WORKTREE` | Already in an owned worktree with valid lease |
-| `REUSE_OWNED_WORKTREE` | Compatible worktree exists (same repository, same workstream branch lineage, compatible base ancestry, no foreign active lease) |
-| `CREATE_NEW_WORKTREE_REQUIRED` | No compatible worktree, write isolation needed for implementation |
-| `READ_ONLY_NO_WORKTREE_NEEDED` | Read-only investigation, validation, or decision analysis; no implementation planned |
-| `BLOCKED_WORKTREE_OWNERSHIP_AMBIGUOUS` | Worktree exists but ownership metadata is missing or ambiguous |
-| `BLOCKED_NO_SAFE_WORKTREE` | All candidate worktrees are foreign-owned, dirty, or otherwise unsafe |
-
-The existing `worktree_safety.py` script (`python skills/go/scripts/worktree_safety.py status`) provides worktree inventory. The existing `go_delegation_enforce_PreToolUse.py` hook enforces delegation boundaries.
-
-**Rules:**
-- B0 must NOT automatically create a worktree, acquire a lease, or remove a worktree.
-- B0 must NOT modify, clean, reset, merge, rebase, prune, or delete any foreign or ambiguously owned worktree.
-- Foreign run/session artifacts MUST fail silent (not read, not used as fallback).
-- Ambiguous current-run identity MUST block.
-- Never use "newest artifact," mtime, directory-wide scanning, or wildcard fallback for identity resolution.
-
-### 0.3 Contract Boundary
-
-Record the authorized contract:
-
-```text
-CONTRACT:
-  session_id: <from hook payload>
-  run_id: <generated>
-  workspace_id: <established>
-  repository: <git rev-parse --show-toplevel>
-  base_revision: <git rev-parse HEAD>
-  Goal: <one-line statement>
-  Authorization: <user | plan reference>
-  In scope: <list>
-  Out of scope: <list>
-  Must not change: <externally observable behaviors, public contracts>
-  contract_fingerprint: <SHA256(canonical(goal + authorization + in_scope + out_of_scope + must_not_change + repository + workspace_id))>
-```
-
-The `contract_fingerprint` is stable canonical form: deterministically sorted lists, normalized whitespace, normalized paths.
-
-## STEP 0.5: Mandatory Pre-Plan Discovery (A-p)
-
-Before planning or editing, perform proportionate mandatory discovery over the target surface. This extends the existing discovery-first contract (see "Discovery-first" section) from operational questions only to ALL implementation tasks.
-
-### Scope
-
-For every implementation task, determine:
-
-1. What capability already exists? (paths, entry points, skill names, triggers)
-2. Does it exist under another name or mechanism? (aliases, NLP triggers, router entries)
-3. Is the existing implementation complete, partial, duplicated, dormant, deprecated, cached, generated, or only in a stale copy?
-4. What is the exact consumed source and runtime path? (cache vs source SHA256 comparison, settings.json registration, hooks.json, router dispatch)
-5. Entry points and registrations (SKILL.md frontmatter, settings.json, hooks.json, router.py)
-6. Inbound consumers (grep for imports, trigger references, SKILL.md name matches)
-7. Outbound dependencies (imports, subprocess calls, SKILL.md suggests/blocks)
-8. State and artifacts produced or consumed (file writes, env vars, artifact directories)
-9. Tests (test_*.py, __lib/*test*, test directories)
-10. Configuration dependencies (settings.json, plugin.json, env vars, config files)
-11. Documentation and prompts (SKILL.md, references/, CLAUDE.md)
-12. Compatibility surfaces (public contracts, output formats, hook protocols)
-13. Provenance of anything proposed for removal (git log, author, purpose, ADRs)
-14. Runtime or live evidence needed where static evidence is insufficient (hook registration, dynamic imports, lazy loading, env-conditional code)
-15. Current repository and worktree state (HEAD, branch, dirty files, cache version, cache-vs-source match)
-16. session_id, run_id, workspace_id from Step 0
-17. Affected surfaces discovered — compute `affected_surfaces_fingerprint = SHA256(canonical(sorted_discovered_paths + sorted_entry_points + sorted_registrations))`
-
-### Path Tracing
-
-Trace the relevant path end to end:
-
-`user intent → public entry point → registration/router → implementation → storage/state → reader/consumer → authority → freshness → failure behavior`
-
-Each link verified by direct inspection (Read, Grep, Bash), not by inference from naming or memory.
-
-### Dispositions
-
-Return exactly one disposition:
-
-| Disposition | When | Next action |
-|---|---|---|
-| `ALREADY_EXISTS` | An existing mechanism fully satisfies the goal | Document and stop; no implementation needed |
-| `NO_CHANGE` | The goal is already met without changes | Document and stop |
-| `CLARIFY_EXISTING` | The mechanism exists but its documentation is misleading | Fix documentation; no structural change |
-| `REUSE_EXISTING` | The mechanism exists but needs a different entry point | Add alias or mode; re-register |
-| `EXTEND_EXISTING` | The mechanism exists but needs a minor extension | Extend within existing contract |
-| `REPAIR_EXISTING` | The mechanism exists but has a proven defect | Fix defect at source; preserve contract |
-| `SIMPLIFY_EXISTING` | The mechanism works but is unnecessarily complex | Simplify without changing behavior |
-| `REMOVE_DUPLICATE` | Two mechanisms serve the same purpose | Remove one; preserve capability |
-| `DEPRECATE_FIRST` | Removal would be breaking | Add deprecation notice; wait one cycle |
-| `NEW_MECHANISM_JUSTIFIED` | No existing mechanism can satisfy the goal | Create with explicit justification |
-| `BLOCKED_DISCOVERY_INCOMPLETE` | Discovery cannot determine the correct disposition | Expand discovery; do NOT proceed to planning |
-
-**A new mechanism is NOT justified until discovery shows why existing mechanisms cannot satisfy the goal.**
-
-### Refresh Conditions
-
-Discovery becomes stale and must be refreshed when:
-- New subsystems or file families enter scope
-- The target contract changes (contract_fingerprint changes)
-- New public behavior is proposed
-- A new registration or persistence surface is touched
-- The implementation plan materially changes
-- The worktree or repository revision changes
-- Affected surfaces expand beyond those in the initial `affected_surfaces_fingerprint`
-
-After implementation, repeat relevant discovery checks to detect: stale references, duplicate paths, obsolete registrations, compatibility gaps, unreachable replacements, and cache/source divergence.
-
-### Record
-
-Discovery evidence is scoped to `session_id + run_id`. Record consumed paths, dispositions, evidence citations, and the `affected_surfaces_fingerprint` alongside the discovery result.
-
-### Exemptions
-
-Exemptions from mandatory discovery exist only for:
-- **Emergency revert** (restore known-good state without behavioral change)
-- **User explicitly and repeatedly confirms** they want a bounded fix without full discovery — must record the skipped step and the reason
 
 ## STEP 1.5: Classify Complexity
 

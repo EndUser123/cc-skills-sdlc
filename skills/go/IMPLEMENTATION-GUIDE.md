@@ -21,7 +21,7 @@ Gen 2 replaces that with:
 This Gen 2 bundle consists of:
 
 1. `SKILL.md`
-2. `go-safe.sh`
+2. `scripts/orchestrate.py` (canonical runtime)
 3. `ralph-go-loop.sh`
 4. `GO-QUICK-REFERENCE.md`
 5. `IMPLEMENTATION-GUIDE.md`
@@ -153,7 +153,7 @@ Required differences from Gen 1:
 - add `task-result_{RUN_ID}.json`
 - add `/go -> /code` dispatch model
 
-### `go-safe.sh`
+### `orchestrate.py` (canonical runtime)
 
 Replace the wrapper so it:
 
@@ -192,7 +192,7 @@ Replace both docs so they no longer mention:
 Do these in order:
 
 1. replace `SKILL.md`
-2. replace `go-safe.sh`
+2. invoke `scripts/orchestrate.py`
 3. replace `ralph-go-loop.sh`
 4. replace `GO-QUICK-REFERENCE.md`
 5. replace `IMPLEMENTATION-GUIDE.md`
@@ -209,7 +209,7 @@ Place the starter plan here:
 .claude/.artifacts/{TERMINAL_ID}/go/active-plan.json
 ```
 
-This must exist before `go-safe.sh` or `ralph-go-loop.sh` runs.
+This must exist before `scripts/orchestrate.py` runs.
 
 ---
 
@@ -218,7 +218,7 @@ This must exist before `go-safe.sh` or `ralph-go-loop.sh` runs.
 ### Manual
 
 ```bash
-bash go-safe.sh
+python scripts/orchestrate.py --help
 ```
 
 Confirm:
@@ -284,7 +284,7 @@ Do not mix the two models in the same active installation.
 Use three starter tasks:
 
 1. replace `SKILL.md`
-2. replace `go-safe.sh`
+2. invoke `scripts/orchestrate.py`
 3. replace `ralph-go-loop.sh`
 
 This validates:

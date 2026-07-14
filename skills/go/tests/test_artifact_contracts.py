@@ -332,9 +332,11 @@ class TestRegistryConsistencyWithTests:
     def test_dispatch_result_schema_matches_test_schema(self):
         from contracts.artifacts import get_contract
         c = get_contract("dispatch-result.v1")
-        # status + exit_code are required; the test asserts these on the artifact.
+        # status is required; exit_code is optional (pre-dispatch writers
+        # emit status markers before exit_code is known).
         assert "status" in c.required_fields
-        assert "exit_code" in c.required_fields
+        assert "exit_code" not in c.required_fields
+        assert "exit_code" in c.optional_fields
 
 
 class TestLiveMetadataValidation:

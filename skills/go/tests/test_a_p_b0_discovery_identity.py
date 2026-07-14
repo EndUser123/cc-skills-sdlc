@@ -21,31 +21,31 @@ class TestApDiscoveryContract:
 
     def test_has_step_0_contract_section(self):
         text = _skill_text()
-        assert "STEP 0:" in text, "SKILL.md must have a Step 0 (Contract) section"
+        assert "STEP 0.7:" in text, "SKILL.md must have a Step 0.7 (Contract + Identity) section"
 
     def test_has_step_0_identity_envelope(self):
         text = _skill_text()
-        assert "session_id" in text, "Step 0 must define session_id"
-        assert "run_id" in text, "Step 0 must define run_id"
-        assert "workspace_id" in text, "Step 0 must define workspace_id"
+        assert "session_id" in text, "Step 0.7 must define session_id"
+        assert "run_id" in text, "Step 0.7 must define run_id"
+        assert "workspace_id" in text, "Step 0.7 must define workspace_id"
 
     def test_has_step_0_worktree_disposition(self):
         text = _skill_text()
-        assert "USE_CURRENT_ISOLATED_WORKTREE" in text, "Step 0 must include worktree dispositions"
+        assert "USE_CURRENT_ISOLATED_WORKTREE" in text, "Step 0.7 must include worktree dispositions"
         assert "REUSE_OWNED_WORKTREE" in text
         assert "READ_ONLY_NO_WORKTREE_NEEDED" in text
         assert "BLOCKED_WORKTREE_OWNERSHIP_AMBIGUOUS" in text
 
     def test_has_step_0_contract_boundary(self):
         text = _skill_text()
-        assert "contract_fingerprint" in text, "Step 0 must include contract_fingerprint"
+        assert "contract_fingerprint" in text, "Step 0.7 must include contract_fingerprint"
         assert "In scope" in text
         assert "Out of scope" in text
         assert "Must not change" in text
 
     def test_has_step_0_5_discovery_section(self):
         text = _skill_text()
-        assert "STEP 0.5:" in text, "SKILL.md must have a Step 0.5 (Discovery) section"
+        assert "STEP 0.8:" in text, "SKILL.md must have a Step 0.8 (Discovery) section"
 
     def test_has_discovery_scope(self):
         text = _skill_text()
