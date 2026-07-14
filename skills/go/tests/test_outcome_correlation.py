@@ -325,7 +325,7 @@ def test_hypothesis_language_not_present(tmp_path):
     entries = _load_index(tmp_path)
     oref = entries[0].get("outcome_reference", {}) or {}
     assert oref.get("qa_verdict") == "redo"  # fact
-    assert "hypothesis" not in str(entries[0])  # no hypothesis fields
+    assert "hypothesis" not in {k for k in entries[0].keys()}  # no hypothesis field keys (avoid str() which includes tmp_path name)
 
 
 @pytest.mark.parametrize("key", [
@@ -364,5 +364,6 @@ def test_load_index_missing(tmp_path):
     """load_index returns empty list for missing file."""
     import outcome_index as oi
     assert oi.load_index(tmp_path / "nonexistent.json") == []
+
 
 
