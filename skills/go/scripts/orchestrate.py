@@ -1862,6 +1862,17 @@ def _persist_evidence(state_dir: Path, run_id: str) -> None:
             for f in findings if isinstance(f, dict)
             for si in (f.get("structural_issues") or [])
         })
+        # Read task_intent from proposal artifact (best-effort)
+        proposal_path = state_dir / f"task-proposal_{run_id}.json"
+        task_intent = ""
+        if proposal_path.is_file():
+            try:
+                prop = _read_json(proposal_path)
+                if isinstance(prop, dict):
+                    task_intent = str(prop.get("task_intent", "") or "")
+            except Exception:
+                pass
+
         entry = _build_index_entry(
             discovery_path=dest,
             run_id=run_id,
@@ -1875,9 +1886,28 @@ def _persist_evidence(state_dir: Path, run_id: str) -> None:
                 1 for f in findings
                 if isinstance(f, dict) and isinstance(f.get("structural_issues"), list)
             ),
+            task_intent=task_intent,
         )
         index_path = ARTIFACTS_ROOT / "discovery-index.json"
         _append_index_entry(index_path, entry)
+
+        # Outcome linkage structure (Part 3): preserve originating run + discovery
+        # fingerprint so future "did discovery prevent this problem?" traces can
+        # start from the run. Written alongside evidence; never blocks.
+        link_path = dest.parent / "discovery-outcome-link.json"
+        link = {
+            "schema": "discovery-outcome-link.v1",
+            "originating_run_id": run_id,
+            "originating_session_id": session_id,
+            "surface_fingerprint": entry.get("surface_fingerprint", ""),
+            "dependency_hash": entry.get("dependency_hash", ""),
+            "finding_count": entry.get("finding_count", 0),
+            "structural_issue_count": entry.get("structural_issue_count", 0),
+            "task_intent": entry.get("task_intent", ""),
+            "evidence_path": str(dest),
+            "created_at": entry.get("created_at", ""),
+        }
+        write_json(link_path, link)
     except Exception:
         pass
 

@@ -3244,7 +3244,8 @@ def _inject_prior_evidence(proposal: dict) -> None:
             task_intent=task_intent,
         )
         result = _er.query(idx, surface_fingerprint=sf,
-                             surface_labels=surface_labels, limit=3)
+                             surface_labels=surface_labels,
+                             task_intent=task_intent, limit=3)
         proposal["prior_evidence"] = result
     except Exception:
         proposal["prior_evidence"] = {"prior_evidence": [], "count": 0, "advisory": True}

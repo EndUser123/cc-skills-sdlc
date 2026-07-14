@@ -102,6 +102,7 @@ def _build_index_entry(
     finding_count: int = 0,
     structural_issue_count: int = 0,
     evidence_summary: str = "",
+    task_intent: str = "",
 ) -> dict:
     return {
         "index_version": INDEX_VERSION,
@@ -118,6 +119,7 @@ def _build_index_entry(
         "structural_issue_count": structural_issue_count,
         "evidence_summary": evidence_summary[:500] if evidence_summary else "",
         "artifact_path": str(discovery_path.resolve()),
+        "task_intent": task_intent,
     }
 
 
@@ -209,6 +211,23 @@ def rebuild_index(
             for si in (f.get("structural_issues") or [])
         })
 
+        # Read task_intent and rewritten_goal from proposal artifact
+        proposal_path = root / "go-runs" / session_id / derived_run_id / f"task-proposal_{derived_run_id}.json"
+        task_intent = ""
+        rewritten_goal = ""
+        if proposal_path.is_file():
+            prop = _read_json(proposal_path)
+            if isinstance(prop, dict):
+                task_intent = str(prop.get("task_intent", "") or "")
+                rewritten_goal = str(prop.get("rewrittenGoal", "") or prop.get("rewritten_goal", "") or "")
+
+        # Recompute surface fingerprint from available surface labels + intent
+        surface_fingerprint = compute_surface_fingerprint(
+            rewritten_goal=rewritten_goal,
+            surface_labels=list(surface_labels),
+            task_intent=task_intent,
+        )
+
         entry = _build_index_entry(
             discovery_path=de_path,
             run_id=derived_run_id,
@@ -217,8 +236,10 @@ def rebuild_index(
             repository=repository,
             base_revision=base_revision,
             surface_labels=list(surface_labels),
+            surface_fingerprint=surface_fingerprint,
             finding_count=finding_count,
             structural_issue_count=si_count,
+            task_intent=task_intent,
         )
         entries.append(entry)
 
