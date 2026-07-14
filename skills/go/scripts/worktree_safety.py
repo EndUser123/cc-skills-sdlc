@@ -24,6 +24,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from run_context import go_worktree_creation_root, go_worktree_management_root
 
 METADATA_SCHEMA = "worktree-task.v1"
 METADATA_DIR_NAME = "worktree-tasks"
@@ -140,7 +141,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
     canonical = args.canonical_branch
     branch = args.branch or f"wt/{task_id}"
-    worktree_root = Path(args.worktree_root or os.environ.get("GO_WORKTREE_ROOT", "P:/worktrees"))
+    worktree_root = Path(args.worktree_root) if args.worktree_root else go_worktree_creation_root()
     worktree_path = worktree_root / task_id
 
     # Get base commit
@@ -466,9 +467,7 @@ if __name__ == "__main__":
 #
 # Every worktree-producing mechanism should use these same primitives.
 
-LIFECYCLE_MANAGED_WORKTREE_ROOT = Path(
-    os.environ.get("GO_MANAGED_WORKTREE_ROOT", "P:/worktrees")
-)
+LIFECYCLE_MANAGED_WORKTREE_ROOT = go_worktree_management_root()
 
 LIFECYCLE_REGISTRY_DIR = "worktree-lifecycle"
 

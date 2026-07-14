@@ -323,3 +323,78 @@ def test_15_branch_deletion_safe(tmp_path):
     bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", branch],
                          capture_output=True, text=True)
     assert bp.stdout.strip() == "", f"branch {branch} still exists"
+
+
+# --- Management-root reconciliation boundary tests --------------------------
+# The management root controls disk scanning scope. Git cross-reference
+# finds registered worktrees regardless of location. These tests verify
+# the boundary semantics.
+
+
+def test_default_root_worktree_visible_to_reconciliation(tmp_path, monkeypatch):
+    import importlib
+    import worktree_safety as ws_mod
+    importlib.reload(ws_mod)
+    default_root = tmp_path / '.worktrees'
+    monkeypatch.setenv('GO_WORKTREE_ROOT', str(default_root))
+    importlib.reload(ws_mod)
+    repo = _git_repo(tmp_path / 'repo')
+    aw, branch, run_id = _create_falsify_worktree(repo, default_root, 'run-vis')
+    ws_mod.lifecycle_register(aw, branch, run_id, repo, 'test',
+                               state_dir=tmp_path / 'state')
+    rc_result = ws_mod.lifecycle_reconcile(tmp_path / 'state')
+    found = any('run-vis' in e['path'] for e in rc_result.get('entries', []))
+    ws_mod.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / 'state',
+                                     branch_name=branch)
+    assert found, 'Worktree not found in reconcile result'
+
+
+def test_git_worktree_outside_management_root_found(tmp_path, monkeypatch):
+    import importlib
+    import worktree_safety as ws_mod
+    importlib.reload(ws_mod)
+    repo = _git_repo(tmp_path / 'repo')
+    outside_root = tmp_path / 'outside'
+    aw, branch, run_id = _create_falsify_worktree(repo, outside_root, 'run-out')
+    ws_mod.lifecycle_register(aw, branch, run_id, repo, 'test',
+                               state_dir=tmp_path / 'state')
+    monkeypatch.setattr(ws_mod, 'LIFECYCLE_MANAGED_WORKTREE_ROOT', tmp_path)
+    rc = ws_mod.lifecycle_reconcile(tmp_path / 'state')
+    found = any('run-out' in e['path'] for e in rc.get('entries', []))
+    ws_mod.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / 'state',
+                                     branch_name=branch)
+    assert found, 'Git-registered outside management root not found'
+
+
+def test_disk_orphan_outside_management_root_excluded(tmp_path, monkeypatch):
+    import importlib
+    import worktree_safety as ws_mod
+    importlib.reload(ws_mod)
+    orphan_root = tmp_path / 'other'
+    orphan_root.mkdir(parents=True, exist_ok=True)
+    (orphan_root / 'falsify-orphan').mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(ws_mod, 'LIFECYCLE_MANAGED_WORKTREE_ROOT', tmp_path)
+    rc = ws_mod.lifecycle_reconcile(tmp_path / 'state')
+    found = any('falsify-orphan' in e['path'] for e in rc.get('entries', []))
+    assert not found, 'Disk orphan outside management root was claimed'
+
+
+def test_existing_worktrees_not_moved(tmp_path, monkeypatch):
+    import importlib
+    import worktree_safety as ws_mod
+    importlib.reload(ws_mod)
+    repo = _git_repo(tmp_path / 'repo')
+    old_root = tmp_path / 'old-worktrees'
+    aw, branch, run_id = _create_falsify_worktree(repo, old_root, 'run-old-loc')
+    original_path = str(aw.resolve())
+    ws_mod.lifecycle_register(aw, branch, run_id, repo, 'test',
+                               state_dir=tmp_path / 'state')
+    monkeypatch.setattr(ws_mod, 'LIFECYCLE_MANAGED_WORKTREE_ROOT', tmp_path)
+    rc = ws_mod.lifecycle_reconcile(tmp_path / 'state')
+    for e in rc.get('entries', []):
+        if 'run-old-loc' in e['path']:
+            assert aw.is_dir(), 'Worktree removed'
+            assert str(aw.resolve()) == original_path, 'Worktree path changed'
+            break
+    ws_mod.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / 'state',
+                                     branch_name=branch)

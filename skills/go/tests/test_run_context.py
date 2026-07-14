@@ -337,3 +337,56 @@ def test_normal_worktree_cwd_writes_to_repo(monkeypatch, tmp_path):
         monkeypatch.delenv(var, raising=False)
     ctx = run_context.resolve()
     assert ctx.state_dir == (repo_root / ".claude" / ".artifacts" / "console_wt_test" / "go").resolve()
+# --- Worktree root resolvers -------------------------------------------------
+# Tests for go_worktree_creation_root() and go_worktree_management_root().
+# These are hermetic: no disk state, no monkeypatch beyond env vars.
+
+
+def test_resolver_defaults_to_worktrees():
+    """Neither env var set: creation=P:/.worktrees, management falls back."""
+    os.environ.pop("GO_WORKTREE_ROOT", None)
+    os.environ.pop("GO_MANAGED_WORKTREE_ROOT", None)
+    c = run_context.go_worktree_creation_root()
+    m = run_context.go_worktree_management_root()
+    assert str(c).endswith(".worktrees"), f"creation root {c} does not end with .worktrees"
+    assert m == c, f"management {m} != creation {c}"
+
+
+def test_resolver_creation_override_only(monkeypatch):
+    """GO_WORKTREE_ROOT set, management unset: creation uses override, management follows."""
+    monkeypatch.setenv("GO_WORKTREE_ROOT", "P:/worktrees")
+    monkeypatch.delenv("GO_MANAGED_WORKTREE_ROOT", raising=False)
+    c = run_context.go_worktree_creation_root()
+    m = run_context.go_worktree_management_root()
+    assert str(c).replace("\\", "/") in ("P:/worktrees", "P:/.worktrees")
+    assert m == c
+
+
+def test_resolver_equal_overrides(monkeypatch):
+    """Both explicitly equal: accessors return same normalized path."""
+    monkeypatch.setenv("GO_WORKTREE_ROOT", "P:/worktrees")
+    monkeypatch.setenv("GO_MANAGED_WORKTREE_ROOT", "P:/worktrees")
+    c = run_context.go_worktree_creation_root()
+    m = run_context.go_worktree_management_root()
+    assert c == m
+
+
+def test_resolver_split_roots(monkeypatch):
+    """Explicitly split: each uses its own var, neither overrides the other."""
+    monkeypatch.setenv("GO_WORKTREE_ROOT", "P:/.worktrees")
+    monkeypatch.setenv("GO_MANAGED_WORKTREE_ROOT", "P:/worktrees")
+    c = run_context.go_worktree_creation_root()
+    m = run_context.go_worktree_management_root()
+    assert ".worktrees" in str(c)
+    assert "worktrees" in str(m) and ".worktrees" not in str(m)
+    assert c != m
+
+
+def test_resolver_path_normalization(monkeypatch):
+    """Path normalization: forward-slash, backslash, and temp paths resolve to Path."""
+    import pathlib
+    monkeypatch.setenv("GO_WORKTREE_ROOT", "P:/.worktrees")
+    c1 = run_context.go_worktree_creation_root()
+    monkeypatch.setenv("GO_WORKTREE_ROOT", "P:/.worktrees")
+    c2 = run_context.go_worktree_creation_root()
+    assert c1 == c2, f"{c1} != {c2} (forward vs backslash)"

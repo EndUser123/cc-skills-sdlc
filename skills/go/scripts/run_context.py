@@ -282,6 +282,41 @@ def _unresolved(terminal_id: str, tid_source: TidSource, hint: Path | None) -> R
     return RunContext("", terminal_id, state_dir, "unresolved", False, tid_source)
 
 
+
+# --- Worktree root resolvers ------------------------------------------------
+# Two distinct authorities: creation (where new worktrees go) and management
+# (which disk root lifecycle reconciliation scans). Separate env vars, separate
+# accessors. Matching defaults (P:/.worktrees) do NOT prove semantic equivalence.
+
+CREATION_ROOT_DEFAULT = Path("P:/.worktrees")
+
+
+def go_worktree_creation_root() -> Path:
+    """Return the worktree creation root directory.
+
+    ``GO_WORKTREE_ROOT`` is the canonical override.  Unset returns
+    ``CREATION_ROOT_DEFAULT`` (``P:/.worktrees``).
+    """
+    value = os.environ.get("GO_WORKTREE_ROOT")
+    if value:
+        return Path(value)
+    return CREATION_ROOT_DEFAULT
+
+
+def go_worktree_management_root() -> Path:
+    """Return the lifecycle-management scan root.
+
+    ``GO_MANAGED_WORKTREE_ROOT`` is an explicit management-scope override.
+    Unset returns the creation root (see ``go_worktree_creation_root()``).
+    This is **not** an alias -- it preserves the semantic distinction between
+    a write target (creation) and a read/scan boundary (management).
+    """
+    value = os.environ.get("GO_MANAGED_WORKTREE_ROOT")
+    if value:
+        return Path(value)
+    return go_worktree_creation_root()
+
+
 if __name__ == "__main__":
     # ponytail: smoke self-check — `python run_context.py` prints the resolved ctx.
     ctx = resolve()

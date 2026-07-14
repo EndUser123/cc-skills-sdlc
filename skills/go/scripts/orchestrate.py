@@ -65,7 +65,7 @@ def resolve_session_id() -> str:
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id  # noqa: E402
+from run_context import resolve as _resolve_run_context, canonical_terminal_id as _canonical_terminal_id, go_worktree_creation_root, go_worktree_management_root  # noqa: E402
 from preflight_propose import run_preflight as _run_preflight  # noqa: E402
 from preflight_propose import apply_discovery_evidence_merge as _apply_discovery_merge  # noqa: E402
 from preflight_propose import emit_discovery_evidence_telemetry as _emit_discovery_telemetry  # noqa: E402
@@ -956,7 +956,7 @@ def create_worktree(
     base = f"{prefix}-task-{ts}-{suffix}"
     if target_repo is not None:
         base = f"{base}-{(repo.name or 'repo').replace(' ', '-')}"
-    root = Path(os.environ.get("GO_WORKTREE_ROOT", "P:/worktrees"))
+    root = go_worktree_creation_root()
     worktree = root / base
     branch = f"{prefix}/{prefix}-task-{ts}-{suffix}"
     root.mkdir(parents=True, exist_ok=True)

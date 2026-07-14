@@ -27,6 +27,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from run_context import go_worktree_creation_root
 from typing import Any
 
 
@@ -309,7 +310,7 @@ def create_attack_worktree(
     is never writable. Without this materialization, the attacker would receive
     HEAD-only code — missing uncommitted changes that are under review.
     """
-    worktree_root = Path(os.environ.get("GO_WORKTREE_ROOT", "P:/worktrees"))
+    worktree_root = go_worktree_creation_root()
     ts = int(time.time())
     attack_path = worktree_root / f"falsify-{ts}-{run_id[:8]}"
     branch = f"falsify/{run_id[:8]}"
