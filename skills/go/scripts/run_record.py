@@ -230,6 +230,12 @@ def validate_workspace_lease(workspace_id="", session_id="", run_id="", leases_r
         return {"valid": False, "reason_code": "LEASE_WRONG_RUN"}
     return {"valid": True, "lease": cur}
 
+def resolve_workspace_id(session_id="", run_id="", artifacts_root=None) -> str:
+    """Read workspace_id from run record, or empty string if not found."""
+    rec = read_run_record(session_id=session_id, run_id=run_id, artifacts_root=artifacts_root)
+    return (rec.get("workspace_id") or "") if rec else ""
+
+
 def check_pre_write(session_id="", run_id="", workspace_id="",
                     artifacts_root=None, leases_root=None,
                     repository="", worktree_path="", contract_fingerprint=""):
@@ -240,8 +246,10 @@ def check_pre_write(session_id="", run_id="", workspace_id="",
         expected_workspace_id=workspace_id)
     if not rc.get("verified"):
         return {"allow": False, "reason_code": rc.get("reason_code", "RUN_FAILED")}
-    if workspace_id:
-        lc = validate_workspace_lease(workspace_id=workspace_id, session_id=session_id,
+    # Auto-derive workspace_id from run record when not explicitly provided.
+    effective_ws = workspace_id or (rc.get("record") or {}).get("workspace_id", "")
+    if effective_ws:
+        lc = validate_workspace_lease(workspace_id=effective_ws, session_id=session_id,
             run_id=run_id, leases_root=leases_root)
         if not lc.get("valid"):
             return {"allow": False, "reason_code": lc.get("reason_code", "LEASE_FAILED")}

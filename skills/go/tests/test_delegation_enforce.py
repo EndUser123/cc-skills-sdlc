@@ -63,11 +63,38 @@ def _state(tmp_path, mode, proposal):
 
 
 def _wire(monkeypatch, state):
-    """Bypass pointer resolution; point the gate straight at `state`."""
+    """Bypass pointer resolution; point the gate straight at `state`.
+
+    Sets up both monkeypatches (for delegation gate's own pointer resolution)
+    and real pointer + run-record files (for canonical check_pre_write from
+    run_record.validate_current_run).
+    """
     monkeypatch.setattr(gate, "_read_pointer",
                         lambda sid: {"go_state_dir": str(state), "run_id": "r1"})
     monkeypatch.setattr(gate, "_resolve_state_dir",
                         lambda ptr: state if ptr else None)
+    monkeypatch.setattr(gate, "_ARTIFACTS_ROOT", state.parent)
+
+    # Real pointer file — required by validate_current_run().
+    ptr_dir = state.parent / "go-sessions"
+    ptr_dir.mkdir(parents=True, exist_ok=True)
+    (ptr_dir / "s1.json").write_text(json.dumps({
+        "go_state_dir": str(state), "run_id": "r1",
+    }), encoding="utf-8")
+
+    # Real run record with repository/worktree_path matching the test process
+    # git context — required by check_pre_write() canonical validation.
+    from run_record import repository_root, current_worktree_path
+    _run_rec_dir = state.parent / "go-runs" / "s1" / "r1"
+    _run_rec_dir.mkdir(parents=True, exist_ok=True)
+    (_run_rec_dir / "run-record.json").write_text(json.dumps({
+        "schema": "go.run-record.v1",
+        "lifecycle_status": "active",
+        "session_id": "s1",
+        "run_id": "r1",
+        "repository": repository_root(),
+        "worktree_path": current_worktree_path(),
+    }), encoding="utf-8")
 
 
 def _decide(monkeypatch, capsys, state, payload):
@@ -233,6 +260,16 @@ class TestHarnessBranchGuard:
 class TestDirectInvocation:
     SID = "deleg-test-direct-sid"
 
+    @staticmethod
+    def _clean_run_record(sid: str, run_id: str = "r1") -> None:
+        """Remove run-record artifacts created by _setup_real_pointer."""
+        rec_path = Path("P:/.claude/.artifacts/go-runs") / sid / run_id / "run-record.json"
+        if rec_path.is_file():
+            rec_path.unlink()
+        parent = rec_path.parent
+        if parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+
     def _setup_real_pointer(self, tmp_path, mode):
         state = tmp_path / "state"; state.mkdir()
         proposal = _proposal(scope=["src/auth.py", "src/auth/"])
@@ -247,6 +284,19 @@ class TestDirectInvocation:
         ptr.write_text(json.dumps({
             "go_state_dir": str(state), "run_id": "r1",
             "updated_at": "2099-01-01T00:00:00Z",
+        }), encoding="utf-8")
+        # Create run-record for the pre-write identity check (go runs subprocess,
+        # so monkeypatch is unavailable — must write to real artifacts root).
+        from run_record import repository_root, current_worktree_path
+        _run_rec_dir = Path("P:/.claude/.artifacts/go-runs") / self.SID / "r1"
+        _run_rec_dir.mkdir(parents=True, exist_ok=True)
+        (_run_rec_dir / "run-record.json").write_text(json.dumps({
+            "schema": "go.run-record.v1",
+            "lifecycle_status": "active",
+            "session_id": self.SID,
+            "run_id": "r1",
+            "repository": repository_root(),
+            "worktree_path": current_worktree_path(),
         }), encoding="utf-8")
         return state, ptr
 
@@ -268,6 +318,7 @@ class TestDirectInvocation:
             assert decision["permissionDecision"] == "deny"
         finally:
             ptr.unlink(missing_ok=True)
+            self._clean_run_record(self.SID)
 
     def test_advisory_read_silent_via_real_path(self, tmp_path):
         state, ptr = self._setup_real_pointer(tmp_path, "advisory")
@@ -278,6 +329,7 @@ class TestDirectInvocation:
             assert rc == 0 and out == ""
         finally:
             ptr.unlink(missing_ok=True)
+            self._clean_run_record(self.SID)
 
     def test_worker_in_scope_silent_via_real_path(self, tmp_path):
         state, ptr = self._setup_real_pointer(tmp_path, "worker")
@@ -288,6 +340,7 @@ class TestDirectInvocation:
             assert rc == 0 and out == ""
         finally:
             ptr.unlink(missing_ok=True)
+            self._clean_run_record(self.SID)
 
 
 # ---------------------------------------------------------------------------

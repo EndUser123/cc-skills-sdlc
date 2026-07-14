@@ -370,7 +370,7 @@ class TestPlainEnglishReportFormat:
         p = generate_proposal("investigate why the hook double-fires", "r-k", "t-k")
         per = p["plain_english_report"]
         assert per["section_order"] == [
-            "what_i_did", "what_i_recommend", "what_is_blocked",
+            "what_i_did", "what_i_recommend", "what_is_blocked", "omission_audit",
             "what_i_need_from_you",
         ]
         assert per["labels_after_plain_english"] is True
@@ -424,7 +424,7 @@ def test_smoke_end_to_end_status_taxonomy_real_path():
         assert p["mixed_work_status"] == expected_status, (
             f"{prompt!r} -> {p['mixed_work_status']!r}, expected {expected_status!r}")
         assert "plain_english_report" in p
-        assert len(p["plain_english_report"]["section_order"]) == 4
+        assert len(p["plain_english_report"]["section_order"]) == 5
 
 
 # ---------------------------------------------------------------------------

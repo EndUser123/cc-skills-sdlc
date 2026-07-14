@@ -33,6 +33,11 @@ import sys
 import time
 from pathlib import Path
 
+
+# Path to scripts dir for canonical run_record import
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 _ARTIFACTS_ROOT = Path("P:/.claude/.artifacts")
 _SESSIONS_DIR = "go-sessions"
 _STALE_TTL_SECONDS = 6 * 3600  # 6h — same as G4/G5
@@ -172,6 +177,22 @@ def _is_mutating(tool_name: str, tool_input: dict) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+
+def _format_prewrite_block(reason_code: str, session_id: str, run_id: str) -> str:
+    fmt = {
+        "RUN_FAILED": "Run identity validation failed: missing or invalid run record",
+        "LEASE_FAILED": "Workspace lease validation failed: session does not own this workspace",
+        "FOREIGN_SESSION": "Cross-session run access blocked: session does not own this run",
+        "WRONG_REPOSITORY": "Repository mismatch detected",
+        "WRONG_WORKTREE": "Worktree path mismatch detected",
+        "WRONG_CONTRACT": "Contract fingerprint mismatch detected",
+        "STALE_RUN": "Run record has expired (stale TTL exceeded)",
+        "LEASE_HELD": "Workspace lease is held by another session",
+        "NO_LEASE": "No valid workspace lease for this session-run pair",
+    }
+    base = fmt.get(reason_code, f"Write authorization denied: {reason_code}")
+    return f"{base} (session={session_id[:8]}..., run={run_id[:8]}...)"
+
 # Decision
 # ---------------------------------------------------------------------------
 
@@ -228,24 +249,30 @@ def _decide(payload: dict) -> int:
     if not mutating:
         return 0  # read-only tools always pass
 
-    # Pre-write: validate current run identity before allowing mutation.
-    # This blocks writes when the run record is missing, foreign, or stale.
+
+    # Pre-write: use canonical validation from run_record.check_pre_write().
+    # This is the single authority chain for write-authorization decisions:
+    # pointer + run record + lifecycle + repository + worktree + lease.
     try:
-        _run_rec_path = _ARTIFACTS_ROOT / "go-runs" / session_id / run_id / "run-record.json"
-        _rec_data = None
-        if _run_rec_path.is_file():
-            _rec_data = json.loads(_run_rec_path.read_text(encoding="utf-8"))
-        if _rec_data is None:
-            return _deny(f"PreToolUse: no run record for {session_id}/{run_id} — cannot verify current run")
-        if not isinstance(_rec_data, dict):
-            return _deny("PreToolUse: run record is malformed")
-        if _rec_data.get("schema") != "go.run-record.v1":
-            return _deny("PreToolUse: run record has wrong schema version")
-        if _rec_data.get("lifecycle_status") != "active":
-            return _deny(f"PreToolUse: run lifecycle is '{
-                _rec_data.get('lifecycle_status', 'unknown')}' — not active")
+        from run_record import check_pre_write as _canonical_prewrite
+        from run_record import repository_root as _rr
+        from run_record import current_worktree_path as _cwt
+
+        _pw_result = _canonical_prewrite(
+            session_id=session_id, run_id=run_id,
+            artifacts_root=_ARTIFACTS_ROOT,
+            repository=_rr(), worktree_path=_cwt()
+        )
+        if not _pw_result.get("allow"):
+            return _deny(_format_prewrite_block(
+                _pw_result.get("reason_code", "UNKNOWN"),
+                session_id, run_id
+            ))
+    except ImportError:
+        pass  # run_record unavailable — fail open
     except Exception as e:
-        return _deny(f"PreToolUse: run identity check failed: {e}")
+        return _deny(f"PreToolUse: write authorization check failed: {e}")
+
 
     role = dp.get("advisory_reviewer") if mode == "advisory" else dp.get("worker")
     scope = list(dp.get("worker_scope") or [])

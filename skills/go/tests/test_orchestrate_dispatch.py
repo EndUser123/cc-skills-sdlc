@@ -75,7 +75,7 @@ def test_common_tail_records_skipped_simplify_before_review_and_qa(monkeypatch, 
         return 0
 
     def fake_subprocess_run(command, **kwargs):
-        if command[:2] == ["git", "diff"]:
+        if "git" in command and "diff" in command:
             return subprocess.CompletedProcess(command, 0, stdout=" src/app.py | 2 +\n", stderr="")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
@@ -110,7 +110,7 @@ def test_common_tail_runs_configured_simplify_command(monkeypatch, tmp_path):
         return 0
 
     def fake_subprocess_run(command, **kwargs):
-        if command[:2] == ["git", "diff"]:
+        if "git" in command and "diff" in command:
             return subprocess.CompletedProcess(command, 0, stdout=" src/app.py | 2 +\n", stderr="")
         commands.append(command)
         return subprocess.CompletedProcess(command, 0, stdout="simplified\n", stderr="")

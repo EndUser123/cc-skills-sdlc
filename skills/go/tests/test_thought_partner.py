@@ -517,14 +517,23 @@ class TestContinuationGateRegistration:
         assert gate_path.exists()
 
     def test_gate_registered_in_settings(self):
+        # The continuation gate is dispatched via the plugin router, not
+        # registered as a direct command in settings.json. Check the router's
+        # DISPATCH table for the Stop event.
+        router_path = Path(__file__).resolve().parent.parent.parent.parent / "__lib" / "router.py"
+        assert router_path.exists(), f"router.py not found at {router_path}"
+        router_src = router_path.read_text(encoding="utf-8")
+        gate_cmd = "go_continuation_gate.py"
+        assert "Stop" in router_src
+        assert gate_cmd in router_src
+        # Also verify via settings.json as before (belt-and-suspenders).
         settings_path = Path("P:/.claude/settings.json")
         if settings_path.exists():
             data = json.loads(settings_path.read_text(encoding="utf-8"))
             stop = data.get("hooks", {}).get("Stop", [])
-            gate_cmd = "go_continuation_gate.py"
-            found = any(
-                gate_cmd in h.get("command", "")
+            found_via_router = any(
+                "router.py Stop" in h.get("command", "")
                 for entry in stop
                 for h in entry.get("hooks", [])
             )
-            assert found, "go_continuation_gate.py not registered in settings.json Stop hooks"
+            assert found_via_router, "router.py Stop not found in settings.json Stop hooks"

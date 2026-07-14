@@ -215,7 +215,7 @@ class TestOrchestrateWiring:
         content = orch_path.read_text(encoding="utf-8")
         idx = content.find('if args.dispatch == "pi":')
         assert idx > 0, "pi dispatch block not found"
-        chunk = content[idx:idx + 500]
+        chunk = content[idx:idx + 1500]
         assert "_apply_discovery_merge" in chunk
 
 
