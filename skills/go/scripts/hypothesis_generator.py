@@ -36,6 +36,57 @@ def _gen_id() -> str:
     return f"hyp-{_now_utc_z()[:19].replace(':', '')}-{os.urandom(2).hex()}"
 
 
+# ── hypothesis lifecycle states ───────────────────────────────────────────────
+
+ALLOWED_STATUSES = frozenset({
+    "GENERATED",
+    "UNDER_REVIEW",
+    "ACCEPTED",
+    "REJECTED",
+    "DUPLICATE",
+    "INSUFFICIENT_EVIDENCE",
+    "ALREADY_SOLVED",
+    "STALE",
+})
+
+STALE_AGE_DAYS_DEFAULT = 90
+
+# Confidence-to-evidence-tier mapping for candidate bridge.
+_CONFIDENCE_TO_TIER: dict[float, str] = {
+    0.0: "inference",
+    0.3: "inference",
+    0.4: "inference",
+    0.5: "source_inspection",
+    0.6: "source_inspection",
+    0.7: "execution_artifact",
+    0.8: "execution_artifact",
+    1.0: "execution_artifact",
+}
+
+
+def _confidence_to_tier(confidence: float) -> str:
+    for threshold, tier in sorted(_CONFIDENCE_TO_TIER.items(), reverse=True):
+        if confidence >= threshold:
+            return tier
+    return "inference"
+
+
+def _hypothesis_type_to_candidate_type(hyp_type: str) -> str:
+    """Map hypothesis observation type to improvement-candidate type."""
+    mapping: dict[str, str] = {
+        "possible_discovery_gap": "semantic_coverage_gap",
+        "possible_evidence_reuse_opportunity": "overclaim_or_evidence_gap",
+        "possible_discovery_overreach": "semantic_coverage_gap",
+        "possible_process_gap": "workflow_friction",
+        "possible_implementation_issue": "workflow_friction",
+        "positive_evidence_reuse": "documentation_gap",
+        "positive_first_pass_validation": "documentation_gap",
+        "positive_discovery_success": "documentation_gap",
+        "unknown": "documentation_gap",
+    }
+    return mapping.get(hyp_type, "documentation_gap")
+
+
 # ── hypothesis types ─────────────────────────────────────────────────────────
 
 HYPOTHESIS_TYPES = frozenset({
@@ -330,6 +381,13 @@ def generate(
                     "reversibility": 0.7,  # default: most discovery improvements are reversible
                 },
                 "status": "GENERATED",
+                "status_history": [{"status": "GENERATED", "changed_at": _now_utc_z(), "reason": "initial_generation"}],
+                "last_observed_at": _now_utc_z(),
+                "observation_count": 1,
+                "dedup_group": "|".join(filter(None, [
+                    dr.get("surface_fingerprint", ""),
+                    h["hypothesis_type"],
+                ])),
                 "provenance": {
                     "writer": "hypothesis_generator.py",
                     "source": "outcome_index",
