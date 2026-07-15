@@ -1,0 +1,67 @@
+{
+  "schema_version": "hypothesis-evaluation-report.v1",
+  "generated_at": "2026-07-15T04:29:42Z",
+  "elapsed_seconds": 0.02,
+  "dataset": {
+    "runs_analyzed": 3,
+    "date_range": {
+      "start": "",
+      "end": ""
+    },
+    "outcome_categories": {
+      "accept-with-concerns": 1,
+      "accept": 1,
+      "redo": 1
+    },
+    "evidence_available": {
+      "has_run_record": 0,
+      "has_discovery_evidence": 0,
+      "has_completion_review": 0,
+      "has_falsification": 0
+    },
+    "repositories": []
+  },
+  "hypotheses": {
+    "total": 3,
+    "distinct_runs": 3,
+    "by_type": {
+      "positive_first_pass_validation": 2,
+      "possible_discovery_gap": 1
+    }
+  },
+  "quality_metrics": {
+    "signal_quality": {
+      "valuable": 1,
+      "interesting_but_low_value": 2,
+      "noise": 0,
+      "actionable": 1,
+      "valuable_pct": 33.3,
+      "actionable_pct": 33.3,
+      "noise_pct": 0.0
+    },
+    "pattern_quality": {
+      "hypotheses_generated": 3,
+      "runs_analyzed": 3,
+      "hypotheses_per_run": 1.0,
+      "deduped_to_original_ratio": 0.67,
+      "recurring_surfaces": 2
+    },
+    "review_burden": {
+      "expected_hypotheses_per_10_runs": 10.0,
+      "estimated_review_minutes": 0.1
+    }
+  },
+  "failure_modes_tested": {
+    "generic_hypothesis": true,
+    "false_causality_alternatives_preserved": true,
+    "not_all_redos_become_discovery_gap": true
+  },
+  "provenance": {
+    "writer": "evaluate_hypothesis_quality.py",
+    "inputs": {
+      "runs_discovered": 3,
+      "hypothesis_generator_version": "improvement-hypothesis.v1"
+    },
+    "generated_at": "2026-07-15T04:29:42Z"
+  }
+}
