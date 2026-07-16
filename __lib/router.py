@@ -30,6 +30,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 # registration.
 DISPATCH: dict[str, list[str]] = {
     "Stop": ["skills/go/scripts/go_continuation_gate.py"],
+    "UserPromptSubmit": ["skills/go/scripts/chain_advance_ups.py"],
 }
 
 _TIMEOUT = 20.0  # generous; dispatched hooks do local file reads only
