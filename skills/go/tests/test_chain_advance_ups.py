@@ -183,6 +183,54 @@ class TestMainIntegration:
         assert len(chains) == 0
         del _os.environ["CHAIN_STEPS_DIR"]
 
+    def test_blank_input_advances_chain(self, capsys, tmp_path):
+        """Blank input while chain is active advances to next step and injects command."""
+        import os as _os
+        _os.environ["CHAIN_STEPS_DIR"] = str(tmp_path)
+        _ups._manifest_mod = None
+        cm = _ups._get_manifest_module()
+        # Create chain at step 0 (go), mark as running at index 0 only
+        chain = cm.create_manifest([("go", "task"), ("check", "")], session_id="sess-4")
+        cm.advance_step(chain.chain_id, new_status="running", step_index=0)
+        # step[0]="running", step[1]="pending", current_step=0
+        # Send blank input
+        payload = json.dumps({"prompt": "", "sessionId": "sess-4"})
+        self._mock_stdin(payload.encode())
+        _ups.main()
+        out, _ = capsys.readouterr()
+        result = json.loads(out.strip())
+        # Should inject /check with additionalContext
+        assert result["hookSpecificOutput"]["additionalContext"] == "/check"
+        # Verify chain advanced: step[0] complete, step[1] running
+        chain = cm.get_chain(chain.chain_id)
+        assert chain.steps[0].status == "complete"
+        assert chain.current_step == 1
+        # Cleanup
+        cm.clear_chain(chain.chain_id, force=True)
+        del _os.environ["CHAIN_STEPS_DIR"]
+
+    def test_blank_input_on_last_step_emits_complete(self, capsys, tmp_path):
+        """Blank input on the last step signals chain complete."""
+        import os as _os
+        _os.environ["CHAIN_STEPS_DIR"] = str(tmp_path)
+        _ups._manifest_mod = None
+        cm = _ups._get_manifest_module()
+        # Create 1-step chain, mark running
+        chain = cm.create_manifest([("check", "")], session_id="sess-5")
+        cm.advance_step(chain.chain_id, new_status="running")
+        # Send blank input
+        payload = json.dumps({"prompt": "", "sessionId": "sess-5"})
+        self._mock_stdin(payload.encode())
+        _ups.main()
+        out, _ = capsys.readouterr()
+        result = json.loads(out.strip())
+        # Should emit chain complete
+        assert "Chain complete" in result["hookSpecificOutput"]["additionalContext"]
+        # Chain should be cleared
+        chains = cm.list_chains(session_id="sess-5")
+        assert len(chains) == 0
+        del _os.environ["CHAIN_STEPS_DIR"]
+
 
 # ---------------------------------------------------------------------------
 # Helpers

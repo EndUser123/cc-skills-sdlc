@@ -152,24 +152,30 @@ def main() -> None:
 
         if chain.status != "in_progress":
             cm.clear_chain(chain.chain_id, force=True)
-            print("{}")
-            return
-
-        next_step = chain.steps[chain.current_step]
-        if next_step.status == "pending":
-            cm.advance_step(chain.chain_id, new_status="running", step_index=next_step.index)
-            cmd_line = f"/{next_step.skill}"
-            if next_step.args:
-                cmd_line += f" {next_step.args}"
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "UserPromptSubmit",
-                    "additionalContext": cmd_line,
+                    "additionalContext": "[Chain complete]",
                 }
             }
             print(json.dumps(output))
             return
-        print("{}")
+
+        # Inject next step command. advance_step("complete") may have already
+        # set the next step to "running"; handle both pending and running.
+        next_step = chain.steps[chain.current_step]
+        if next_step.status == "pending":
+            cm.advance_step(chain.chain_id, new_status="running", step_index=next_step.index)
+        cmd_line = f"/{next_step.skill}"
+        if next_step.args:
+            cmd_line += f" {next_step.args}"
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": cmd_line,
+            }
+        }
+        print(json.dumps(output))
         return
 
     # --- Non-blank input while chain active -> abandon ---
