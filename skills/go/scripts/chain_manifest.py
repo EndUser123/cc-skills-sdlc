@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -20,8 +21,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "skill-chain.v1"
-CHAIN_STEPS_DIR = "P:/.artifacts/skill-chains"
-SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+CHAIN_STEPS_DIR = os.environ.get("CHAIN_STEPS_DIR", "P:/.artifacts/skill-chains")
 UUID_RE = re.compile(r"[0-9a-fA-F-]{36}")
 DEFAULT_TTL_SECONDS = 86400  # 24 hours
 
@@ -108,7 +108,7 @@ class ChainState:
                     errors.append(f"steps[{i}].skill: required")
                 if step.status not in ("pending", "running", "complete", "failed", "skipped"):
                     errors.append(f"steps[{i}].status: invalid {step.status!r}")
-        if self.current_step < 0 or self.current_step >= len(self.steps) if self.steps else True:
+        if self.steps and (self.current_step < 0 or self.current_step >= len(self.steps)):
             errors.append(f"current_step: out of range ({self.current_step})")
         return errors
 
@@ -196,6 +196,19 @@ def get_chain(chain_id: str) -> ChainState:
     return chain
 
 
+def _atomic_write(path: Path, data: str) -> None:
+    """Write content to path atomically using temp+replace.
+
+    Windows-safe: os.replace is atomic even if target exists.
+    """
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp", prefix=".chain_")
+    try:
+        os.write(fd, data.encode("utf-8"))
+    finally:
+        os.close(fd)
+    os.replace(tmp_path, path)
+
+
 def advance_step(
     chain_id: str,
     *,
@@ -228,11 +241,14 @@ def advance_step(
     # Update the step status
     chain.steps[idx].status = new_status
 
-    # If complete and not the last step, advance to next
-    if new_status == "complete" and idx < len(chain.steps) - 1:
+    # Advance based on status
+    if new_status in ("complete", "skipped") and idx < len(chain.steps) - 1:
         chain.current_step = idx + 1
         chain.steps[chain.current_step].status = "running"
     elif new_status == "complete" and idx == len(chain.steps) - 1:
+        chain.status = "complete"
+    elif new_status == "skipped" and idx == len(chain.steps) - 1:
+        # Last step skipped: chain ends with remaining steps still pending
         chain.status = "complete"
     elif new_status == "failed":
         chain.status = "failed"
@@ -240,9 +256,8 @@ def advance_step(
     chain.updated_at = datetime.now(timezone.utc).isoformat()
 
     path = _chain_path(chain_id)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(chain.to_dict(), f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    content = json.dumps(chain.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    _atomic_write(path, content)
 
     return chain
 
