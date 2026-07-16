@@ -95,6 +95,23 @@ def _pointer_path(session_id: str) -> Path:
     return ARTIFACTS_ROOT / SESSIONS_DIR_NAME / f"{session_id}.json"
 
 
+def _check_pointer_path(session_id: str) -> Path:
+    """Path to the /check session pointer for this session."""
+    return ARTIFACTS_ROOT / "check-sessions" / f"{session_id}.json"
+
+
+def _read_check_pointer(session_id: str) -> dict | None:
+    """Read the /check session pointer. None if missing/malformed."""
+    path = _check_pointer_path(session_id)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _read_pointer(session_id: str) -> dict | None:
     """Read the session pointer file, or None if missing/malformed/stale."""
     ptr = _pointer_path(session_id)
@@ -254,18 +271,33 @@ def check_go_completion(payload: dict | None = None) -> dict | None:
     # /check has work remaining even if no active task exists.
     blocker = _check_blocker(state_dir, run_id)
     if blocker is not None:
-        owner_gen_match = True
-        if "ownership_generation" in blocker:
-            # Generation check: only block if the blocker's generation matches
-            # the check pointer's current generation (stale blockers ignored)
-            pass  # TODO: resolve check pointer for generation match
-
-        if not blocker.get("terminal", True):
-            # /check says it's not done — block with its reason
+        # Generation check: only block if the blocker's ownership_generation
+        # matches the check pointer's current generation. Otherwise the
+        # blocker is from a stale /go generation (adoption has transferred
+        # ownership to /check) and must be ignored.
+        blocker_gen = blocker.get("ownership_generation")
+        if blocker_gen is not None:
+            check_ptr = _read_check_pointer(session_id)
+            current_gen = (check_ptr or {}).get("ownership_generation")
+            if current_gen is not None and blocker_gen != current_gen:
+                # Generation mismatch → stale blocker; ignore and fall through
+                # to normal active-task detection.
+                _telemetry("check_blocker_stale", session_id, "silent",
+                           f"gen {blocker_gen} != {current_gen}")
+            elif not blocker.get("terminal", True):
+                # /check says it's not done — block with its reason
+                next_phase = blocker.get("next_phase", "unknown")
+                reason_code = blocker.get("reason_code", "REQUIRED_PHASE_INCOMPLETE")
+                reason = f"continue: {next_phase} — {reason_code} (check)"
+                _telemetry("check_blocker", session_id, "block", reason)
+                return {"decision": "block", "reason": reason}
+        elif not blocker.get("terminal", True):
+            # No generation field in blocker — legacy blocker without generation.
+            # Block (conservative) since we can't verify freshness.
             next_phase = blocker.get("next_phase", "unknown")
             reason_code = blocker.get("reason_code", "REQUIRED_PHASE_INCOMPLETE")
             reason = f"continue: {next_phase} — {reason_code} (check)"
-            _telemetry("check_blocker", session_id, "block", reason)
+            _telemetry("check_blocker_legacy", session_id, "block", reason)
             return {"decision": "block", "reason": reason}
         else:
             # /check says terminal — clean up the blocker and proceed normally
