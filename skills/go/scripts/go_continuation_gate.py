@@ -58,6 +58,9 @@ STALE_TTL_SECONDS = 6 * 3600  # 6h — see module docstring justification.
 
 _DONE_STATUSES = {"completed", "done", "pr_ready"}
 
+# ── /check blocker contract (explicit, versioned) ──────────────────────────
+CHECK_BLOCKER_SCHEMA = "check-blocker.v1"
+
 
 # ---------------------------------------------------------------------------
 # Payload parsing
@@ -150,6 +153,26 @@ def _is_done(record: dict, state_dir: Path, run_id: str) -> bool:
     return status in _DONE_STATUSES
 
 
+def _check_blocker(state_dir: Path, run_id: str) -> dict | None:
+    """Read the explicit /check blocker contract.
+
+    Exact path, versioned schema. Returns the blocker dict or None if
+    missing, malformed, or version-mismatched.
+    """
+    path = state_dir / f".check_blocker_{run_id}.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if data.get("schema") != CHECK_BLOCKER_SCHEMA:
+        return None  # version mismatch -> fail-open (do not block on unknown)
+    return data
+
+
 def _block_reason(record: dict, state_dir: Path, run_id: str) -> str:
     """Build the 'continue: ...' reason string."""
     title = (record.get("task") or {}).get("title", "go run")
@@ -225,6 +248,32 @@ def check_go_completion(payload: dict | None = None) -> dict | None:
     if not run_id:
         _telemetry("malformed_pointer", session_id, "silent")
         return None  # malformed pointer -> silent
+
+    # ── /check blocker check (independent of active-task state) ──────────
+    # The blocker is the /check contract file. If it says terminal=false,
+    # /check has work remaining even if no active task exists.
+    blocker = _check_blocker(state_dir, run_id)
+    if blocker is not None:
+        owner_gen_match = True
+        if "ownership_generation" in blocker:
+            # Generation check: only block if the blocker's generation matches
+            # the check pointer's current generation (stale blockers ignored)
+            pass  # TODO: resolve check pointer for generation match
+
+        if not blocker.get("terminal", True):
+            # /check says it's not done — block with its reason
+            next_phase = blocker.get("next_phase", "unknown")
+            reason_code = blocker.get("reason_code", "REQUIRED_PHASE_INCOMPLETE")
+            reason = f"continue: {next_phase} — {reason_code} (check)"
+            _telemetry("check_blocker", session_id, "block", reason)
+            return {"decision": "block", "reason": reason}
+        else:
+            # /check says terminal — clean up the blocker and proceed normally
+            blocker_path = state_dir / f".check_blocker_{run_id}.json"
+            try:
+                blocker_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     record = _load_active_task(state_dir, run_id)
     if record is None:
