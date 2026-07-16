@@ -24,6 +24,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+# Per-process stable session id fallback (generated once at module load)
+_INSTANCE_ID: str = str(uuid.uuid4())
+
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent  # skills/go
 _manifest_mod = None
 
@@ -32,10 +35,12 @@ def _get_manifest_module():
     global _manifest_mod
     if _manifest_mod is not None:
         return _manifest_mod
+    import sys as _sys_m
     import importlib.util as _util
     scripts_dir = PLUGIN_ROOT / "scripts"
     spec = _util.spec_from_file_location("chain_manifest", scripts_dir / "chain_manifest.py")
     mod = _util.module_from_spec(spec)
+    _sys_m.modules["chain_manifest"] = mod
     spec.loader.exec_module(mod)
     _manifest_mod = mod
     return mod
@@ -72,12 +77,24 @@ def parse_chain(prompt: str) -> list[tuple[str, str]]:
 
 
 def _session_id(payload: dict) -> str:
+    """Extract stable session id from payload.
+    
+    Priority:
+    1. Payload sessionId (camelCase, from Claude Code internal)
+    2. Payload session_id (snake_case, from some hook contexts)
+    3. CLAUDE_CODE_SESSION_ID env var (set by Claude Code per-session)
+    4. Per-process instance UUID (generated once at module load)
+    
+    NOT using CLAUDE_TERMINAL_ID: that env var is the Windows Terminal
+    session id which is shared across concurrent Claude Code sessions
+    in the same terminal. Using it would cause cross-terminal chain
+    contamination.
+    """
     return (
         payload.get("sessionId")
         or payload.get("session_id")
         or os.environ.get("CLAUDE_CODE_SESSION_ID")
-        or os.environ.get("CLAUDE_TERMINAL_ID")
-        or str(uuid.uuid4())
+        or _INSTANCE_ID  # per-process stable fallback
     )
 
 
