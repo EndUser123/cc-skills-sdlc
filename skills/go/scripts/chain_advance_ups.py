@@ -5,13 +5,14 @@ Contract:
     stdout: JSON  {} (pass-through) or {hookSpecificOutput: {...}} (with injection)
 
 Flow:
-    - Prompt contains ", /<skill>" → parse chain, create manifest, pass through (first step
-      dispatched naturally by SlashCommand routing; trailing chain text bleeds into first
-      step's args — acceptable for v1).
-    - Subsequent input (blank or any) while chain active → advance last step, inject next
-      command via additionalContext.
-    - Non-blank input during active chain → abandon chain, pass through.
-    - No active chain → pass through unchanged.
+    - Prompt contains ", /<skill>" -> parse chain, create manifest,
+      abandon any existing active chain for this session first.
+      First step is dispatched by SlashCommand routing; trailing chain text
+      bleeds into first step's args (acceptable v1 limitation).
+    - Empty/blank prompt while chain active -> advance last step,
+      inject next command via additionalContext.
+    - Non-blank input while chain active -> abandon chain, pass through.
+    - No active chain -> pass through unchanged.
 """
 
 from __future__ import annotations
@@ -47,27 +48,26 @@ def _get_manifest_module():
 
 
 def parse_chain(prompt: str) -> list[tuple[str, str]]:
-    """Parse a prompt into skill-chain steps, or return [] if no chain detected."""
+    """Parse a prompt into skill-chain steps, or return [] if no chain detected.
+
+    Handles "/go task, /check" and "/go, /check" (no space before comma).
+    """
     stripped = prompt.strip()
-    if not stripped.startswith("/"):
+    m = re.match(r"/([a-z0-9-]+(?::[a-z0-9-]+)?)\s*(.*)", stripped, re.IGNORECASE)
+    if not m:
         return []
-    space_idx = stripped.find(" ")
-    if space_idx == -1:
-        return []
-    primary_cmd = stripped[1:space_idx]
-    primary_args = stripped[space_idx + 1:]
-    spans = list(re.finditer(r",\s*/", primary_args))
+    primary_cmd = m.group(1)
+    remaining = m.group(2).strip()
+    spans = list(re.finditer(r",\s*/", remaining))
     if not spans:
         return []
     first_end = spans[0].start()
-    first_args = primary_args[:first_end].strip()
+    first_args = remaining[:first_end].strip()
     result: list[tuple[str, str]] = [(primary_cmd, first_args)]
     for i, span in enumerate(spans):
-        if i + 1 < len(spans):
-            segment = primary_args[span.end():spans[i + 1].start()]
-        else:
-            segment = primary_args[span.end():]
-        segment = segment.strip()
+        seg_start = span.end()
+        seg_end = spans[i + 1].start() if i + 1 < len(spans) else len(remaining)
+        segment = remaining[seg_start:seg_end].strip()
         cmd_match = re.match(r"([a-z0-9-]+(?::[a-z0-9-]+)?)(?:\s+(.*))?", segment, re.IGNORECASE)
         if cmd_match:
             result.append((cmd_match.group(1), cmd_match.group(2) or ""))
@@ -78,13 +78,13 @@ def parse_chain(prompt: str) -> list[tuple[str, str]]:
 
 def _session_id(payload: dict) -> str:
     """Extract stable session id from payload.
-    
+
     Priority:
     1. Payload sessionId (camelCase, from Claude Code internal)
     2. Payload session_id (snake_case, from some hook contexts)
     3. CLAUDE_CODE_SESSION_ID env var (set by Claude Code per-session)
     4. Per-process instance UUID (generated once at module load)
-    
+
     NOT using CLAUDE_TERMINAL_ID: that env var is the Windows Terminal
     session id which is shared across concurrent Claude Code sessions
     in the same terminal. Using it would cause cross-terminal chain
@@ -94,16 +94,19 @@ def _session_id(payload: dict) -> str:
         payload.get("sessionId")
         or payload.get("session_id")
         or os.environ.get("CLAUDE_CODE_SESSION_ID")
-        or _INSTANCE_ID  # per-process stable fallback
+        or _INSTANCE_ID
     )
 
 
-def _active_chain_for_session(cm, session_id: str):
+def _abandon_chain(cm, session_id: str) -> None:
+    """Mark all in_progress chains for this session as abandoned."""
     chains = cm.list_chains(session_id=session_id)
     for c in chains:
         if c.status == "in_progress":
-            return c
-    return None
+            try:
+                cm.clear_chain(c.chain_id, force=True)
+            except Exception:
+                pass
 
 
 def main() -> None:
@@ -120,15 +123,13 @@ def main() -> None:
     prompt: str = payload.get("prompt", "")
     sid = _session_id(payload)
 
-    if not prompt:
-        print("{}")
-        return
-
     cm = _get_manifest_module()
 
-    # Check for chain-input
+    # --- Chain creation ---
     steps = parse_chain(prompt)
     if steps:
+        # Abandon any existing active chain for this session before creating
+        _abandon_chain(cm, sid)
         try:
             cm.create_manifest(steps, session_id=sid, origin_command=prompt)
         except FileExistsError:
@@ -136,40 +137,52 @@ def main() -> None:
         print("{}")
         return
 
-    # Check for active chain needing advancement
+    # --- Check for active chain ---
     chain = _active_chain_for_session(cm, sid)
     if not chain:
         print("{}")
         return
 
-    current = chain.steps[chain.current_step]
+    # --- Empty input -> advance chain ---
+    if not prompt.strip():
+        current = chain.steps[chain.current_step]
+        if current.status == "running":
+            cm.advance_step(chain.chain_id, new_status="complete")
+            chain = cm.get_chain(chain.chain_id)
 
-    if current.status == "running":
-        cm.advance_step(chain.chain_id, new_status="complete")
-        chain = cm.get_chain(chain.chain_id)
+        if chain.status != "in_progress":
+            cm.clear_chain(chain.chain_id, force=True)
+            print("{}")
+            return
 
-    if chain.status != "in_progress":
-        cm.clear_chain(chain.chain_id, force=True)
+        next_step = chain.steps[chain.current_step]
+        if next_step.status == "pending":
+            cm.advance_step(chain.chain_id, new_status="running", step_index=next_step.index)
+            cmd_line = f"/{next_step.skill}"
+            if next_step.args:
+                cmd_line += f" {next_step.args}"
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": cmd_line,
+                }
+            }
+            print(json.dumps(output))
+            return
         print("{}")
         return
 
-    next_step = chain.steps[chain.current_step]
-
-    if next_step.status == "pending":
-        cm.advance_step(chain.chain_id, new_status="running", step_index=next_step.index)
-        cmd_line = f"/{next_step.skill}"
-        if next_step.args:
-            cmd_line += f" {next_step.args}"
-        output = {
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": cmd_line,
-            }
-        }
-        print(json.dumps(output))
-        return
-
+    # --- Non-blank input while chain active -> abandon ---
+    _abandon_chain(cm, sid)
     print("{}")
+
+
+def _active_chain_for_session(cm, session_id: str):
+    chains = cm.list_chains(session_id=session_id)
+    for c in chains:
+        if c.status == "in_progress":
+            return c
+    return None
 
 
 if __name__ == "__main__":

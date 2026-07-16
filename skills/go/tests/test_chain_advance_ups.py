@@ -52,6 +52,16 @@ class TestParseChain:
     def test_no_slash_no_chain(self):
         assert parse_chain("hello world") == []
 
+    def test_chain_without_space_after_command(self):
+        """parse_chain handles /go, /check (no space after command)."""
+        result = parse_chain("/go, /check")
+        assert result == [("go", ""), ("check", "")]
+
+    def test_chain_without_space_args_then_comma(self):
+        """parse_chain handles /go task, /check (space before comma, not after cmd)."""
+        result = parse_chain("/go task, /check")
+        assert result == [("go", "task"), ("check", "")]
+
     def test_namespaced_skill(self):
         result = parse_chain("/go task, /cc-skills-sdlc:check")
         assert result == [("go", "task"), ("cc-skills-sdlc:check", "")]
@@ -127,6 +137,50 @@ class TestMainIntegration:
         # Cleanup
         for c in chains:
             cm.clear_chain(c.chain_id, force=True)
+        del _os.environ["CHAIN_STEPS_DIR"]
+
+    def test_chain_abandons_old_chain(self, capsys, tmp_path):
+        """Creating a new chain abandons any existing active chain for the session."""
+        import os as _os
+        _os.environ["CHAIN_STEPS_DIR"] = str(tmp_path)
+        _ups._manifest_mod = None
+        cm = _ups._get_manifest_module()
+        # Create an initial chain
+        cm.create_manifest([("go", "task"), ("check", "")], session_id="sess-2")
+        # Now send new chain input
+        payload = json.dumps({"prompt": "/verify test, /check", "sessionId": "sess-2"})
+        self._mock_stdin(payload.encode())
+        _ups.main()
+        out, _ = capsys.readouterr()
+        assert out.strip() == "{}"
+        # Verify old chain is gone (abandoned via clear_chain force)
+        chains = cm.list_chains(session_id="sess-2")
+        active = [c for c in chains if c.status == "in_progress"]
+        assert len(active) == 1
+        assert active[0].steps[0].skill == "verify"
+        # Cleanup
+        for c in chains:
+            cm.clear_chain(c.chain_id, force=True)
+        del _os.environ["CHAIN_STEPS_DIR"]
+
+    def test_non_blank_abandons_chain(self, capsys, tmp_path):
+        """Non-blank input while a chain is active abandons the chain."""
+        import os as _os
+        _os.environ["CHAIN_STEPS_DIR"] = str(tmp_path)
+        _ups._manifest_mod = None
+        cm = _ups._get_manifest_module()
+        # Create a chain
+        chain = cm.create_manifest([("go", "task")], session_id="sess-3")
+        cm.advance_step(chain.chain_id, new_status="running")
+        # Send non-blank input
+        payload = json.dumps({"prompt": "/check unrelated", "sessionId": "sess-3"})
+        self._mock_stdin(payload.encode())
+        _ups.main()
+        out, _ = capsys.readouterr()
+        assert out.strip() == "{}"
+        # Chain should be cleared (abandoned)
+        chains = cm.list_chains(session_id="sess-3")
+        assert len(chains) == 0
         del _os.environ["CHAIN_STEPS_DIR"]
 
 
