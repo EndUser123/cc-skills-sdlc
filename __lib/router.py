@@ -29,7 +29,10 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 # Add future cc-skills-sdlc hooks here as they move off direct settings.json
 # registration.
 DISPATCH: dict[str, list[str]] = {
-    "Stop": ["skills/go/scripts/go_continuation_gate.py"],
+    "Stop": [
+        "skills/go/scripts/chain_stop_gate.py",
+        "skills/go/scripts/go_continuation_gate.py",
+    ],
     "UserPromptSubmit": ["skills/go/scripts/chain_advance_ups.py"],
 }
 
