@@ -69,10 +69,17 @@ class TestSessionId:
         assert sid == "test-session-1"
 
     def test_uses_claude_code_session_id_fallback(self, monkeypatch):
-        monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
-        monkeypatch.setenv("CLAUDE_TERMINAL_ID", "term-1")
+        """When CLAUDE_CODE_SESSION_ID is set, it's used as fallback."""
+        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-from-env")
         sid = _ups._session_id({})
-        assert sid == "term-1"
+        assert sid == "session-from-env"
+
+    def test_uses_instance_id_when_no_session_available(self, monkeypatch):
+        """When no payload sessionId and no env var, falls back to _INSTANCE_ID."""
+        monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+        # _INSTANCE_ID is set at module load time
+        sid = _ups._session_id({})
+        assert sid == _ups._INSTANCE_ID
 
 
 class TestMainIntegration:

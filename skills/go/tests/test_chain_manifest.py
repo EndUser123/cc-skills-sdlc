@@ -30,6 +30,20 @@ list_chains = _cm.list_chains
 RUN_ID = "87654321-4321-4432-8432-210987654321"
 
 
+@pytest.fixture(autouse=True)
+def _protect_module_registration():
+    """Re-register _cm before each test.
+
+    test_chain_advance_ups.py's _get_manifest_module() overwrites
+    sys.modules["chain_manifest"] during integration tests in the same
+    pytest session. This fixture ensures monkeypatch.setattr("chain_manifest.X")
+    resolves to _cm, not the leaked module from the other test file.
+    """
+    _sys.modules["chain_manifest"] = _cm
+    yield
+    _sys.modules["chain_manifest"] = _cm
+
+
 class TestChainStep:
     """ChainStep dataclass serialization."""
 
