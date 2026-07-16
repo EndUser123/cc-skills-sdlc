@@ -199,8 +199,8 @@ class TestMainIntegration:
         _ups.main()
         out, _ = capsys.readouterr()
         result = json.loads(out.strip())
-        # Should inject /check with additionalContext
-        assert result["hookSpecificOutput"]["additionalContext"] == "/check"
+        # Should inject prose instruction with /check
+        assert "run /check" in result["hookSpecificOutput"]["additionalContext"]
         # Verify chain advanced: step[0] complete, step[1] running
         chain = cm.get_chain(chain.chain_id)
         assert chain.steps[0].status == "complete"
@@ -225,7 +225,7 @@ class TestMainIntegration:
         out, _ = capsys.readouterr()
         result = json.loads(out.strip())
         # Should emit chain complete
-        assert "Chain complete" in result["hookSpecificOutput"]["additionalContext"]
+        assert "complete" in result["hookSpecificOutput"]["additionalContext"].lower()
         # Chain should be cleared
         chains = cm.list_chains(session_id="sess-5")
         assert len(chains) == 0

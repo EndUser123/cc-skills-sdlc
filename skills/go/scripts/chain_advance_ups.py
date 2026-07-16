@@ -10,7 +10,7 @@ Flow:
       First step is dispatched by SlashCommand routing; trailing chain text
       bleeds into first step's args (acceptable v1 limitation).
     - Empty/blank prompt while chain active -> advance last step,
-      inject next command via additionalContext.
+      inject prose instruction to run the next step (e.g. "Next step: run /check. Press Enter again to advance.").
     - Non-blank input while chain active -> abandon chain, pass through.
     - No active chain -> pass through unchanged.
 """
@@ -155,24 +155,27 @@ def main() -> None:
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "UserPromptSubmit",
-                    "additionalContext": "[Chain complete]",
+                    "additionalContext": "Skill chain complete. No further steps remain.",
                 }
             }
             print(json.dumps(output))
             return
 
-        # Inject next step command. advance_step("complete") may have already
-        # set the next step to "running"; handle both pending and running.
+        # Inject next step as prose instruction. additionalContext is delivered
+        # as a system reminder, NOT routed through SlashCommand dispatch.
+        # Prose framing ("Next step: run /check.") tells the model explicitly
+        # what to do without relying on command routing.
         next_step = chain.steps[chain.current_step]
         if next_step.status == "pending":
             cm.advance_step(chain.chain_id, new_status="running", step_index=next_step.index)
-        cmd_line = f"/{next_step.skill}"
+        cmd_str = f"/{next_step.skill}"
         if next_step.args:
-            cmd_line += f" {next_step.args}"
+            cmd_str += f" {next_step.args}"
+        instruction = f"Next step in the skill chain: run {cmd_str}."
         output = {
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
-                "additionalContext": cmd_line,
+                "additionalContext": instruction,
             }
         }
         print(json.dumps(output))
