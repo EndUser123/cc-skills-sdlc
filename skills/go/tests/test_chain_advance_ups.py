@@ -209,6 +209,36 @@ class TestMainIntegration:
         cm.clear_chain(chain.chain_id, force=True)
         del _os.environ["CHAIN_STEPS_DIR"]
 
+    def test_blank_input_on_fresh_chain(self, capsys, tmp_path):
+        """Blank input on a fresh chain (step[0] pending, dispatched by SlashCommand)
+        correctly marks step[0] done and injects the next step."""
+        import os as _os
+        _os.environ["CHAIN_STEPS_DIR"] = str(tmp_path)
+        _ups._manifest_mod = None
+        cm = _ups._get_manifest_module()
+        # Create fresh chain — all steps pending, like after user types
+        # "/go task, /check" where step[0] was dispatched by SlashCommand
+        chain = cm.create_manifest([("go", "task"), ("check", "")], session_id="sess-fresh")
+        # step[0]="pending", step[1]="pending", current_step=0
+        assert chain.steps[0].status == "pending"
+        # Send blank input
+        payload = json.dumps({"prompt": "", "sessionId": "sess-fresh"})
+        self._mock_stdin(payload.encode())
+        _ups.main()
+        out, _ = capsys.readouterr()
+        result = json.loads(out.strip())
+        # Should inject /check, not /go task
+        ctx = result["hookSpecificOutput"]["additionalContext"]
+        assert "run /check" in ctx, f"Got: {ctx}"
+        assert "run /go task" not in ctx, f"Should not inject first step: {ctx}"
+        # Verify chain: step[0] complete, step[1] running, current_step=1
+        chain = cm.get_chain(chain.chain_id)
+        assert chain.steps[0].status == "complete", f"Step[0] should be complete: {chain.steps[0]}"
+        assert chain.current_step == 1
+        # Cleanup
+        cm.clear_chain(chain.chain_id, force=True)
+        del _os.environ["CHAIN_STEPS_DIR"]
+
     def test_blank_input_on_last_step_emits_complete(self, capsys, tmp_path):
         """Blank input on the last step signals chain complete."""
         import os as _os

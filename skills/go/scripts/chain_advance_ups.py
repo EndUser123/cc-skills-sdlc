@@ -146,7 +146,7 @@ def main() -> None:
     # --- Empty input -> advance chain ---
     if not prompt.strip():
         current = chain.steps[chain.current_step]
-        if current.status == "running":
+        if current.status in ("pending", "running"):
             cm.advance_step(chain.chain_id, new_status="complete")
             chain = cm.get_chain(chain.chain_id)
 
