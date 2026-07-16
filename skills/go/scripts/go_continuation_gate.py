@@ -194,8 +194,13 @@ def _block_reason(record: dict, state_dir: Path, run_id: str) -> str:
     """Build the 'continue: ...' reason string."""
     title = (record.get("task") or {}).get("title", "go run")
     # If .blocked_* exists, refine reason with its content.
+    # The glob matches marker files like `.blocked_{run_id}`.  If a companion
+    # JSON file named `blocked_{run_id}.json` (stem minus leading dot) also
+    # exists, it is read for a machine-readable reason_code.  The marker
+    # file alone is sufficient to indicate a block; the JSON is optional
+    # enrichment.
     for bf in state_dir.glob(f".blocked*{run_id}*"):
-        bj = state_dir / f"blocked_{bf.stem.replace('.', '')}.json"
+        bj = state_dir / f"{bf.stem.lstrip('.')}.json"
         if bj.exists():
             try:
                 bd = json.loads(bj.read_text(encoding="utf-8"))
