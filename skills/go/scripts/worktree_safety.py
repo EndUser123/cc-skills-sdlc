@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -589,6 +590,7 @@ def lifecycle_inspect_worktree(worktree_path: Path, repo_root: Path | None = Non
 def lifecycle_clean_worktree(
     worktree_path: Path, repo_root: Path, run_id: str = "",
     state_dir: Path | None = None, *, branch_name: str = "",
+    auto_tag: bool = False,
 ) -> dict:
     report = {"worktree_path": str(worktree_path), "git_remove_ok": False,
               "branch_deleted": False, "git_pruned": False,
@@ -596,6 +598,14 @@ def lifecycle_clean_worktree(
               "errors": []}
     wt = Path(worktree_path)
     rr = Path(repo_root)
+    # NB: --force bypasses git's dirty-tree safety. The shutil.rmtree
+    # fallback below (with ignore_errors=True) destroys data even on a
+    # half-disabled path. This function is NOT a safe removal authority
+    # for worktrees with uncommitted work; use cmd_remove (in
+    # worktree_cleanup.py per P:/docs/worktree-lifecycle-design.md PR 4)
+    # for the policy-validated path. PR 1 fix keeps --force for now
+    # because removing it alone would be a partial fix that hides the
+    # rmtree-fallback destruction path.
     p = _git(rr, "worktree", "remove", "--force", str(wt))
     if p.returncode == 0:
         report["git_remove_ok"] = True
@@ -608,8 +618,27 @@ def lifecycle_clean_worktree(
         except Exception as e:
             report["errors"].append(f"rmtree: {e}")
     if branch_name:
-        bp = _git(rr, "branch", "-D", branch_name)
-        if bp.returncode == 0:
+        # PR 1 fix (P:/docs/worktree-lifecycle-design.md): never `git branch -D`
+        # unconditionally. Reachability check first; refuse to delete
+        # unreachable branches unless auto_tag=True (which creates a backup
+        # tag, then deletes). Preserves the user's "don't destroy code"
+        # principle — committing to --D silently would lose unreachable work.
+        check = _git(rr, "merge-base", "--is-ancestor", branch_name, "main")
+        bp = None
+        if check.returncode == 0:
+            # Branch tip reachable from main -> safe to use -d (only-merged)
+            bp = _git(rr, "branch", "-d", branch_name)
+        elif auto_tag:
+            # Branch tip NOT reachable from main. auto_tag=True: create
+            # backup tag, then force-delete. The tag preserves the commit.
+            stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+            tag_name = f"backup/{branch_name.replace('/', '-')}-{stamp}"
+            _git(rr, "tag", "-a", tag_name, branch_name, "-m",
+                 f"Pre-delete backup of {branch_name}")
+            bp = _git(rr, "branch", "-D", branch_name)
+        # else: unreachable branch, auto_tag=False (default) -> preserve.
+        # Do not delete. branch_deleted stays False. Caller can act on it.
+        if bp is not None and bp.returncode == 0:
             report["branch_deleted"] = True
     _git(rr, "worktree", "prune")
     report["git_pruned"] = True

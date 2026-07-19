@@ -325,6 +325,64 @@ def test_15_branch_deletion_safe(tmp_path):
     assert bp.stdout.strip() == "", f"branch {branch} still exists"
 
 
+# Test 16: PR 1 falsifier — unreachable branch is preserved by default
+def test_16_unreachable_branch_preserved_without_auto_tag(tmp_path):
+    """PR 1 falsifier: lifecycle_clean_worktree must NOT silently -D a
+    branch whose tip is not reachable from main. Only auto_tag=True
+    creates a backup tag and force-deletes."""
+    ws = _ws()
+    repo = _git_repo(tmp_path / "repo")
+    aw, branch, run_id = _create_falsify_worktree(repo, tmp_path, "run-unc")
+    # Make a commit in the worktree so the branch diverges from main
+    test_file = aw / "extra.txt"
+    test_file.write_text("diverged content\n")
+    subprocess.run(["git", "-C", str(aw), "add", "extra.txt"], check=True)
+    subprocess.run(["git", "-C", str(aw), "commit", "-m", "diverge"], check=True)
+    # Capture branch tip before worktree removal
+    tip_before = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", branch],
+        capture_output=True, text=True).stdout.strip()
+    # Manually remove the worktree
+    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(aw)])
+    # Call lifecycle clean WITHOUT auto_tag — branch should be preserved
+    lr = ws.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / "state",
+                                       branch_name=branch)
+    assert lr["branch_deleted"] is False, (
+        f"unreachable branch was deleted without auto_tag: {lr}")
+    bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", branch],
+                         capture_output=True, text=True)
+    assert bp.stdout.strip() != "", (
+        f"unreachable branch {branch} was lost from the repo")
+    # Branch tip is unchanged (still the diverged commit)
+    tip_after = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", branch],
+        capture_output=True, text=True).stdout.strip()
+    assert tip_after == tip_before, (
+        f"branch tip changed: {tip_after} != {tip_before}")
+    # Now retry WITH auto_tag=True — branch should be deleted, backup tag created
+    lr2 = ws.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / "state",
+                                        branch_name=branch, auto_tag=True)
+    assert lr2["branch_deleted"] is True, (
+        f"branch should be deleted with auto_tag=True: {lr2}")
+    # Branch should be gone now
+    bp2 = subprocess.run(["git", "-C", str(repo), "branch", "--list", branch],
+                         capture_output=True, text=True)
+    assert bp2.stdout.strip() == "", (
+        f"branch {branch} still exists after auto_tag delete")
+    # Backup tag should exist and point to the original tip
+    tag_pattern = f"backup/{branch.replace('/', '-')}-*"
+    tag_list = subprocess.run(
+        ["git", "-C", str(repo), "tag", "-l", tag_pattern],
+        capture_output=True, text=True).stdout.strip()
+    assert tag_list, "no backup tag created"
+    first_tag = tag_list.split("\n")[0]
+    tag_target = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", f"{first_tag}^{{commit}}"],
+        capture_output=True, text=True).stdout.strip()
+    assert tag_target == tip_before, (
+        f"backup tag points to {tag_target}, expected {tip_before}")
+
+
 # --- Management-root reconciliation boundary tests --------------------------
 # The management root controls disk scanning scope. Git cross-reference
 # finds registered worktrees regardless of location. These tests verify
