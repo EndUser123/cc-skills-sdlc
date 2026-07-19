@@ -456,3 +456,183 @@ def test_existing_worktrees_not_moved(tmp_path, monkeypatch):
             break
     ws_mod.lifecycle_clean_worktree(aw, repo, run_id, tmp_path / 'state',
                                      branch_name=branch)
+
+
+# --- PR 2 tests: worktree_lifecycle module -----------------------------------
+# Extracted helpers from worktree_safety.lifecycle_clean_worktree. Each test
+# creates a real temporary git repo so reachability checks are exercised.
+
+
+def test_safe_delete_branch_reachable(tmp_path):
+    """Branch tip equal to main HEAD -> reachable -> safe-delete via -d."""
+    from worktree_lifecycle import safe_delete_branch
+    repo = _git_repo(tmp_path / "repo")
+    # Create a branch at HEAD (reachable from main)
+    subprocess.run(["git", "-C", str(repo), "branch", "feat/merged"], check=True)
+    deleted, status = safe_delete_branch(repo, "feat/merged")
+    assert deleted is True
+    assert status == "merged_deleted"
+    bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", "feat/merged"],
+                        capture_output=True, text=True)
+    assert bp.stdout.strip() == "", "branch still exists"
+
+
+def test_safe_delete_branch_unreachable_default_preserves(tmp_path):
+    """Branch tip NOT reachable from main; auto_tag=False (default) -> preserved."""
+    from worktree_lifecycle import safe_delete_branch
+    repo = _git_repo(tmp_path / "repo")
+    aw, _branch, _run = _create_falsify_worktree(repo, tmp_path, "run-sdb")
+    # Make a divergent commit so branch tip is unreachable
+    (aw / "extra.txt").write_text("divergent\n")
+    subprocess.run(["git", "-C", str(aw), "add", "extra.txt"], check=True)
+    subprocess.run(["git", "-C", str(aw), "commit", "-qm", "diverge"], check=True)
+    branch = "falsify/run-sdb"
+    deleted, status = safe_delete_branch(repo, branch, auto_tag=False)
+    assert deleted is False
+    assert status == "unreachable_preserved"
+    bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", branch],
+                        capture_output=True, text=True)
+    assert bp.stdout.strip() != "", "unreachable branch was deleted (should be preserved)"
+
+
+def test_safe_delete_branch_unreachable_auto_tag_deletes(tmp_path):
+    """Branch tip NOT reachable; auto_tag=True -> backup tag created, branch deleted."""
+    from worktree_lifecycle import safe_delete_branch
+    repo = _git_repo(tmp_path / "repo")
+    aw, _branch, _run = _create_falsify_worktree(repo, tmp_path, "run-at")
+    (aw / "extra.txt").write_text("divergent\n")
+    subprocess.run(["git", "-C", str(aw), "add", "extra.txt"], check=True)
+    subprocess.run(["git", "-C", str(aw), "commit", "-qm", "diverge"], check=True)
+    branch = "falsify/run-at"
+    # Remove the worktree first (safe_delete_branch requires branch not in use)
+    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(aw)],
+                   check=True)
+    tip_before = subprocess.run(["git", "-C", str(repo), "rev-parse", branch],
+                               capture_output=True, text=True).stdout.strip()
+    deleted, status = safe_delete_branch(repo, branch, auto_tag=True)
+    assert deleted is True, f"safe_delete_branch returned deleted=False, status={status!r}"
+    assert status.startswith("backup_tag_deleted:"), f"unexpected status: {status}"
+    # Branch is gone
+    bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", branch],
+                        capture_output=True, text=True)
+    assert bp.stdout.strip() == "", "branch still exists after auto_tag delete"
+    # Backup tag exists and points at original tip
+    tag_name = status.split(":", 1)[1]
+    tag_target = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", f"{tag_name}^" + "{commit}"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    assert tag_target == tip_before, (
+        f"backup tag points to {tag_target}, expected {tip_before}"
+    )
+
+
+def test_safe_delete_branch_in_use_returns_error(tmp_path):
+    """safe_delete_branch fails (does not crash) when branch is currently checked out."""
+    from worktree_lifecycle import safe_delete_branch
+    repo = _git_repo(tmp_path / "repo")
+    _aw, _branch, _run = _create_falsify_worktree(repo, tmp_path, "run-inuse")
+    # Branch is `falsify/run-inus` (run_id[:8] of "run-inuse")
+    actual_branch = "falsify/run-inus"
+    # Don't remove the worktree — the branch is still in use.
+    deleted, status = safe_delete_branch(repo, actual_branch, auto_tag=False)
+    assert deleted is False
+    assert status.startswith("git_error:"), f"expected git_error, got {status!r}"
+    # Branch is still present
+    bp = subprocess.run(["git", "-C", str(repo), "branch", "--list", actual_branch],
+                        capture_output=True, text=True)
+    assert bp.stdout.strip() != "", "branch should still exist after failed delete"
+
+
+def test_repo_policy_validate_name_default():
+    """Default RepoPolicy accepts alphanum / dot / dash / underscore names."""
+    from worktree_lifecycle import RepoPolicy
+    p = RepoPolicy()
+    ok, msg = p.validate_name("yt-is-cleanup-foo")
+    assert ok is True and msg == ""
+    ok, msg = p.validate_name("refactor.cold-planes_v2")
+    assert ok is True
+    # Empty name rejected
+    ok, msg = p.validate_name("")
+    assert ok is False
+    # Names with shell metacharacters rejected
+    ok, msg = p.validate_name("foo;rm -rf /")
+    assert ok is False
+    ok, msg = p.validate_name("foo bar")  # space
+    assert ok is False
+
+
+def test_repo_policy_validate_name_custom_pattern():
+    """Custom naming_pattern is enforced."""
+    from worktree_lifecycle import RepoPolicy
+    p = RepoPolicy(naming_pattern=r"^yt-is-[a-z]+-[a-z0-9]{4}$")
+    ok, _ = p.validate_name("yt-is-feature-abcd")
+    assert ok is True
+    ok, _ = p.validate_name("yt-is-feature-abC")  # uppercase fails lowercase-only pattern
+    assert ok is False
+    ok, _ = p.validate_name("not-yt-is-feature-abcd")  # wrong prefix
+    assert ok is False
+
+
+def test_validate_name_function_with_and_without_policy():
+    """Standalone validate_name function uses default policy when none given."""
+    from worktree_lifecycle import validate_name, RepoPolicy
+    # No policy -> defaults
+    ok, _ = validate_name("anything.reasonable-name")
+    assert ok is True
+    # With explicit policy
+    ok, _ = validate_name("foo", RepoPolicy(naming_pattern=r"^bar$"))
+    assert ok is False
+    ok, _ = validate_name("bar", RepoPolicy(naming_pattern=r"^bar$"))
+    assert ok is True
+
+
+def test_load_policy_default_when_no_file(tmp_path):
+    """load_policy returns defaults when file doesn't exist."""
+    from worktree_lifecycle import load_policy
+    p = load_policy(tmp_path / "nonexistent.toml")
+    assert p.package_name == "yt-is"
+    assert p.main_branch == "main"
+    assert p.backup_tag_prefix == "backup"
+
+
+def test_load_policy_default_when_none(tmp_path):
+    """load_policy(None) returns defaults (graceful no-op)."""
+    from worktree_lifecycle import load_policy
+    p = load_policy(None)
+    assert p.package_name == "yt-is"
+    assert p.main_branch == "main"
+
+
+def test_load_policy_from_toml(tmp_path):
+    """load_policy reads worktree-policy.toml when present."""
+    from worktree_lifecycle import load_policy
+    from pathlib import Path as _P
+    cfg = tmp_path / "worktree-policy.toml"
+    cfg.write_text(
+        '[package]\n'
+        'name = "my-pkg"\n'
+        '\n'
+        '[worktree]\n'
+        'main_branch = "trunk"\n'
+        'naming_pattern = "^my-pkg-[a-z]+-[a-z0-9]+$"\n'
+        'worktree_root = "/tmp/wt"\n'
+        'backup_tag_prefix = "bk"\n',
+        encoding="utf-8",
+    )
+    p = load_policy(cfg)
+    assert p.package_name == "my-pkg"
+    assert p.main_branch == "trunk"
+    assert p.naming_pattern == r"^my-pkg-[a-z]+-[a-z0-9]+$"
+    # Path comparison (stringifying Path is OS-dependent; comparing Path objects is not)
+    assert p.worktree_root == _P("/tmp/wt")
+    assert p.backup_tag_prefix == "bk"
+
+
+def test_load_policy_handles_malformed_gracefully(tmp_path):
+    """load_policy returns defaults on malformed TOML (doesn't raise)."""
+    from worktree_lifecycle import load_policy
+    cfg = tmp_path / "broken.toml"
+    cfg.write_text("this is not [valid toml", encoding="utf-8")
+    p = load_policy(cfg)
+    assert p.package_name == "yt-is"  # defaults

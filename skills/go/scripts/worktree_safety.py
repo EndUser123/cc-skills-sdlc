@@ -26,6 +26,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from run_context import go_worktree_creation_root, go_worktree_management_root
+from worktree_lifecycle import (
+    RepoPolicy,
+    load_policy,
+    safe_delete_branch,
+    validate_name,
+)
 
 METADATA_SCHEMA = "worktree-task.v1"
 METADATA_DIR_NAME = "worktree-tasks"
@@ -618,27 +624,12 @@ def lifecycle_clean_worktree(
         except Exception as e:
             report["errors"].append(f"rmtree: {e}")
     if branch_name:
-        # PR 1 fix (P:/docs/worktree-lifecycle-design.md): never `git branch -D`
-        # unconditionally. Reachability check first; refuse to delete
-        # unreachable branches unless auto_tag=True (which creates a backup
-        # tag, then deletes). Preserves the user's "don't destroy code"
-        # principle — committing to --D silently would lose unreachable work.
-        check = _git(rr, "merge-base", "--is-ancestor", branch_name, "main")
-        bp = None
-        if check.returncode == 0:
-            # Branch tip reachable from main -> safe to use -d (only-merged)
-            bp = _git(rr, "branch", "-d", branch_name)
-        elif auto_tag:
-            # Branch tip NOT reachable from main. auto_tag=True: create
-            # backup tag, then force-delete. The tag preserves the commit.
-            stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
-            tag_name = f"backup/{branch_name.replace('/', '-')}-{stamp}"
-            _git(rr, "tag", "-a", tag_name, branch_name, "-m",
-                 f"Pre-delete backup of {branch_name}")
-            bp = _git(rr, "branch", "-D", branch_name)
-        # else: unreachable branch, auto_tag=False (default) -> preserve.
-        # Do not delete. branch_deleted stays False. Caller can act on it.
-        if bp is not None and bp.returncode == 0:
+        # PR 2 refactor (P:/docs/worktree-lifecycle-design.md): branch-delete
+        # logic moved to worktree_lifecycle.safe_delete_branch. This block
+        # is now a thin wrapper around the reachability-checked + auto_tag
+        # flow. See worktree_lifecycle.safe_delete_branch for the contract.
+        deleted, _status = safe_delete_branch(rr, branch_name, auto_tag=auto_tag)
+        if deleted:
             report["branch_deleted"] = True
     _git(rr, "worktree", "prune")
     report["git_pruned"] = True
