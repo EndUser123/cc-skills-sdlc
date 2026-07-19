@@ -147,10 +147,11 @@ def query_qmd(query: str, limit: int, qmd_bin: str) -> list[dict]:
     if proc.returncode != 0:
         return []
     out = proc.stdout.strip()
-    if not out or not out.startswith("["):
+    idx = out.find("[") if out else -1
+    if idx < 0:
         return []
     try:
-        return json.loads(out)
+        return json.loads(out[idx:])
     except json.JSONDecodeError:
         return []
 
