@@ -49,15 +49,22 @@ class TestReadFrontmatter:
 # ---------- query sanitization ----------
 
 class TestBuildQuery:
-    def test_strips_punctuation(self):
+    def test_preserves_punctuation(self):
+        # Contract: build_query does NOT strip punctuation. FTS5 operator
+        # escaping is handled at the root by the forked qmd.build_fts5_query
+        # (see cc-skills-utils/__lib/qmd_fts5_patch.patch). Caller-side
+        # sanitization was removed when the patch landed; this test pins the
+        # current contract so a revert would be caught.
         q = waw.build_query({
             "title": "Subagent `model:` field (haiku/sonnet/opus)",
             "summary": "TWO levers — not one. /ai-api, /ai-cli work.",
         })
-        assert "`" not in q
-        assert "/" not in q
-        assert "(" not in q
-        assert "—" not in q
+        # Punctuation preserved (FTS5 patch handles escaping downstream)
+        assert "`" in q
+        assert "/" in q
+        assert "(" in q
+        assert "—" in q
+        # Keywords still present
         assert "model" in q and "haiku" in q and "sonnet" in q
 
     def test_truncates_to_max(self):
