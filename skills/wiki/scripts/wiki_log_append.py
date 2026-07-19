@@ -46,20 +46,24 @@ def build_entry(title: str, slug: str, notes: str, entry_type: str) -> str:
 
 
 def _entry_already_present(log_path: Path, slug: str, entry_type: str) -> bool:
-    """Return True if a recent entry already references this page+type. Idempotency check."""
+    """Return True if a recent entry already references this page+type. Idempotency check.
+
+    Tracks the most recent entry type as we scan; when the page marker is found,
+    verifies the owning entry's type matches. Only scans the first 200 lines
+    (recent entries) — historical entries won't collide.
+    """
     page_marker = f"Page: wiki/concepts/{slug}.md"
     text = log_path.read_text(encoding="utf-8")
-    # Scan only the first 200 lines (recent entries) — historical entries won't collide.
     head_lines = text.splitlines()[:200]
-    found_marker = False
+    most_recent_entry_type: str | None = None
+    entry_header_re = re.compile(r"^## \[\d{4}-\d{2}-\d{2}\]\s+(\w+)\s*\|")
     for ln in head_lines:
+        m = entry_header_re.match(ln)
+        if m:
+            most_recent_entry_type = m.group(1).lower()
+            continue
         if ln.strip() == page_marker:
-            found_marker = True
-        elif found_marker and ln.startswith("## ["):
-            # Next entry started — verify the previous (matched) one was the same type.
-            return entry_type in ln  # crude but reliable: type appears in title line
-        elif found_marker and ln.startswith("# "):
-            return False  # hit a top-level header before finding next entry
+            return most_recent_entry_type == entry_type.lower()
     return False
 
 
