@@ -140,7 +140,7 @@ def query_qmd(query: str, limit: int, qmd_bin: str) -> list[dict]:
         proc = subprocess.run(
             [qmd_bin, "search", "--collection", "wiki",
              "--limit", str(limit + 5), "--format", "json", query],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=60,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return []
