@@ -63,14 +63,24 @@ def read_frontmatter(text: str) -> dict:
     return out
 
 
-def build_query(meta: dict) -> str:
-    """Build a QMD query from title+summary, truncated to MAX_QUERY_CHARS.
+def build_query(meta: dict, summary_chars: int = 0) -> str:
+    """Build a QMD query from title (and optionally truncated summary).
+
+    Title is the most semantically dense signal; concatenated title+summary strings
+    cause QMD to return poor results because the long concatenated text dilutes
+    the per-token match weight. Default = title only. Pass summary_chars > 0
+    for a fallback that appends the first N chars of summary.
 
     FTS5 operator stripping is handled at the root in our forked
     qmd.build_fts5_query (see __lib/qmd_fts5_patch.patch in cc-skills-utils),
     so no caller-side sanitization is needed here.
     """
-    parts = [meta.get("title", ""), meta.get("summary", "")]
+    title = meta.get("title", "")
+    parts = [title]
+    if summary_chars > 0:
+        summary = meta.get("summary", "")
+        if summary:
+            parts.append(summary[:summary_chars])
     return " ".join(p for p in parts if p)[:MAX_QUERY_CHARS]
 
 
@@ -82,7 +92,7 @@ def query_qmd(query: str, limit: int, qmd_bin: str) -> list[dict]:
         proc = subprocess.run(
             [qmd_bin, "search", "--collection", "wiki", "--limit", str(limit + 5),
              "--format", "json", query],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=60,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return []
@@ -102,13 +112,16 @@ def slug_from_file(file_field: str) -> Optional[str]:
     """`wiki/concepts/foo.md` -> `foo`. Reject non-concept paths."""
     if not file_field:
         return None
-    norm = file_field.replace("\\", "/")
+    norm = file_field.replace("\\", "/").lower()
+    # Explicitly reject vault-level files that aren't concept pages
+    basename = norm.rsplit("/", 1)[-1]
+    if basename in ("log.md", "schema.md", "index.md"):
+        return None
     if "/concepts/" not in norm:
         return None
-    name = norm.rsplit("/", 1)[-1]
-    if not name.endswith(".md"):
+    if not basename.endswith(".md"):
         return None
-    return name[:-3]
+    return basename[:-3]
 
 
 def find_section_bounds(text: str, header: str) -> Optional[tuple[int, int]]:
@@ -151,29 +164,60 @@ def inject_section(text: str, links: list[str]) -> str:
 
 
 def after_write(page_path: Path, limit: int, qmd_bin: str, dry_run: bool) -> dict:
-    """Run auto-link on a page. Returns a report dict."""
+    """Run auto-link on a page. Returns a report dict.
+
+    Two-pass query strategy (fixes dense-query bug):
+      Pass 1: title only — best semantic density
+      Pass 2: title + first 200 chars of summary — fallback if pass 1 returns <2
+              non-self concept neighbors
+    """
     if not page_path.exists():
         return {"ok": False, "error": f"page not found: {page_path}"}
     text = page_path.read_text(encoding="utf-8")
     meta = read_frontmatter(text)
-
-    # Respect hand-authored ## Related: never pollute it. Auto goes in its own section.
-    query = build_query(meta)
-    results = query_qmd(query, limit, qmd_bin)
-
     self_slug = page_path.stem
-    seen: set[str] = set()
-    links: list[str] = []
-    for r in results:
-        slug = slug_from_file(r.get("file", ""))
-        if not slug or slug == self_slug or slug in seen:
-            continue
-        seen.add(slug)
-        links.append(slug)
-        if len(links) >= limit:
-            break
 
-    report = {"page": str(page_path), "query": query, "links": links, "dry_run": dry_run}
+    def _filter_concepts(results: list[dict]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for r in results:
+            slug = slug_from_file(r.get("file", ""))
+            if not slug or slug == self_slug or slug in seen:
+                continue
+            seen.add(slug)
+            out.append(slug)
+        return out
+
+    # Pass 1: title only
+    # Use a high limit so concept pages aren't crowded out by the 150+ source docs.
+    # Source docs outnumber concepts ~6:1, so we need to search deep to find concepts.
+    search_limit = max(limit + 5, 40)
+    query1 = build_query(meta, summary_chars=0)
+    results1 = query_qmd(query1, search_limit, qmd_bin)
+    links = _filter_concepts(results1)
+
+    # Pass 2 fallback: title + 200 chars summary, only if pass 1 gave <2 results
+    pass2_used = False
+    if len(links) < 2:
+        query2 = build_query(meta, summary_chars=200)
+        if query2 != query1:
+            pass2_used = True
+            results2 = query_qmd(query2, search_limit, qmd_bin)
+            links = _filter_concepts(results2)
+            # If pass 2 actually found more, use it; else keep pass 1
+            if not links and results1:
+                links = _filter_concepts(results1)
+                pass2_used = False
+
+    links = links[:limit]
+    report = {
+        "page": str(page_path),
+        "query": query1,
+        "query_pass2": (build_query(meta, summary_chars=200) if pass2_used else None),
+        "pass2_used": pass2_used,
+        "links": links,
+        "dry_run": dry_run,
+    }
     if not links:
         report["ok"] = True
         report["note"] = "no qualifying concept neighbors found (QMD empty or all non-concept)"
