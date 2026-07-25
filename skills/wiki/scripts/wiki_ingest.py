@@ -207,7 +207,8 @@ def main(argv=None) -> int:
             # GC is opportunistic — never blocks ingest
             steps["6_state_gc"] = {"ok": False, "skipped": f"{type(e).__name__}: {e}"}
 
-    overall_ok = all(s.get("ok") for s in steps.values())
+    # GC is opportunistic — excluded from overall_ok so it never blocks ingest
+    overall_ok = all(s.get("ok") for k, s in steps.items() if k != "6_state_gc")
     report = {"ok": overall_ok, "page": str(page), "steps": steps}
     print(json.dumps(report, indent=2, ensure_ascii=True))
     return 0 if overall_ok else 1
