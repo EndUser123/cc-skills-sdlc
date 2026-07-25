@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,47 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 LOG_APPEND = SCRIPTS_DIR / "wiki_log_append.py"
 AUTO_LINK = SCRIPTS_DIR / "wiki_after_write.py"
 CONTRADICTION = SCRIPTS_DIR / "wiki_contradiction_scan.py"
+WIKI_STATE = SCRIPTS_DIR / "wiki_state.py"
+# wiki_health_check.py lives in the sibling cc-skills-utils plugin (shared
+# scripts). Derive via the shared marketplace root, not a brittle relative path.
+_MARKETPLACE_ROOT = SCRIPTS_DIR.parents[3]  # .../plugins/cc-skills-sdlc/skills/wiki/scripts -> plugins
+HEALTH_CHECK = _MARKETPLACE_ROOT / "cc-skills-utils" / "skills" / "main" / "scripts" / "wiki_health_check.py"
+
+
+def _mark_phase(session_id: str | None, phase: str) -> None:
+    """Lifecycle state update — HARD GATE per SCHEMA.md §15.
+
+    Per the wiki skill's lifecycle contract, every wiki touch must be tracked.
+    Failures are NOT silently swallowed — they raise. The caller (wiki_ingest.py)
+    surfaces the failure as a non-zero exit code so operators see lifecycle
+    tracking broke.
+
+    Idempotent: auto-inits state file if missing.
+    No-op if no session-id is provided (skipping is opt-in via env var absence).
+    """
+    if not session_id:
+        return  # caller opted out by not providing session-id
+    # Ensure state file exists (idempotent init)
+    init_proc = subprocess.run(
+        ["python", str(WIKI_STATE), "init", session_id],
+        capture_output=True, text=True, timeout=10,
+    )
+    if init_proc.returncode != 0:
+        raise RuntimeError(
+            f"wiki_state.py init failed (exit {init_proc.returncode}); "
+            f"stderr_tail: {init_proc.stderr.strip()[-200:]}; "
+            f"lifecycle tracking is now broken — refusing to continue"
+        )
+    mark_proc = subprocess.run(
+        ["python", str(WIKI_STATE), "mark", session_id, phase],
+        capture_output=True, text=True, timeout=10,
+    )
+    if mark_proc.returncode != 0:
+        raise RuntimeError(
+            f"wiki_state.py mark {phase} failed (exit {mark_proc.returncode}); "
+            f"stderr_tail: {mark_proc.stderr.strip()[-200:]}; "
+            f"lifecycle tracking is now broken — refusing to continue"
+        )
 
 
 def step_verify(page: Path) -> dict:
@@ -69,22 +111,37 @@ def main(argv=None) -> int:
     p.add_argument("--notes", default="", help="1-line notes for the log entry")
     p.add_argument("--skip-qmd", action="store_true",
                    help="skip the qmd update step (used for offline testing)")
+    p.add_argument("--session-id", dest="session_id", default=os.environ.get("GROK_SESSION_ID", ""),
+                   help="session id for lifecycle tracking (defaults to $GROK_SESSION_ID)")
     args = p.parse_args(argv)
 
     page = Path(args.page)
     steps: dict = {}
 
+    # 0. Lifecycle: mark ingest_started before any work
+    _mark_phase(args.session_id, "ingest_started")
+
     # 1. Read-back verify (gate for all subsequent steps)
     steps["1_verify"] = step_verify(page)
     verify_ok = steps["1_verify"]["ok"]
+    if verify_ok:
+        _mark_phase(args.session_id, "ingest_completed")
 
-    # 2. qmd update — must run before step 3 (auto-link) so QMD sees the new page
+    # 2. qmd document add — must run before step 3 (auto-link) so QMD sees the new page.
+    #    "qmd update" was never a valid subcommand; the correct single-page upsert is
+    #    "qmd document add" (idempotent — returns ok:true on re-add).
     if verify_ok and not args.skip_qmd:
-        steps["2_qmd_update"] = run_subprocess(["qmd", "update"], timeout=120)
+        steps["2_qmd_update"] = run_subprocess(
+            ["qmd", "document", "add", "--collection", "wiki",
+             "--document-id", page.stem, "--markdown-file", str(page)],
+            timeout=120,
+        )
     elif verify_ok:
         steps["2_qmd_update"] = {"ok": True, "skipped": "--skip-qmd"}
     else:
         steps["2_qmd_update"] = {"ok": False, "skipped": "verify failed"}
+    if steps.get("2_qmd_update", {}).get("ok"):
+        _mark_phase(args.session_id, "qmd_updated")
 
     # 3. Auto-link (queries QMD — depends on step 2)
     if verify_ok:
@@ -93,6 +150,8 @@ def main(argv=None) -> int:
         )
     else:
         steps["3_auto_link"] = {"ok": False, "skipped": "verify failed"}
+    if steps.get("3_auto_link", {}).get("ok"):
+        _mark_phase(args.session_id, "auto_link_run")
 
     # 4. Contradiction scan (skip if deliverable #2 doesn't exist)
     if verify_ok:
@@ -104,6 +163,8 @@ def main(argv=None) -> int:
             steps["4_contradiction"] = {"ok": True, "skipped": "wiki_contradiction_scan.py not present"}
     else:
         steps["4_contradiction"] = {"ok": False, "skipped": "verify failed"}
+    if steps.get("4_contradiction", {}).get("ok"):
+        _mark_phase(args.session_id, "contradiction_scan_run")
 
     # 5. Log append (always try — even if earlier steps failed, the page exists)
     if verify_ok:
@@ -113,6 +174,38 @@ def main(argv=None) -> int:
         )
     else:
         steps["5_log_append"] = {"ok": False, "skipped": "verify failed"}
+    if steps.get("5_log_append", {}).get("ok"):
+        _mark_phase(args.session_id, "log_appended")
+
+    # 6. Automatic GC of stale completed state files (per SCHEMA.md §15).
+    # Runs on every ingest — opportunistic, low cost (single directory scan,
+    # single-file stat per candidate). Default TTL: 90 days, override via
+    # $GROK_WIKI_STATE_GC_DAYS env var. 0 = disabled.
+    gc_days = int(os.environ.get("GROK_WIKI_STATE_GC_DAYS", "90"))
+    if gc_days > 0:
+        try:
+            gc_proc = subprocess.run(
+                ["python", str(HEALTH_CHECK),
+                 "--lifecycle", "--lifecycle-gc", str(gc_days)],
+                capture_output=True, text=True, timeout=30,
+            )
+            # Parse the deleted count from the GC output (printed to stderr)
+            # wiki_health_check.py prints "GC: deleted N state files older than N days:"
+            deleted = 0
+            for line in (gc_proc.stderr + gc_proc.stdout).splitlines():
+                if "GC: deleted" in line and "state files" in line:
+                    try:
+                        deleted = int(line.split("deleted")[1].split("state")[0].strip())
+                    except (ValueError, IndexError):
+                        pass
+            steps["6_state_gc"] = {
+                "ok": gc_proc.returncode == 0,
+                "ttl_days": gc_days,
+                "deleted": deleted,
+            }
+        except Exception as e:
+            # GC is opportunistic — never blocks ingest
+            steps["6_state_gc"] = {"ok": False, "skipped": f"{type(e).__name__}: {e}"}
 
     overall_ok = all(s.get("ok") for s in steps.values())
     report = {"ok": overall_ok, "page": str(page), "steps": steps}
