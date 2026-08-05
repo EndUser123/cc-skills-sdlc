@@ -118,3 +118,95 @@ def test_cmd_remove_succeeds_on_clean_worktree(tmp_path, capsys):
     rc = cmd_remove(args)
     assert rc == 0, f"expected rc=0, got {rc}, stderr={capsys.readouterr().err}"
     assert not wt.exists(), "worktree directory should be gone after successful remove"
+
+
+def test_cmd_remove_refreshes_handoff_after_clean_worktree(tmp_path, capsys):
+    """A successful removal removes the stale branch from HANDOFF.md."""
+    from worktree_cleanup import cmd_remove
+    import argparse
+
+    repo = _git_repo(tmp_path / "repo")
+    handoff = repo / "HANDOFF.md"
+    handoff.write_text(
+        "# Project HANDOFF\n\n"
+        "<!-- BEGIN worktree-status (auto-generated; do not edit) -->\n"
+        "stale worktree entry\n"
+        "<!-- END worktree-status -->\n",
+        encoding="utf-8",
+    )
+    wt, branch = _make_worktree(repo, tmp_path / "wts", "handoff-rm")
+    subprocess.run(["git", "-C", str(wt), "checkout", "--detach", "HEAD"],
+                   check=True, capture_output=True)
+
+    args = argparse.Namespace(
+        worktree=str(wt), repo=str(repo), branch=branch,
+        force=False, auto_tag=False,
+    )
+    rc = cmd_remove(args)
+
+    assert rc == 0, f"expected rc=0, stderr={capsys.readouterr().err}"
+    assert not wt.exists()
+    content = handoff.read_text(encoding="utf-8")
+    assert "stale worktree entry" not in content
+    assert branch not in content
+    assert "worktree-status" in content
+    assert "main" in content
+
+
+def test_cmd_remove_reports_handoff_sync_failure_after_removal(
+    tmp_path, monkeypatch, capsys
+):
+    """A post-remove handoff failure is visible even though removal succeeded."""
+    import argparse
+    import worktree_cleanup
+
+    repo = _git_repo(tmp_path / "repo")
+    (repo / "HANDOFF.md").write_text(
+        "# Project HANDOFF\n"
+        "<!-- BEGIN worktree-status (auto-generated; do not edit) -->\n"
+        "stale\n"
+        "<!-- END worktree-status -->\n",
+        encoding="utf-8",
+    )
+    wt, branch = _make_worktree(repo, tmp_path / "wts", "handoff-fail")
+    subprocess.run(["git", "-C", str(wt), "checkout", "--detach", "HEAD"],
+                   check=True, capture_output=True)
+
+    def fail_sync(*args, **kwargs):
+        raise OSError("simulated handoff write failure")
+
+    monkeypatch.setattr(worktree_cleanup.handoff_sync, "sync", fail_sync)
+    args = argparse.Namespace(
+        worktree=str(wt), repo=str(repo), branch=branch,
+        force=False, auto_tag=False,
+    )
+    rc = worktree_cleanup.cmd_remove(args)
+
+    assert rc == 2
+    assert not wt.exists()
+    assert "Handoff sync failed after removal" in capsys.readouterr().err
+
+
+def test_cmd_remove_does_not_add_handoff_sentinel(tmp_path, capsys):
+    """A human-only HANDOFF.md is not mutated without the opt-in sentinel."""
+    from worktree_cleanup import cmd_remove
+    import argparse
+
+    repo = _git_repo(tmp_path / "repo")
+    handoff = repo / "HANDOFF.md"
+    original = "# Project HANDOFF\n\nHuman notes only.\n"
+    handoff.write_text(original, encoding="utf-8")
+    wt, branch = _make_worktree(repo, tmp_path / "wts", "handoff-skip")
+    subprocess.run(["git", "-C", str(wt), "checkout", "--detach", "HEAD"],
+                   check=True, capture_output=True)
+
+    args = argparse.Namespace(
+        worktree=str(wt), repo=str(repo), branch=branch,
+        force=False, auto_tag=False,
+    )
+    rc = cmd_remove(args)
+
+    assert rc == 0
+    assert not wt.exists()
+    assert handoff.read_text(encoding="utf-8") == original
+    assert "sentinel block not found" in capsys.readouterr().out
