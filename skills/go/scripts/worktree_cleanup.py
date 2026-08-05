@@ -26,6 +26,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import preflight  # noqa: E402
+import handoff_sync  # noqa: E402
 import worktree_lifecycle  # noqa: E402
 import worktree_safety  # noqa: E402
 
@@ -71,6 +72,7 @@ def cmd_remove(args) -> int:
       1. preflight_run (refuses to proceed on BLOCK unless --force)
       2. safe_delete_branch (with --auto-tag if requested)
       3. git worktree remove --force
+      4. refresh the repository HANDOFF.md worktree-status block when present
     """
     wt = Path(args.worktree).resolve()
     repo = Path(args.repo).resolve() if args.repo else _find_repo_root(wt)
@@ -112,6 +114,41 @@ def cmd_remove(args) -> int:
         print(f"Worktree remove failed: {r.stderr.strip()}", file=sys.stderr)
         return 2
     print(f"Removed: {wt}")
+    return _sync_handoff_after_remove(repo)
+
+
+def _sync_handoff_after_remove(repo: Path) -> int:
+    """Refresh HANDOFF.md after removal, preserving cleanup outcome visibility.
+
+    The worktree is already gone when this runs.  A failed documentation
+    refresh therefore returns an internal-error code so callers can distinguish
+    "removed but handoff stale" from a fully completed cleanup.  Repositories
+    without HANDOFF.md are intentionally unaffected.
+    """
+    handoff = repo / "HANDOFF.md"
+    if not handoff.exists():
+        print("Handoff sync: skipped (HANDOFF.md not found)")
+        return 0
+
+    try:
+        content = handoff.read_text(encoding="utf-8")
+        if (
+            handoff_sync.SENTINEL_BEGIN not in content
+            or handoff_sync.SENTINEL_END not in content
+        ):
+            print("Handoff sync: skipped (sentinel block not found)")
+            return 0
+        policy = worktree_lifecycle.load_policy(repo / "worktree-policy.toml")
+        changed = handoff_sync.sync(
+            repo,
+            handoff,
+            main_branch=policy.main_branch,
+        )
+    except Exception as exc:  # noqa: BLE001 - expose post-remove partial state
+        print(f"Handoff sync failed after removal: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Handoff sync: {'updated' if changed else 'current'}")
     return 0
 
 
