@@ -87,7 +87,7 @@ prompts for hook tasks; applies to direct edits too.
 
 Before classifying any capability as existing, duplicated, missing, obsolete,
 active, or already subsumed—and before proposing or implementing a non-trivial
-change—invoke the package `source-authority-discovery` skill. Its packet must
+change—invoke the package `preflight` skill (formerly `source-authority-discovery`). Its packet must
 inspect the relevant source, registration, invocation, artifact, test,
 cache/generated, worktree, and competing-plan paths. If the audit returns
 `needs_review` or `blocked`, gather evidence or obtain an explicit user
