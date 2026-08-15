@@ -86,7 +86,14 @@ def step_verify(page: Path) -> dict:
 
 def run_subprocess(cmd: list[str], timeout: int) -> dict:
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
         return {
             "ok": proc.returncode == 0,
             "exit": proc.returncode,
@@ -187,7 +194,11 @@ def main(argv=None) -> int:
             gc_proc = subprocess.run(
                 ["python", str(HEALTH_CHECK),
                  "--lifecycle", "--lifecycle-gc", str(gc_days)],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
             )
             # Parse the deleted count from the GC output (printed to stderr)
             # wiki_health_check.py prints "GC: deleted N state files older than N days:"
@@ -207,9 +218,24 @@ def main(argv=None) -> int:
             # GC is opportunistic — never blocks ingest
             steps["6_state_gc"] = {"ok": False, "skipped": f"{type(e).__name__}: {e}"}
 
-    # GC is opportunistic — excluded from overall_ok so it never blocks ingest
+    # GC is opportunistic — excluded from overall_ok so it never blocks ingest.
+    # Surface that distinction explicitly instead of returning an apparently
+    # clean result next to an unlabelled failed step.
     overall_ok = all(s.get("ok") for k, s in steps.items() if k != "6_state_gc")
-    report = {"ok": overall_ok, "page": str(page), "steps": steps}
+    optional_failures = [
+        key for key, value in steps.items()
+        if key == "6_state_gc" and not value.get("ok")
+    ]
+    report = {
+        "ok": overall_ok,
+        "page": str(page),
+        "steps": steps,
+        "optional_failures": optional_failures,
+        "warnings": [
+            "optional lifecycle GC failed; ingest pipeline completed"
+            for _ in optional_failures
+        ],
+    }
     print(json.dumps(report, indent=2, ensure_ascii=True))
     return 0 if overall_ok else 1
 

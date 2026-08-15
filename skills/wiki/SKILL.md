@@ -67,3 +67,5 @@ calling command or explicit user confirmation. Posture is prompt-advisory.
 - **Recommended cadence** (§11)
 - **Evidence-first principles** (§12)
 - **Key principles** (§13)
+
+- **Lifecycle state file \u2014 mandatory workflow tracking** (\u00a715): every wiki touch MUST mark the corresponding phase via wiki_state.py. Hard gate \u2014 wiki_ingest.py refuses exit-0 on lifecycle tracking failure. State file at P:/.data/wiki/_state/<session-id>.json. Session ID via $CLAUDE_SESSION_ID env var. State machine: discovered \u2192 ingesting \u2192 linking \u2192 linting \u2192 complete with incomplete as terminal-failure branch. Required phases for complete: ingest_completed, qmd_updated, uto_link_run, contradiction_scan_run, log_appended. Atomic writes via .tmp + os.replace + fsync; read-modify-write wrapped in _FileLock (msvcrt on Windows, fcntl on POSIX).

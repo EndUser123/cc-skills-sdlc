@@ -208,7 +208,9 @@ class TestCLI:
         assert "ok" in data
         assert "page" in data
         assert "steps" in data
-        assert set(data["steps"].keys()) == {
+        assert {
             "1_verify", "2_qmd_update", "3_auto_link",
             "4_contradiction", "5_log_append"
-        }
+        }.issubset(data["steps"])
+        assert "optional_failures" in data
+        assert "warnings" in data
