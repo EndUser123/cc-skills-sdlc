@@ -282,6 +282,12 @@ def test_goal_budget(tmp_path):
     assert len(result.stdout.rstrip("\n")) <= 4000
 
 
+def test_default_goal_budget_leaves_transport_margin(tmp_path):
+    result = run("goal", "--state", valid(tmp_path))
+    assert result.returncode == 0
+    assert len(result.stdout.rstrip("\n")) <= 3800
+
+
 def test_too_small_goal_fails(tmp_path):
     assert run("goal", "--state", valid(tmp_path), "--max-chars", 20).returncode != 0
 

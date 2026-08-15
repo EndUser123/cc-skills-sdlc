@@ -281,7 +281,9 @@ def build_parser():
         command.add_argument("--state", required=True)
     compile_goal = subparsers.add_parser("goal")
     compile_goal.add_argument("--state", required=True)
-    compile_goal.add_argument("--max-chars", type=int, default=4000)
+    # Claude Code rejects goal conditions at 4000 characters; leave margin for
+    # transport/rendering differences while preserving all safety fields.
+    compile_goal.add_argument("--max-chars", type=int, default=3800)
     return parser
 
 
