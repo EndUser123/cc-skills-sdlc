@@ -1,16 +1,17 @@
 """wiki_ingest.py — Post-write pipeline orchestrator for the wiki skill.
 
-Collapses the 5-6 ad-hoc tool calls per page (verify, qmd update, auto-link,
-contradiction scan, log append) into one. Steps run in strict order because
-auto-link depends on the new page being indexed by QMD first.
+Collapses the 5-6 ad-hoc tool calls per page (verify, index update, auto-link,
+contradiction scan, log append) into one. Steps run in strict order.
 
 CLI:
-    python wiki_ingest.py --post-write <page.md> [--notes "<1-line>"] [--skip-qmd]
+    python wiki_ingest.py --post-write <page.md> [--notes "<1-line>"] [--skip-index]
 
 Pipeline (all steps run; failures are reported but do NOT abort the chain):
   1. Read-back verify (file exists, non-empty, frontmatter has `title:`)
-  2. qmd update (single-page refresh so step 3 can see the new page)
-  3. wiki_after_write.py <page>      (auto-link — queries QMD)
+  2. index update via P:/.agents/scripts/wiki_search.py add (FTS5 engine,
+     qmd-compatible CLI; keeps the shared ranked index fresh for the
+     search_wiki MCP layer)
+  3. wiki_after_write.py <page>      (auto-link — ripgrep-based)
   4. wiki_contradiction_scan.py <page> (contradiction scan; skip if missing)
   5. wiki_log_append.py --page <page> --notes <notes>  (atomic log entry)
 
@@ -30,6 +31,9 @@ LOG_APPEND = SCRIPTS_DIR / "wiki_log_append.py"
 AUTO_LINK = SCRIPTS_DIR / "wiki_after_write.py"
 CONTRADICTION = SCRIPTS_DIR / "wiki_contradiction_scan.py"
 WIKI_STATE = SCRIPTS_DIR / "wiki_state.py"
+# FTS5 search engine (qmd replacement). Cross-root by design — the engine is
+# shared fleet infrastructure (.agents), the callers are plugin scripts.
+SEARCH_ENGINE = Path("P:/.agents/scripts/wiki_search.py")
 # wiki_health_check.py lives in the sibling cc-skills-utils plugin (shared
 # scripts). Derive via the shared marketplace root, not a brittle relative path.
 _MARKETPLACE_ROOT = SCRIPTS_DIR.parents[3]  # .../plugins/cc-skills-sdlc/skills/wiki/scripts -> plugins
@@ -116,8 +120,10 @@ def main(argv=None) -> int:
     p.add_argument("--post-write", dest="page", required=True,
                    help="absolute path to the wiki page just written")
     p.add_argument("--notes", default="", help="1-line notes for the log entry")
-    p.add_argument("--skip-qmd", action="store_true",
-                   help="skip the qmd update step (used for offline testing)")
+    p.add_argument("--skip-index", action="store_true",
+                   help="skip the index-update step (used for offline testing)")
+    p.add_argument("--skip-qmd", dest="skip_index", action="store_true",
+                   help="deprecated alias for --skip-index (qmd removed 2026-07-28)")
     p.add_argument("--session-id", dest="session_id", default=os.environ.get("GROK_SESSION_ID", ""),
                    help="session id for lifecycle tracking (defaults to $GROK_SESSION_ID)")
     args = p.parse_args(argv)
@@ -134,23 +140,23 @@ def main(argv=None) -> int:
     if verify_ok:
         _mark_phase(args.session_id, "ingest_completed")
 
-    # 2. qmd document add — must run before step 3 (auto-link) so QMD sees the new page.
-    #    "qmd update" was never a valid subcommand; the correct single-page upsert is
-    #    "qmd document add" (idempotent — returns ok:true on re-add).
-    if verify_ok and not args.skip_qmd:
-        steps["2_qmd_update"] = run_subprocess(
-            ["qmd", "document", "add", "--collection", "wiki",
-             "--document-id", page.stem, "--markdown-file", str(page)],
+    # 2. Index update via the FTS5 engine (qmd-compatible add; idempotent).
+    #    Keeps the shared index fresh for the search_wiki MCP layer. Auto-link
+    #    (step 3) is ripgrep-based and does NOT depend on this step.
+    if verify_ok and not args.skip_index:
+        steps["2_index_update"] = run_subprocess(
+            [sys.executable, str(SEARCH_ENGINE), "--collection", "wiki",
+             "add", "--doc-id", page.stem, "--markdown-file", str(page)],
             timeout=120,
         )
     elif verify_ok:
-        steps["2_qmd_update"] = {"ok": True, "skipped": "--skip-qmd"}
+        steps["2_index_update"] = {"ok": True, "skipped": "--skip-index"}
     else:
-        steps["2_qmd_update"] = {"ok": False, "skipped": "verify failed"}
-    if steps.get("2_qmd_update", {}).get("ok"):
-        _mark_phase(args.session_id, "qmd_updated")
+        steps["2_index_update"] = {"ok": False, "skipped": "verify failed"}
+    if steps.get("2_index_update", {}).get("ok"):
+        _mark_phase(args.session_id, "indexed")
 
-    # 3. Auto-link (queries QMD — depends on step 2)
+    # 3. Auto-link (ripgrep-based neighbor discovery)
     if verify_ok:
         steps["3_auto_link"] = run_subprocess(
             ["python", str(AUTO_LINK), str(page)], timeout=30

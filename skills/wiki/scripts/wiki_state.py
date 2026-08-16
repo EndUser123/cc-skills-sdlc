@@ -17,7 +17,7 @@ State machine (5 states, transitions explicit):
 
 Required phases for `complete`:
   ingest_completed, auto_link_run, contradiction_scan_run,
-  log_appended, qmd_updated
+  log_appended, indexed
 
 Atomic writes: write to .tmp, then os.replace (filesystem rename is atomic).
 Per the conventions in python-atomicwrites, npm/write-file-atomic, and the
@@ -82,7 +82,7 @@ PHASES = (
     "auto_link_run",
     "contradiction_scan_run",
     "log_appended",
-    "qmd_updated",
+    "indexed",
     "health_check_run",
     "drift_check_run",
 )
@@ -92,7 +92,7 @@ REQUIRED_FOR_COMPLETE = (
     "auto_link_run",
     "contradiction_scan_run",
     "log_appended",
-    "qmd_updated",
+    "indexed",
 )
 
 VALID_TRANSITIONS = {

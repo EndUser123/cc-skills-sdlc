@@ -14,7 +14,7 @@ semantic opposition is delegated to v2. Supersession and version-drift patterns
 are explicitly deferred — see TODO(v2) below.
 
 CLI:
-    python wiki_contradiction_scan.py <page-path> [--limit 5] [--qmd qmd] [--dry-run]
+    python wiki_contradiction_scan.py <page-path> [--limit 5] [--dry-run]
 
 Exit codes: 0 on success (including no-contradictions no-op), 1 on hard error
 (missing file, unparseable page). Best-effort: qmd unavailable or returns empty
@@ -33,7 +33,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -46,7 +45,6 @@ from typing import Optional
 VAULT_ROOT = Path("P:/.data/wiki")
 CONCEPTS_DIR = VAULT_ROOT / "concepts"
 AUTO_SECTION_HEADER = "## Auto-related"
-MAX_QUERY_CHARS = 400
 
 # Polarity keyword sets. v1 heuristic looks for the SAME content noun phrase
 # flanked by opposing polarity words across two pages.
@@ -118,59 +116,8 @@ def read_frontmatter(text: str) -> dict:
     return out
 
 
-def build_query(meta: dict) -> str:
-    """Build a QMD query from tags first, then title/summary. Truncated."""
-    parts: list[str] = []
-    tags = meta.get("tags") or []
-    parts.extend(tags[:5])
-    title = meta.get("title", "")
-    summary = meta.get("summary", "")
-    if title:
-        parts.append(title)
-    if summary:
-        parts.append(summary)
-    return " ".join(p for p in parts if p)[:MAX_QUERY_CHARS]
-
-
-def query_qmd(query: str, limit: int, qmd_bin: str) -> list[dict]:
-    """Run qmd search, return parsed results. Empty list on any failure."""
-    if not query:
-        return []
-    try:
-        proc = subprocess.run(
-            [qmd_bin, "search", "--collection", "wiki",
-             "--limit", str(limit + 5), "--format", "json", query],
-            capture_output=True, text=True, timeout=60,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-    if proc.returncode != 0:
-        return []
-    out = proc.stdout.strip()
-    idx = out.find("[") if out else -1
-    if idx < 0:
-        return []
-    try:
-        return json.loads(out[idx:])
-    except json.JSONDecodeError:
-        return []
-
-
-def slug_from_file(file_field: str) -> Optional[str]:
-    """`wiki/concepts/foo.md` -> `foo`. Reject non-concept paths."""
-    if not file_field:
-        return None
-    norm = file_field.replace("\\", "/")
-    if "/concepts/" not in norm:
-        return None
-    name = norm.rsplit("/", 1)[-1]
-    if not name.endswith(".md"):
-        return None
-    return name[:-3]
-
-
 def find_overlapping_via_grep(tags: list[str], self_slug: str) -> list[tuple[str, int]]:
-    """Fallback: scan concepts/ for files with overlapping tags. Returns [(slug, overlap_count)]."""
+    """Scan concepts/ for files with overlapping tags. Returns [(slug, overlap_count)]."""
     if not tags or not CONCEPTS_DIR.exists():
         return []
     tag_set = {t.lower() for t in tags if t}
@@ -334,7 +281,7 @@ def inject_contradiction(text: str, slug: str, today: str) -> str:
 
 
 def contradiction_scan(
-    page_path: Path, limit: int, qmd_bin: str, dry_run: bool,
+    page_path: Path, limit: int, dry_run: bool,
 ) -> dict:
     """Run the contradiction scan on a page. Returns a JSON-friendly report."""
     if not page_path.exists():
@@ -347,28 +294,12 @@ def contradiction_scan(
     self_slug = page_path.stem
     tags = meta.get("tags") or []
 
-    # --- Step 1: find overlapping pages (QMD primary, grep fallback) ---
+    # --- Step 1: find overlapping pages (ripgrep tag-overlap; qmd removed 2026-07-28) ---
     candidates: list[tuple[str, float]] = []  # (slug, score)
-    query = build_query(meta)
-    qmd_results = query_qmd(query, limit, qmd_bin)
     used_fallback = False
-    for r in qmd_results:
-        slug = slug_from_file(r.get("file", ""))
-        if not slug or slug == self_slug:
-            continue
-        score = r.get("score", 0.0)
-        if score < 0.1:
-            continue
-        candidates.append((slug, float(score)))
-        if len(candidates) >= limit:
-            break
-
-    if not candidates:
-        # Fallback: grep by tag overlap.
-        used_fallback = True
-        grep_hits = find_overlapping_via_grep(tags, self_slug)
-        for slug, overlap_count in grep_hits[:limit]:
-            candidates.append((slug, float(overlap_count)))
+    grep_hits = find_overlapping_via_grep(tags, self_slug)
+    for slug, overlap_count in grep_hits[:limit]:
+        candidates.append((slug, float(overlap_count)))
 
     if not candidates:
         return {
@@ -456,10 +387,9 @@ def main(argv: Optional[list] = None) -> int:
                    help="max contradictions to flag/inject (default 5)")
     p.add_argument("--dry-run", action="store_true",
                    help="report candidates, do not write")
-    p.add_argument("--qmd", default="qmd", help="qmd binary (default: qmd on PATH)")
     args = p.parse_args(argv)
 
-    report = contradiction_scan(Path(args.page), args.limit, args.qmd, args.dry_run)
+    report = contradiction_scan(Path(args.page), args.limit, args.dry_run)
     print(json.dumps(report, ensure_ascii=True))
     return 0 if report.get("ok") else 1
 
